@@ -1,3 +1,5 @@
+build/
+fastPTA.egg-info/
 fastPTA/__pycache__/
 examples/__pycache__/
 examples/plots/

@@ -26,6 +26,7 @@ setuptools.setup(
         "pyyaml>=6.0",
         "emcee>=3.1.2",
         "jax>=0.4.13",
+        "jaxlib>=0.4.13",
     ],
     classifiers=[],
 )
