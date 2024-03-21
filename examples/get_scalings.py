@@ -243,7 +243,7 @@ def T_scaling(
 def N_scaling(
     rerun=False,
     N_min=5,
-    N_max=1500,
+    N_max=200,
     N_times=20,
     N_runs=20,
     signal_label="power_law",
