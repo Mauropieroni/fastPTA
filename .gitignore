@@ -1,0 +1,11 @@
+fastPTA/__pycache__/
+examples/__pycache__/
+examples/plots/
+examples/generated_data/
+examples/generated_chains/
+examples/pulsar_configurations/
+tests/__pycache__/
+tests/plots/
+tests/generated_data/
+tests/generated_chains/
+tests/pulsar_configurations/
