@@ -299,7 +299,10 @@ def N_scaling(
         for i in range(N_times):
             SNR_iteration = np.zeros(shape=(N_runs,))
             parameters_iteration = np.zeros(shape=(N_runs, parameter_len))
-            generate_catalog_kwargs = {"n_pulsars": N_pulsars[i]}
+
+            generate_catalog_kwargs = default_pulsars.copy()
+            generate_catalog_kwargs["n_pulsars"] = N_pulsars[i]
+
             print("Here starts N = %d" % (N_pulsars[i]))
             for j in tqdm.tqdm(range(N_runs)):
                 (
