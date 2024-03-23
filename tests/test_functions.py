@@ -17,8 +17,8 @@ file_path = os.path.dirname(__file__)
 if file_path:
     file_path += "/"
 
-sys.path.append(os.path.join(file_path, "../../examples"))
-from examples.get_forecasts import get_constraints
+sys.path.append(os.path.join(file_path, "../examples/"))
+from get_forecasts import get_constraints
 
 
 fmin = 1e-10
