@@ -24,6 +24,7 @@ setuptools.setup(
         "pandas>=2.0.3",
         "tqdm>=4.64.1",
         "pyyaml>=6.0",
+        "corner>=2.2.1",
         "emcee>=3.1.2",
         "jax>=0.4.13",
         "jaxlib>=0.4.13",

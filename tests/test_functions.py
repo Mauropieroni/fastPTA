@@ -17,8 +17,8 @@ file_path = os.path.dirname(__file__)
 if file_path:
     file_path += "/"
 
-sys.path.append(os.path.join(file_path, "../../examples"))
-from examples.get_forecasts import get_constraints
+sys.path.append(os.path.join(file_path, "../examples/"))
+from get_forecasts import get_constraints
 
 
 fmin = 1e-10
@@ -144,7 +144,6 @@ def test_current_EPTA(
     MCMC_iteration_steps=1000,
     path_to_MCMC_chains="generated_chains/MCMC_chains_current.npz",
 ):
-
     print("-- Test current EPTA --")
     get_tensors_kwargs = {"path_to_pulsars": path_to_pulsars, "add_curn": True}
 
