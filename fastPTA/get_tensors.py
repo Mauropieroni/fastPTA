@@ -255,6 +255,52 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
 
 
 @jit
+def Gamma(p, q, Omega):
+    """
+    TO ADD
+    """
+    pq = jnp.einsum("vi,vj->ij", p, q)
+    pOmega = jnp.einsum("vi,vj->ij", p, Omega)
+    qOmega = jnp.einsum("vi,vj->ij", q, Omega)
+    numerator = (
+        2 * (pq[..., None] - pOmega[:, None, :] * qOmega[None, ...]) ** 2
+    )
+    denominator = (1 + pOmega[:, None, :]) * (1 + qOmega[None, ...])
+    term2 = -(1 - pOmega[:, None, :]) * (1 - qOmega[None, ...])
+    return numerator / (1e-30 + denominator) + term2
+
+
+def get_response_lm_IJ(p_I, order, nside):
+    """
+    TO ADD
+    """
+
+    npix = hp.nside2npix(nside)
+    theta, phi = hp.pix2ang(nside, jnp.arange(npix))
+
+    gamma_pq = Gamma(p_I, p_I, unit_vector(theta, phi))
+
+    r_lm = jnp.zeros(
+        shape=(len(p_I), len(p_I), int(1 + order) ** 2), dtype=jnp.complex64
+    )
+
+    i = 0
+    for l in range(order + 1):
+        for m in jnp.linspace(-l, l, 2 * l + 1, dtype=int):
+            sp_lm = sph_harm(m, l, theta, phi)
+            r_lm[:, :, i] = (
+                np.sum(gamma_pq * sp_lm[None, None, :], axis=-1) / npix
+            )
+            i += 1
+
+    # Compute HD and add the self correlation term
+    chi_tensor_IJ = HD_correlations(zeta_IJ) + 0.5 * jnp.eye(len(zeta_IJ))
+
+    # combine the Hellings and Downs part and the time part
+    return time_tensor_IJ * chi_tensor_IJ[None, ...]
+
+
+@jit
 def get_response_IJ(zeta_IJ, time_tensor_IJ):
     """
     Compute the response tensor for given angular separations and time tensors.
