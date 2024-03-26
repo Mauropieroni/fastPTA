@@ -1,7 +1,16 @@
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 # Local
-from fastPTA.utils import *
-from fastPTA.signals import SMBBH_parameters, get_model
-from fastPTA.get_tensors import get_tensors
+from utils import *
+from signals import SMBBH_parameters, get_model
+from get_tensors import get_tensors
 
 
 @jit
@@ -31,7 +40,7 @@ def get_SNR_integrand(signal_tensor, c_inverse):
     c_bar_SNR = jnp.einsum("ijk,ikl->ijl", c_inverse, signal_tensor)
 
     # Contracting the 2 matrixes
-    return jnp.einsum("ijk,ikj->i", c_bar_SNR, c_bar_SNR)
+    return jnp.einsum("ijk,ikj->i", c_bar_SNR, jnp.conj(c_bar_SNR))
 
 
 @jit
@@ -65,7 +74,7 @@ def get_fisher_integrand(dsignal_tensor, c_inverse):
     c_bar = jnp.einsum("ijk,aikl->aijl", c_inverse, dsignal_tensor)
 
     # Contracting the 2 matrixes
-    return jnp.einsum("aijk,bikj->abi", c_bar, c_bar)
+    return jnp.einsum("aijk,bikj->abi", c_bar, jnp.conj(c_bar))
 
 
 @jit
@@ -147,6 +156,87 @@ def get_integrands(
     return SNR_integrand, effective_noise, fisher_integrand
 
 
+@jit
+def get_integrands_lm(
+    signal_lm,
+    signal,
+    dsignal,
+    response_IJ,
+    noise_tensor,
+):
+    """
+    Compute integrands for Signal-to-Noise Ratio (SNR) and Fisher Information
+    Matrix given some signal data, derivatives and other quantities that
+    characterize the pulsar configuration used for the analysis
+
+    Parameters:
+    -----------
+    signal : numpy.ndarray or jax.numpy.ndarray
+        Array containing signal data.
+    dsignal : numpy.ndarray or jax.numpy.ndarray
+        2D array containing derivative of the signal data with respect to the
+        signal parameters. This function assumes dsignal to have shape (P, N)
+        where P is the number of parameters, N is the number of frequency bins
+    response_IJ : numpy.ndarray or jax.numpy.ndarray
+        $D array containing  the response for all frequencies and pulsar pairs.
+        Assumed to have shape (lm, N, M, M), where lm are the spherical
+        harmonics coefficients N is the number of frequency bins and M is the
+        number of pulsars.
+    noise_tensor : numpy.ndarray or jax.numpy.ndarray
+        3D array containing  the noise for all frequencies and pulsar pairs.
+        Assumed to have shape (N, M, M), where N is the number of frequency
+        bins and M is the number of pulsars.
+
+    Returns:
+    --------
+    Tuple containing:
+    - SNR_integrand: numpy.ndarray or jax.numpy.ndarray
+        the integrand for the Signal-to-Noise Ratio (SNR) computation.
+    - effective_noise: numpy.ndarray or jax.numpy.ndarray
+        the effective noise as a function of frequency.
+    - fisher_integrand: numpy.ndarray or jax.numpy.ndarray
+        the integrand for the Fisher Information Matrix computation.
+    """
+
+    signal_lm_f = signal_lm[:, None] * signal[None, :]
+
+    # Assemble the signal tensor
+    signal_tensor = jnp.sum(response_IJ * signal_lm_f[..., None, None], axis=0)
+
+    # Build the covariance
+    covariance = signal_tensor + noise_tensor
+
+    # Invert the covariance
+    c_inverse = compute_inverse(covariance)
+
+    # This is the SNR integrand
+    SNR_integrand = get_SNR_integrand(signal_tensor, c_inverse)
+
+    # Build the effective noise
+    effective_noise = jnp.sqrt(signal**2 / SNR_integrand)
+
+    dsignal_lm_f = signal_lm[None, :, None] * dsignal[:, None, :]
+
+    # Assemble the tensor with signal derivatives
+    dsignal_tensor = jnp.sum(
+        response_IJ[None, ...] * dsignal_lm_f[..., None, None], axis=1
+    )
+    # derivatives of signal_lm_f in parameters
+    delta = jnp.eye(len(signal_lm_f))
+    dsignal_lm_f = delta[..., None] * signal[None, None, :]
+
+    print(delta.shape, response_IJ.shape, dsignal_lm_f.shape)
+    dsignal_tensor2 = jnp.einsum("ijkl,aij->ajkl", response_IJ, dsignal_lm_f)
+
+    # Append HD functions
+    dsignal_tensor = jnp.concatenate((dsignal_tensor, dsignal_tensor2), axis=0)
+
+    # Get the fisher integrand
+    fisher_integrand = get_fisher_integrand(dsignal_tensor, c_inverse)
+
+    return SNR_integrand.real, effective_noise, fisher_integrand.real
+
+
 def compute_fisher(
     T_obs_yrs=10.33,
     n_frequencies=30,
@@ -201,6 +291,11 @@ def compute_fisher(
 
     """
 
+    if "lm_order" in get_tensors_kwargs.keys():
+        lm_order = get_tensors_kwargs["lm_order"]
+    else:
+        lm_order = 0
+
     # Setting the frequency vector from the observation time
     T_tot = T_obs_yrs * yr
     fmin = 1 / T_tot
@@ -211,7 +306,7 @@ def compute_fisher(
     signal_model = model["signal_model"]
     dsignal_model = model["dsignal_model"]
 
-    # Computing signal
+    # Computing the signal
     signal = signal_model(frequency, signal_parameters)
 
     # Building the signal derivatives
@@ -227,14 +322,29 @@ def compute_fisher(
         frequency, **get_tensors_kwargs, **generate_catalog_kwargs
     )
 
-    # Computes the fisher
-    SNR_integrand, effective_noise, fisher_integrand = get_integrands(
-        signal,
-        dsignal,
-        response_IJ,
-        strain_omega,
-        HD_functions_IJ,
-    )
+    if True:  # lm_order:
+        response_IJ = jnp.array([response_IJ])
+        signal_lm = np.append([1], np.zeros(int(1 + lm_order) ** 2)[1:])
+
+        # Computes the fisher
+        SNR_integrand, effective_noise, fisher_integrand = get_integrands_lm(
+            signal_lm,
+            signal,
+            dsignal,
+            response_IJ,
+            strain_omega,
+        )
+
+    else:
+
+        # Computes the fisher
+        SNR_integrand, effective_noise, fisher_integrand = get_integrands(
+            signal,
+            dsignal,
+            response_IJ,
+            strain_omega,
+            HD_functions_IJ,
+        )
 
     # Compute SNR and Fisher integrals
     SNR = jnp.sqrt(T_tot * simps(SNR_integrand, x=frequency, axis=-1))

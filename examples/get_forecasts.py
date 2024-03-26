@@ -4,11 +4,22 @@ file_path = os.path.dirname(__file__)
 if file_path:
     file_path += "/"
 
-from fastPTA.utils import *
-from fastPTA.signals import SMBBH_parameters, CGW_LN_parameters
-from fastPTA.Fisher_code import compute_fisher
-from fastPTA.MCMC_code import run_MCMC
-from fastPTA.plotting_functions import (
+
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
+
+from utils import *
+from signals import SMBBH_parameters, CGW_LN_parameters
+from Fisher_code import compute_fisher
+from MCMC_code import run_MCMC
+from plotting_functions import (
     plot_corner,
     plot_HD_Legendre,
     plot_HD_binned,

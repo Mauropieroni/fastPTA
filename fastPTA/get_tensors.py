@@ -1,6 +1,15 @@
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 # Local
-from fastPTA.utils import *
-from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
+from utils import *
+from generate_new_pulsar_configuration import generate_pulsars_catalog
 
 # Just some constants
 log_A_curn_default = -13.94
@@ -259,9 +268,9 @@ def Gamma(p, q, Omega):
     """
     TO ADD
     """
-    pq = jnp.einsum("vi,vj->ij", p, q)
-    pOmega = jnp.einsum("vi,vj->ij", p, Omega)
-    qOmega = jnp.einsum("vi,vj->ij", q, Omega)
+    pq = jnp.einsum("iv,jv->ij", p, q)
+    pOmega = jnp.einsum("iv,jv->ij", p, Omega)
+    qOmega = jnp.einsum("iv,jv->ij", q, Omega)
     numerator = (
         2 * (pq[..., None] - pOmega[:, None, :] * qOmega[None, ...]) ** 2
     )
@@ -270,34 +279,46 @@ def Gamma(p, q, Omega):
     return numerator / (1e-30 + denominator) + term2
 
 
-def get_response_lm_IJ(p_I, order, nside):
+def get_correlations_lm_IJ(p_I, lm_order, nside):
     """
     TO ADD
     """
 
     npix = hp.nside2npix(nside)
     theta, phi = hp.pix2ang(nside, jnp.arange(npix))
+    theta = jnp.array(theta)
+    phi = jnp.array(phi)
 
     gamma_pq = Gamma(p_I, p_I, unit_vector(theta, phi))
 
-    r_lm = jnp.zeros(
-        shape=(len(p_I), len(p_I), int(1 + order) ** 2), dtype=jnp.complex64
+    correlations_lm = np.zeros(
+        shape=(int(1 + lm_order) ** 2, len(p_I), len(p_I)), dtype=jnp.complex128
     )
 
     i = 0
-    for l in range(order + 1):
+    for l in range(lm_order + 1):
         for m in jnp.linspace(-l, l, 2 * l + 1, dtype=int):
             sp_lm = sph_harm(m, l, theta, phi)
-            r_lm[:, :, i] = (
-                np.sum(gamma_pq * sp_lm[None, None, :], axis=-1) / npix
+            correlations_lm[i] = (
+                jnp.sum(gamma_pq * sp_lm[None, None, :], axis=-1) / npix
             )
             i += 1
 
-    # Compute HD and add the self correlation term
-    chi_tensor_IJ = HD_correlations(zeta_IJ) + 0.5 * jnp.eye(len(zeta_IJ))
+    return correlations_lm
+
+
+def get_response_IJ_lm(p_I, time_tensor_IJ, lm_order, nside):
+    """
+    TO ADD
+
+    """
+
+    # Compute the correlations on lm basis
+    # To understand if a factor 0.5 * jnp.eye(len(zeta_IJ)) is missing!!!!
+    correlations_lm_IJ = get_correlations_lm_IJ(p_I, lm_order, nside)
 
     # combine the Hellings and Downs part and the time part
-    return time_tensor_IJ * chi_tensor_IJ[None, ...]
+    return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
 
 
 @jit
@@ -503,6 +524,8 @@ def get_tensors(
     add_curn=False,
     order=0,
     method="legendre",
+    lm_order=0,
+    nside=16,
     regenerate_catalog=False,
     **generate_catalog_kwargs
 ):
@@ -579,9 +602,6 @@ def get_tensors(
     phi = jnp.array(pulsars_DF["phi"].values)
     pi_vec = unit_vector(theta, phi)
 
-    # compute angular separations
-    zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)
-
     # get noises for all pulsars
     noise = get_pulsar_noises(
         frequencies,
@@ -620,21 +640,34 @@ def get_tensors(
     # get the time tensor
     time_tensor_IJ = get_time_tensor(frequencies, pta_span_yrs, Tspan_yr)
 
-    # compute the response
-    response_IJ = get_response_IJ(zeta_IJ, time_tensor_IJ)
+    if True:  # lm_order == 0:
+        # compute angular separations
+        zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)
 
-    # and if needed the HD part
-    if order > 0 and method.lower() == "legendre":
-        HD_functions_IJ, HD_coefficients = HD_projection_Legendre(
-            zeta_IJ, time_tensor_IJ, order
-        )
+        # compute the response
+        response_IJ = get_response_IJ(zeta_IJ, time_tensor_IJ)
 
-    elif order > 0 and method.lower() == "binned":
-        HD_functions_IJ, HD_coefficients = HD_projection_binned(
-            zeta_IJ, time_tensor_IJ, order
-        )
+        # and if needed the HD part
+        if order > 0 and method.lower() == "legendre":
+            HD_functions_IJ, HD_coefficients = HD_projection_Legendre(
+                zeta_IJ, time_tensor_IJ, order
+            )
+
+        elif order > 0 and method.lower() == "binned":
+            HD_functions_IJ, HD_coefficients = HD_projection_binned(
+                zeta_IJ, time_tensor_IJ, order
+            )
+
+        else:
+            HD_functions_IJ = jnp.zeros(
+                shape=(0, len(frequencies), len(WN_par), len(WN_par))
+            )
+            HD_coefficients = jnp.zeros(shape=(0,))
 
     else:
+        response_IJ = get_response_IJ_lm(
+            pi_vec, time_tensor_IJ, lm_order, nside
+        )
         HD_functions_IJ = jnp.zeros(
             shape=(0, len(frequencies), len(WN_par), len(WN_par))
         )

@@ -3,10 +3,19 @@ import time
 import numpy as np
 import emcee
 
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 # Local
-from fastPTA.utils import *
-from fastPTA.get_tensors import get_tensors
-from fastPTA.signals import SMBBH_parameters, get_model
+from utils import *
+from get_tensors import get_tensors
+from signals import SMBBH_parameters, get_model
 
 i_max_default = 100
 R_convergence_default = 1e-1

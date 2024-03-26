@@ -2,12 +2,14 @@
 import os, yaml
 import numpy as np
 import pandas as pd
+import healpy as hp
 
 import matplotlib
 import matplotlib.pyplot as plt
 
 from scipy.integrate import simps
 from scipy.special import legendre
+from scipy.special import sph_harm
 
 import jax
 from jax import jit

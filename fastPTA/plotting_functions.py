@@ -2,8 +2,17 @@
 import corner
 from matplotlib.patches import Patch
 
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 ### Local
-from fastPTA.utils import *
+from utils import *
 
 
 def plot_HD_Legendre(x_points, data_HD_coeffs, plot_suplabel):

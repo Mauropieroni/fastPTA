@@ -3,19 +3,23 @@ import os, sys
 import numpy as np
 import pandas as pd
 
-# Local
-from fastPTA.utils import *
-from fastPTA.signals import SMBBH_parameters
-from fastPTA.get_tensors import get_tensors
-from fastPTA.Fisher_code import compute_fisher
-from fastPTA.MCMC_code import run_MCMC
-from fastPTA.plotting_functions import plot_corner
-from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
-
 # Setting the path to this file
+import os, sys
+
 file_path = os.path.dirname(__file__)
 if file_path:
     file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
+# Local
+from utils import *
+from signals import SMBBH_parameters
+from get_tensors import get_tensors
+from Fisher_code import compute_fisher
+from MCMC_code import run_MCMC
+from plotting_functions import plot_corner
+from generate_new_pulsar_configuration import generate_pulsars_catalog
 
 sys.path.append(os.path.join(file_path, "../examples/"))
 from get_forecasts import get_constraints
@@ -294,7 +298,41 @@ def test_future(
     )
 
 
+def test_anisotropies():
+
+    get_tensors_kwargs = {
+        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "add_curn": False,
+        "regenerate_catalog": True,
+        "lm_order": 0,
+    }
+
+    (
+        frequency,
+        signal,
+        HD_functions_IJ,
+        HD_coeffs,
+        effective_noise,
+        SNR,
+        fisher,
+    ) = compute_fisher(
+        get_tensors_kwargs=get_tensors_kwargs,
+    )
+
+    fisher[2:, 2:] = np.eye(len(fisher[2:, 2:]))
+    print(fisher)
+
+    e_vals, e_vecs = np.linalg.eigh(fisher)
+    print(e_vals)
+    print(e_vecs)
+    print(compute_inverse(fisher))
+    print(np.linalg.inv(fisher))
+
+
 if __name__ == "__main__":
+    test_anisotropies()
+    print(Asdasda)
+
     test_generation()
     test_generation(
         pulsar_configuration=mockSKA10,

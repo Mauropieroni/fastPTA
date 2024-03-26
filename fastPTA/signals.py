@@ -1,5 +1,14 @@
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 ### Local
-from fastPTA.utils import *
+from utils import *
 
 
 ### Current SMBBH SGWB log_amplitude best-fit

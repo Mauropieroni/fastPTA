@@ -3,8 +3,17 @@ import os, sys
 import numpy as np
 import pandas as pd
 
+# Setting the path to this file
+import os, sys
+
+file_path = os.path.dirname(__file__)
+if file_path:
+    file_path += "/"
+
+sys.path.append(os.path.join(file_path, "../fastPTA/"))
+
 # Local
-from fastPTA.utils import load_yaml
+from utils import load_yaml
 
 # Setting the path to this file
 file_path = os.path.dirname(__file__)
