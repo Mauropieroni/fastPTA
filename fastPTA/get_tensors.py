@@ -289,22 +289,38 @@ def get_correlations_lm_IJ(p_I, lm_order, nside):
     theta = jnp.array(theta)
     phi = jnp.array(phi)
 
-    gamma_pq = Gamma(p_I, p_I, unit_vector(theta, phi))
+    gamma_pq = 3 / 8 * Gamma(p_I, p_I, unit_vector(theta, phi))
 
     correlations_lm = np.zeros(
-        shape=(int(1 + lm_order) ** 2, len(p_I), len(p_I)), dtype=jnp.complex128
+        shape=(int(1 + lm_order) ** 2, len(p_I), len(p_I))
     )
 
     i = 0
     for l in range(lm_order + 1):
-        for m in jnp.linspace(-l, l, 2 * l + 1, dtype=int):
-            sp_lm = sph_harm(m, l, theta, phi)
-            correlations_lm[i] = (
-                jnp.sum(gamma_pq * sp_lm[None, None, :], axis=-1) / npix
-            )
-            i += 1
+        for m in jnp.linspace(0, l, l + 1, dtype=int):
+            if m != 0:
+                sp_lm1 = sph_harm(m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp_lm2 = sph_harm(-m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp1 = (1j / jnp.sqrt(2) * (sp_lm1 - (-1) ** m * sp_lm2)).real
+                sp2 = (1 / jnp.sqrt(2) * (sp_lm2 + (-1) ** m * sp_lm1)).real
+                correlations_lm[i] = jnp.mean(
+                    gamma_pq * sp1[None, None, :], axis=-1
+                )
+                correlations_lm[i + 1] = jnp.mean(
+                    gamma_pq * sp2[None, None, :], axis=-1
+                )
 
-    return correlations_lm
+                i += 2
+
+            else:
+                sp0 = sph_harm(m, l, phi, theta).real * np.sqrt(4 * jnp.pi)
+                correlations_lm[i] = jnp.mean(
+                    gamma_pq * sp0[None, None, :], axis=-1
+                )
+
+                i += 1
+
+    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
 
 
 def get_response_IJ_lm(p_I, time_tensor_IJ, lm_order, nside):
@@ -524,6 +540,7 @@ def get_tensors(
     add_curn=False,
     order=0,
     method="legendre",
+    anisotropies=False,
     lm_order=0,
     nside=16,
     regenerate_catalog=False,
@@ -640,7 +657,7 @@ def get_tensors(
     # get the time tensor
     time_tensor_IJ = get_time_tensor(frequencies, pta_span_yrs, Tspan_yr)
 
-    if True:  # lm_order == 0:
+    if not anisotropies:
         # compute angular separations
         zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)
 
@@ -665,9 +682,11 @@ def get_tensors(
             HD_coefficients = jnp.zeros(shape=(0,))
 
     else:
+
         response_IJ = get_response_IJ_lm(
             pi_vec, time_tensor_IJ, lm_order, nside
         )
+
         HD_functions_IJ = jnp.zeros(
             shape=(0, len(frequencies), len(WN_par), len(WN_par))
         )

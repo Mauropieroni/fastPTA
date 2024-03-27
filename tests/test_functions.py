@@ -298,13 +298,23 @@ def test_future(
     )
 
 
-def test_anisotropies():
+def test_anisotropies_monopole(
+    pulsar_configuration=mockSKA10,
+):
 
     get_tensors_kwargs = {
         "path_to_pulsars": "pulsar_configurations/future.txt",
         "add_curn": False,
+        "anisotropies": True,
         "regenerate_catalog": True,
         "lm_order": 0,
+        "nside": 16,  # 1,
+    }
+
+    generate_catalog_kwargs = {
+        "n_pulsars": 20,
+        "save_it": True,
+        **pulsar_configuration,
     }
 
     (
@@ -317,20 +327,112 @@ def test_anisotropies():
         fisher,
     ) = compute_fisher(
         get_tensors_kwargs=get_tensors_kwargs,
+        generate_catalog_kwargs=generate_catalog_kwargs,
     )
 
-    fisher[2:, 2:] = np.eye(len(fisher[2:, 2:]))
     print(fisher)
-
-    e_vals, e_vecs = np.linalg.eigh(fisher)
-    print(e_vals)
-    print(e_vecs)
+    print()
     print(compute_inverse(fisher))
-    print(np.linalg.inv(fisher))
+    print()
+    print(np.sqrt(np.diag(compute_inverse(fisher))))
+    print()
+
+    get_tensors_kwargs = {
+        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "add_curn": False,
+        "anisotropies": False,
+        "regenerate_catalog": False,  # True,
+    }
+
+    (
+        frequency,
+        signal,
+        HD_functions_IJ,
+        HD_coeffs,
+        effective_noise,
+        SNR,
+        fisher,
+    ) = compute_fisher(
+        get_tensors_kwargs=get_tensors_kwargs,
+        generate_catalog_kwargs=generate_catalog_kwargs,
+    )
+
+    print(fisher)
+    print()
+    print(compute_inverse(fisher))
+
+    print(np.sqrt(np.diag(compute_inverse(fisher))))
+
+
+def test_anisotropies_others(
+    pulsar_configuration=mockSKA10,
+):
+
+    get_tensors_kwargs = {
+        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "add_curn": False,
+        "anisotropies": True,
+        "regenerate_catalog": True,
+        "lm_order": 0,
+        "nside": 16,  # 1,
+    }
+
+    generate_catalog_kwargs = {
+        "n_pulsars": 20,
+        "save_it": True,
+        **pulsar_configuration,
+    }
+
+    (
+        frequency,
+        signal,
+        HD_functions_IJ,
+        HD_coeffs,
+        effective_noise,
+        SNR,
+        fisher,
+    ) = compute_fisher(
+        get_tensors_kwargs=get_tensors_kwargs,
+        generate_catalog_kwargs=generate_catalog_kwargs,
+    )
+
+    print(fisher)
+    print()
+    print(compute_inverse(fisher))
+    print()
+    print(np.sqrt(np.diag(compute_inverse(fisher))))
+    print()
+
+    get_tensors_kwargs = {
+        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "add_curn": False,
+        "anisotropies": False,
+        "regenerate_catalog": False,  # True,
+    }
+
+    (
+        frequency,
+        signal,
+        HD_functions_IJ,
+        HD_coeffs,
+        effective_noise,
+        SNR,
+        fisher,
+    ) = compute_fisher(
+        get_tensors_kwargs=get_tensors_kwargs,
+        generate_catalog_kwargs=generate_catalog_kwargs,
+    )
+
+    print(fisher)
+    print()
+    print(compute_inverse(fisher))
+
+    print(np.sqrt(np.diag(compute_inverse(fisher))))
 
 
 if __name__ == "__main__":
-    test_anisotropies()
+    test_anisotropies_monopole()
+    # test_anisotropies_others()
     print(Asdasda)
 
     test_generation()

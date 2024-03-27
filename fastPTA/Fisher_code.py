@@ -40,7 +40,7 @@ def get_SNR_integrand(signal_tensor, c_inverse):
     c_bar_SNR = jnp.einsum("ijk,ikl->ijl", c_inverse, signal_tensor)
 
     # Contracting the 2 matrixes
-    return jnp.einsum("ijk,ikj->i", c_bar_SNR, jnp.conj(c_bar_SNR))
+    return jnp.einsum("ijk,ikj->i", c_bar_SNR, c_bar_SNR)
 
 
 @jit
@@ -74,7 +74,7 @@ def get_fisher_integrand(dsignal_tensor, c_inverse):
     c_bar = jnp.einsum("ijk,aikl->aijl", c_inverse, dsignal_tensor)
 
     # Contracting the 2 matrixes
-    return jnp.einsum("aijk,bikj->abi", c_bar, jnp.conj(c_bar))
+    return jnp.einsum("aijk,bikj->abi", c_bar, c_bar)
 
 
 @jit
@@ -156,7 +156,7 @@ def get_integrands(
     return SNR_integrand, effective_noise, fisher_integrand
 
 
-@jit
+# @jit
 def get_integrands_lm(
     signal_lm,
     signal,
@@ -218,23 +218,29 @@ def get_integrands_lm(
     dsignal_lm_f = signal_lm[None, :, None] * dsignal[:, None, :]
 
     # Assemble the tensor with signal derivatives
-    dsignal_tensor = jnp.sum(
+    dsignal_tensor1 = jnp.sum(
         response_IJ[None, ...] * dsignal_lm_f[..., None, None], axis=1
     )
-    # derivatives of signal_lm_f in parameters
-    delta = jnp.eye(len(signal_lm_f))
-    dsignal_lm_f = delta[..., None] * signal[None, None, :]
 
-    print(delta.shape, response_IJ.shape, dsignal_lm_f.shape)
-    dsignal_tensor2 = jnp.einsum("ijkl,aij->ajkl", response_IJ, dsignal_lm_f)
+    # derivatives of signal_lm_f in parameters
+    signal_lm_f_no_monopole = signal_lm_f[1:]
+    delta = jnp.eye(len(signal_lm_f_no_monopole))
+    dsignal_lm_f2 = delta[..., None] * signal[None, None, ...]
+
+    dsignal_tensor2 = jnp.einsum(
+        "ijkl,aij->ajkl", response_IJ[1:], dsignal_lm_f2
+    )
+
+    # derivatives of signal_lm_f in parameters
+    # dsignal_tensor2 = jnp.einsum("ijkl,aij->ajkl", response_IJ, dsignal_lm_f)
 
     # Append HD functions
-    dsignal_tensor = jnp.concatenate((dsignal_tensor, dsignal_tensor2), axis=0)
+    dsignal_tensor = jnp.concatenate((dsignal_tensor1, dsignal_tensor2), axis=0)
 
     # Get the fisher integrand
     fisher_integrand = get_fisher_integrand(dsignal_tensor, c_inverse)
 
-    return SNR_integrand.real, effective_noise, fisher_integrand.real
+    return SNR_integrand, effective_noise, fisher_integrand
 
 
 def compute_fisher(
@@ -291,10 +297,15 @@ def compute_fisher(
 
     """
 
+    if "anisotropies" in get_tensors_kwargs.keys():
+        anisotropies = get_tensors_kwargs["anisotropies"]
+    else:
+        anisotropies = False
+
     if "lm_order" in get_tensors_kwargs.keys():
         lm_order = get_tensors_kwargs["lm_order"]
     else:
-        lm_order = 0
+        lm_order = False
 
     # Setting the frequency vector from the observation time
     T_tot = T_obs_yrs * yr
@@ -322,9 +333,9 @@ def compute_fisher(
         frequency, **get_tensors_kwargs, **generate_catalog_kwargs
     )
 
-    if True:  # lm_order:
-        response_IJ = jnp.array([response_IJ])
-        signal_lm = np.append([1], np.zeros(int(1 + lm_order) ** 2)[1:])
+    if anisotropies:
+        signal_lm = np.zeros((1 + lm_order) ** 2)
+        signal_lm[0] = 1.0
 
         # Computes the fisher
         SNR_integrand, effective_noise, fisher_integrand = get_integrands_lm(
@@ -336,7 +347,6 @@ def compute_fisher(
         )
 
     else:
-
         # Computes the fisher
         SNR_integrand, effective_noise, fisher_integrand = get_integrands(
             signal,
