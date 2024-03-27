@@ -114,9 +114,44 @@ def get_pl_colored_noise(frequencies, log10_ampl, gamma):
 
     """
 
-    amplitude_prefactor = (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
+    amplitude_prefactor = (
+        (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
+    )
     frequency_dependent_term = (f_yr / frequencies)[None, :] ** gamma[:, None]
     return amplitude_prefactor[:, None] * frequency_dependent_term
+
+
+@jit
+def get_noise_omega(frequencies, noise):
+    """
+    Takes pulsar noises and convert them in Omega units.
+
+    Parameters:
+    -----------
+    frequencies : numpy.ndarray or jax.numpy.ndarray
+        Array of frequencies.
+    noise : numpy.ndarray or jax.numpy.ndarray
+        Array representing the noise.
+
+    Returns:
+    --------
+    numpy.ndarray
+        Noise converted to Omega units.
+
+    """
+
+    # Factor to convert to strain
+    convert_to_strain_factor = 12 * jnp.pi**2 * frequencies**2
+
+    # Factor to convert to omega units
+    convert_to_omega_factor = (
+        strain_to_Omega(frequencies) * convert_to_strain_factor
+    )
+
+    # Convert the noise to omega units
+    return convert_to_omega_factor[:, None, None] * (
+        (noise.T)[..., None] * jnp.eye(len(noise))[None, ...]
+    )
 
 
 @jit
@@ -558,18 +593,8 @@ def get_tensors(
         curn = get_pl_colored_noise(frequencies, log10_A_curn, gamma_curn)
         noise += curn
 
-    # Factor to convert to strain
-    convert_to_strain_factor = 12 * jnp.pi**2 * frequencies**2
-
-    # Factor to convert to omega units
-    convert_to_omega_factor = (
-        strain_to_Omega(frequencies) * convert_to_strain_factor
-    )
-
-    # Convert the noise to omega units
-    strain_omega = convert_to_omega_factor[:, None, None] * (
-        (noise.T)[..., None] * jnp.eye(len(WN_par))[None, ...]
-    )
+    # convert the noise in strain and then omega units
+    strain_omega = get_noise_omega(frequencies, noise)
 
     # get the time tensor
     time_tensor_IJ = get_time_tensor(frequencies, pta_span_yrs, Tspan_yr)

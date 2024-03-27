@@ -237,8 +237,8 @@ def compute_fisher(
     )
 
     # Compute SNR and Fisher integrals
-    SNR = jnp.sqrt(T_tot * simps(SNR_integrand, x=frequency, axis=-1))
-    fisher = T_tot * simps(fisher_integrand, x=frequency, axis=-1)
+    SNR = jnp.sqrt(jnp.sum(SNR_integrand, axis=-1))
+    fisher = jnp.sum(fisher_integrand, axis=-1)
 
     return (
         frequency,

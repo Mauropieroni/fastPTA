@@ -10,7 +10,7 @@ SMBBH_tilt = 2
 SMBBH_parameters = jnp.array([SMBBH_log_amplitude, SMBBH_tilt])
 
 ### A value for a flat spectrum
-CGW_flat_parameters = jnp.array([-9.0])
+CGW_flat_parameters = jnp.array([-7.0])
 
 ### Some values for a LN spectrum
 LN_log_amplitude = -6.45167492
@@ -492,6 +492,9 @@ def get_model(signal_label):
 
     if signal_label == "power_law":
         signal = {"signal_model": power_law, "dsignal_model": dpower_law}
+
+    elif signal_label == "flat":
+        signal = {"signal_model": flat, "dsignal_model": dflat}
 
     elif signal_label == "lognormal":
         signal = {"signal_model": lognormal, "dsignal_model": dlognormal}
