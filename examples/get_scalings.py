@@ -1,5 +1,5 @@
 # This reproduces the plot in fig xx, yy of the paper
-import os, sys, tqdm
+import os, sys
 import numpy as np
 
 file_path = os.path.dirname(__file__)

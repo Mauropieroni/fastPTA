@@ -1,5 +1,5 @@
 # Global
-import os, yaml
+import os, yaml, tqdm
 import numpy as np
 import pandas as pd
 import healpy as hp

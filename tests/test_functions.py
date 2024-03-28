@@ -46,6 +46,12 @@ mockSKA10 = load_yaml(
     file_path + "../pulsar_configurations/mockSKA10_pulsar_parameters.yaml"
 )
 
+### Default parameters for the pulsars
+EPTAnoiseless = load_yaml(
+    file_path
+    + "../pulsar_configurations/EPTAlike_pulsar_parameters_noiseless.yaml"
+)
+
 
 def test_generation(
     n_pulsars=n_pulsars1,
@@ -301,14 +307,17 @@ def test_future(
 def test_anisotropies_monopole(
     pulsar_configuration=mockSKA10,
 ):
+    nside = 16
+    lm_order = 0
+    npix = hp.nside2npix(nside)
 
     get_tensors_kwargs = {
         "path_to_pulsars": "pulsar_configurations/future.txt",
         "add_curn": False,
         "anisotropies": True,
         "regenerate_catalog": True,
-        "lm_order": 0,
-        "nside": 16,  # 1,
+        "lm_order": lm_order,
+        "nside": nside,  # 1,
     }
 
     generate_catalog_kwargs = {
@@ -365,20 +374,24 @@ def test_anisotropies_monopole(
 
 
 def test_anisotropies_others(
-    pulsar_configuration=mockSKA10,
+    pulsar_configuration=EPTAnoiseless,
 ):
 
+    nside = 64
+    lm_order = 6
+    npix = hp.nside2npix(nside)
+
     get_tensors_kwargs = {
-        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "path_to_pulsars": "pulsar_configurations/EPTA_test_anisotropies.txt",
         "add_curn": False,
         "anisotropies": True,
         "regenerate_catalog": True,
-        "lm_order": 0,
-        "nside": 16,  # 1,
+        "lm_order": lm_order,
+        "nside": nside,  # 1,
     }
 
     generate_catalog_kwargs = {
-        "n_pulsars": 20,
+        "n_pulsars": 300,
         "save_it": True,
         **pulsar_configuration,
     }
@@ -396,15 +409,42 @@ def test_anisotropies_others(
         generate_catalog_kwargs=generate_catalog_kwargs,
     )
 
+    cov = compute_inverse(fisher)
     print(fisher)
     print()
-    print(compute_inverse(fisher))
+    print(cov)
     print()
-    print(np.sqrt(np.diag(compute_inverse(fisher))))
+    print(np.sqrt(np.diag(cov)))
+    print()
+
+    nsamps = 10000
+
+    signal_lm = 1e-10 * np.ones((1 + lm_order) ** 2)
+    signal_lm[0] = 1.0
+    means = np.append(SMBBH_parameters, signal_lm[1:])
+    data = np.random.multivariate_normal(means, cov, nsamps)
+
+    correlations_lm = np.zeros(shape=(lm_order, nsamps))
+
+    i = 2
+    for l in range(1, lm_order + 1):
+        res = np.mean(data[:, i : i + 2 * l + 1] ** 2, axis=-1)
+        correlations_lm[l - 1] = res
+        i += 2 * l + 1
+
+    my_mean = np.mean(correlations_lm, axis=-1)
+    my_std = np.std(correlations_lm, axis=-1)
+
+    print(np.sqrt(np.diag(cov))[:2])
+    print(my_mean)
+    print(my_std)
+    print(np.quantile(correlations_lm, [0.025, 0.5, 0.95, 0.975], axis=-1))
+    # print(np.sqrt(np.diag(cov))[:2], my_mean, my_std)
+    # print(my_std / my_mean)
     print()
 
     get_tensors_kwargs = {
-        "path_to_pulsars": "pulsar_configurations/future.txt",
+        "path_to_pulsars": "pulsar_configurations/EPTA_test_anisotropies.txt",
         "add_curn": False,
         "anisotropies": False,
         "regenerate_catalog": False,  # True,
@@ -431,8 +471,8 @@ def test_anisotropies_others(
 
 
 if __name__ == "__main__":
-    test_anisotropies_monopole()
-    # test_anisotropies_others()
+    # test_anisotropies_monopole()
+    test_anisotropies_others()
     print(Asdasda)
 
     test_generation()

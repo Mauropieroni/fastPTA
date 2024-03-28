@@ -296,7 +296,7 @@ def get_correlations_lm_IJ(p_I, lm_order, nside):
     )
 
     i = 0
-    for l in range(lm_order + 1):
+    for l in tqdm.tqdm(range(lm_order + 1)):
         for m in jnp.linspace(0, l, l + 1, dtype=int):
             if m != 0:
                 sp_lm1 = sph_harm(m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)

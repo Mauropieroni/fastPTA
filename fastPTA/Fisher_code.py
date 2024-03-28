@@ -334,8 +334,10 @@ def compute_fisher(
     )
 
     if anisotropies:
-        signal_lm = np.zeros((1 + lm_order) ** 2)
+        signal_lm = 1e-1 * np.ones((1 + lm_order) ** 2)
         signal_lm[0] = 1.0
+        # signal_lm[1] = 1.0
+        # signal_lm[2] = 1.0
 
         # Computes the fisher
         SNR_integrand, effective_noise, fisher_integrand = get_integrands_lm(
