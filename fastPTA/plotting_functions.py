@@ -127,25 +127,53 @@ def plot_corner(
     for i in range(len(samples)):
         hist_kwargs["color"] = colors[i]
 
-        fig = corner.corner(
-            samples[i],
-            color=colors[i],
-            smooth=smooth[i],
-            weights=weights[i],
-            fig=fig,
-            show_titles=show_titles,
-            plot_density=plot_density,
-            plot_datapoints=plot_datapoints,
-            fill_contours=fill_contours,
-            bins=bins,
-            title_kwargs=title_kwargs,
-            hist_kwargs=hist_kwargs,
-            **kwargs,
-        )
+        if samples[i].shape[-1] > 1:
+            fig = corner.corner(
+                samples[i],
+                color=colors[i],
+                smooth=smooth[i],
+                weights=weights[i],
+                fig=fig,
+                show_titles=show_titles,
+                plot_density=plot_density,
+                plot_datapoints=plot_datapoints,
+                fill_contours=fill_contours,
+                bins=bins,
+                title_kwargs=title_kwargs,
+                hist_kwargs=hist_kwargs,
+                **kwargs,
+            )
+
+        else:
+            plt.hist(
+                samples[i],
+                color=colors[i],
+                weights=weights[i],
+                bins=bins,
+                histtype="step",
+                label=chain_labels[i],
+                density=True,
+            )
+
+            if "truths" in kwargs.keys():
+                truths = kwargs["truths"]
+            if "truth_color" in kwargs.keys():
+                truth_color = kwargs["truth_color"]
+            else:
+                truth_color = "black"
+
+            plt.axvline(truths, color=truth_color)
 
     custom_lines = []
 
-    for i in range(len(chain_labels)):
-        custom_lines.append(Patch(facecolor=colors[i], label=chain_labels[i]))
+    if samples[0].shape[-1] > 1:
+        for i in range(len(chain_labels)):
+            custom_lines.append(
+                Patch(facecolor=colors[i], label=chain_labels[i])
+            )
 
-    plt.legend(handles=custom_lines, bbox_to_anchor=(0.0, 1.0, 1.0, 1.0), loc=0)
+        plt.legend(
+            handles=custom_lines, bbox_to_anchor=(0.0, 1.0, 1.0, 1.0), loc=0
+        )
+    else:
+        plt.legend(loc=0)

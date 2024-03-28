@@ -568,14 +568,16 @@ def run_MCMC(
         generate_catalog_kwargs=generate_catalog_kwargs,
     )
 
+    nwalkers = max(2 * len(priors.T), 5)
+
     # Generate the initial points if not provided
     if not initial and which_prior.lower() == "flat":
         initial = np.random.uniform(
-            priors[0, :], priors[1, :], size=(2 * len(priors.T), len(priors.T))
+            priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
         )
     elif not initial and which_prior.lower() == "gaussian":
         initial = np.random.uniform(
-            priors[0, :], priors[1, :], size=(2 * len(priors.T), len(priors.T))
+            priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
         )
     elif initial:
         pass
