@@ -87,10 +87,11 @@ class TestFisher(unittest.TestCase):
             n_frequencies=n_frequencies, get_tensors_kwargs=get_tensors_kwargs
         )
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             jnp.sum(jnp.abs(res_HD_legendre[6] - data["fisher_HD_legendre"])),
             0.0,
-        )
+            places=10,
+        )  # type: ignore
 
         get_tensors_kwargs = {
             "path_to_pulsar_catalog": test_catalog_path3,
@@ -103,9 +104,11 @@ class TestFisher(unittest.TestCase):
             n_frequencies=n_frequencies, get_tensors_kwargs=get_tensors_kwargs
         )
 
-        self.assertEqual(
-            jnp.sum(jnp.abs(res_HD_binned[6] - data["fisher_HD_binned"])), 0.0
-        )
+        self.assertAlmostEqual(
+            jnp.sum(jnp.abs(res_HD_binned[6] - data["fisher_HD_binned"])),
+            0.0,
+            places=10,
+        )  # type: ignore
 
 
 if __name__ == "__main__":

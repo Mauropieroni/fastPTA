@@ -6,7 +6,7 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 
-from scipy.integrate import simps
+from scipy.integrate import simpson
 from scipy.special import legendre
 
 import jax
