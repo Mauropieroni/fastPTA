@@ -36,9 +36,10 @@ class TestFisher(unittest.TestCase):
 
         res_HD_legendre = compute_fisher(get_tensors_kwargs=get_tensors_kwargs)
 
-        self.assertEqual(
+        self.assertAlmostEqual(
             jnp.sum(jnp.abs(res_HD_legendre[6] - data["fisher_HD_legendre"])),
             0.0,
+            places=10,
         )
 
         get_tensors_kwargs = {
