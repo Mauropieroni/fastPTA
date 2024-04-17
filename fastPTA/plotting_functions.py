@@ -6,6 +6,30 @@ from matplotlib.patches import Patch
 from fastPTA.utils import *
 
 
+# Setting plotting parameters
+matplotlib.rcParams["text.usetex"] = True
+plt.rc("xtick", labelsize=20)
+plt.rc("ytick", labelsize=20)
+plt.rcParams.update(
+    {"axes.labelsize": 20, "legend.fontsize": 20, "axes.titlesize": 22}
+)
+
+# Some other useful things
+cmap_HD = matplotlib.colormaps["coolwarm"]
+cmap1_grid = matplotlib.colormaps["hot"]
+cmap2_grid = matplotlib.colormaps["PiYG"]
+
+my_colormap = {
+    "red": "#EE6677",
+    "green": "#228833",
+    "blue": "#4477AA",
+    "yellow": "#CCBB44",
+    "purple": "#AA3377",
+    "cyan": "#66CCEE",
+    "gray": "#BBBBBB",
+}
+
+
 def plot_HD_Legendre(x_points, data_HD_coeffs, plot_suplabel):
     x = np.linspace(-1, 1, x_points)
     p_sum = np.zeros(shape=(x_points, len(data_HD_coeffs)))
