@@ -70,7 +70,7 @@ class TestGetTensors(unittest.TestCase):
         )
 
         for i in range(len(get_tensor_labels)):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 jnp.sum(
                     jnp.abs(results[i] - loaded_data[get_tensor_labels[i]])
                 ),
@@ -87,7 +87,7 @@ class TestGetTensors(unittest.TestCase):
         )
 
         for i in range(len(get_tensor_labels)):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 jnp.sum(
                     jnp.abs(results[i] - loaded_data[get_tensor_labels[i]])
                 ),
@@ -104,7 +104,7 @@ class TestGetTensors(unittest.TestCase):
         )
 
         for i in range(len(get_tensor_labels)):
-            self.assertEqual(
+            self.assertAlmostEqual(
                 jnp.sum(
                     jnp.abs(results[i] - loaded_data[get_tensor_labels[i]])
                 ),

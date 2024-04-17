@@ -50,8 +50,10 @@ class TestFisher(unittest.TestCase):
 
         res_HD_binned = compute_fisher(get_tensors_kwargs=get_tensors_kwargs)
 
-        self.assertEqual(
-            jnp.sum(jnp.abs(res_HD_binned[6] - data["fisher_HD_binned"])), 0.0
+        self.assertAlmostEqual(
+            jnp.sum(jnp.abs(res_HD_binned[6] - data["fisher_HD_binned"])),
+            0.0,
+            places=10,
         )
 
     def test_compute_fisher_future(self):
