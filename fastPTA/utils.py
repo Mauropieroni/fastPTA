@@ -146,7 +146,11 @@ def load_yaml(path_to_file):
     return yaml.load(raw, Loader=yaml.SafeLoader)
 
 
-default_pulsar_config = load_yaml("default_pulsar_parameters.yaml")
+path_to_default_pulsar_parameters = os.path.join(
+    os.path.dirname(__file__), "default_pulsar_parameters.yaml"
+)
+
+default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 
 
 @jit
