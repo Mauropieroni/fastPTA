@@ -332,7 +332,7 @@ def get_HD_Legendre_coefficients(order):
     return jnp.array(
         [
             # Project onto Legendre polynomials
-            simps(legendre(i)(x) * HD_value, x=x) * l_coeffs[i]
+            simpson(legendre(i)(x) * HD_value, x=x) * l_coeffs[i]
             for i in range(order + 1)
         ]
     )
