@@ -2,11 +2,6 @@
 from fastPTA.utils import *
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
-# Just some constants
-log_A_curn_default = -13.94
-log_gamma_curn_default = 2.71
-integration_points = 10000
-
 
 @jit
 def unit_vector(theta, phi):
@@ -66,7 +61,7 @@ def HD_correlations(zeta_IJ):
 
 
 # Some default values to compute the HD curve
-x = jnp.linspace(-1, 1, 10000)
+x = jnp.linspace(-1, 1, integration_points)
 HD_value = HD_correlations(x)
 
 
@@ -114,9 +109,7 @@ def get_pl_colored_noise(frequencies, log10_ampl, gamma):
 
     """
 
-    amplitude_prefactor = (
-        (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
-    )
+    amplitude_prefactor = (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
     frequency_dependent_term = (f_yr / frequencies)[None, :] ** gamma[:, None]
     return amplitude_prefactor[:, None] * frequency_dependent_term
 
@@ -487,7 +480,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
 def get_tensors(
     frequencies,
-    path_to_pulsars="pulsar_configurations/EPTAlike_medians_curn.txt",
+    path_to_pulsar_catalog="pulsar_configurations/default_catalog.txt",
     pta_span_yrs=10.33,
     add_curn=False,
     order=0,
@@ -505,9 +498,9 @@ def get_tensors(
     -----------
     frequencies : numpy.ndarray or jax.numpy.ndarray
         Array of frequencies.
-    path_to_pulsars : str, optional
+    path_to_pulsar_catalog : str, optional
         Path to the pulsars data file.
-        Default is "pulsar_configurations/EPTAlike_medians_curn.txt".
+        Default is "pulsar_configurations/default_catalog.txt".
     pta_span_yrs : float, optional
         Average span of the PTA data in years.
         Default is 10.33 years.
@@ -548,10 +541,10 @@ def get_tensors(
     try:
         if regenerate_catalog:
             raise FileNotFoundError
-        pulsars_DF = pd.read_csv(path_to_pulsars, sep=" ")
+        pulsars_DF = pd.read_csv(path_to_pulsar_catalog, sep=" ")
 
     except FileNotFoundError:
-        generate_catalog_kwargs["outname"] = path_to_pulsars
+        generate_catalog_kwargs["outname"] = path_to_pulsar_catalog
         pulsars_DF = generate_pulsars_catalog(**generate_catalog_kwargs)
 
     # unpack all parameters

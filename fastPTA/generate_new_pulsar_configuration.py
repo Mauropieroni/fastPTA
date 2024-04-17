@@ -6,16 +6,6 @@ import pandas as pd
 # Local
 from fastPTA.utils import load_yaml
 
-# Setting the path to this file
-file_path = os.path.dirname(__file__)
-if file_path:
-    file_path += "/"
-
-# Default parameters for the pulsars
-EPTAlike = load_yaml(
-    file_path + "../pulsar_configurations/EPTAlike_pulsar_parameters.yaml"
-)
-
 
 def generate_parameter(n_pulsars, parameter_dict):
     """
@@ -126,16 +116,16 @@ def generate_noise_parameter(
 
 def generate_pulsars_catalog(
     n_pulsars=30,
-    dt_dict=EPTAlike["dt_dict"],
-    T_span_dict=EPTAlike["T_span_dict"],
-    wn_dict=EPTAlike["wn_dict"],
-    dm_noise_log_10_A_dict=EPTAlike["dm_noise_log_10_A_dict"],
-    red_noise_log_10_A_dict=EPTAlike["red_noise_log_10_A_dict"],
-    sv_noise_log_10_A_dict=EPTAlike["sv_noise_log_10_A_dict"],
-    dm_noise_g_dict=EPTAlike["dm_noise_g_dict"],
-    red_noise_g_dict=EPTAlike["red_noise_g_dict"],
-    sv_noise_g_dict=EPTAlike["sv_noise_g_dict"],
-    noise_probabilities_dict=EPTAlike["noise_probabilities_dict"],
+    dt_dict=default_pulsar_config["dt_dict"],
+    T_span_dict=default_pulsar_config["T_span_dict"],
+    wn_dict=default_pulsar_config["wn_dict"],
+    dm_noise_log_10_A_dict=default_pulsar_config["dm_noise_log_10_A_dict"],
+    red_noise_log_10_A_dict=default_pulsar_config["red_noise_log_10_A_dict"],
+    sv_noise_log_10_A_dict=default_pulsar_config["sv_noise_log_10_A_dict"],
+    dm_noise_g_dict=default_pulsar_config["dm_noise_g_dict"],
+    red_noise_g_dict=default_pulsar_config["red_noise_g_dict"],
+    sv_noise_g_dict=default_pulsar_config["sv_noise_g_dict"],
+    noise_probabilities_dict=default_pulsar_config["noise_probabilities_dict"],
     save_it=False,
     outname="pulsar_configurations/new_pulsars_catalog.txt",
 ):
