@@ -47,8 +47,10 @@ CGW_SIGW_parameters = jnp.array(
     [SIGW_log_amplitude, SIGW_log_width, SIGW_log_pivot]
 )
 
-cgx = np.loadtxt("/Users/chiaracecchini/Documents/src/new_folder0/fastpta_models/fastPTA/data/fvals.txt")
-cgy = np.loadtxt("/Users/chiaracecchini/Documents/src/new_folder0/fastpta_models/fastPTA/data/cgvals.txt")
+file_path = os.path.dirname(__file__)
+
+cgx = np.loadtxt(file_path + "/data/fvals.txt")
+cgy = np.loadtxt(file_path + "/data/cgvals.txt")
 
 def cg(f):
     return 10 ** jnp.interp(np.log10(f), cgx, cgy)
