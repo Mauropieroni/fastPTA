@@ -5,7 +5,7 @@ import pandas as pd
 
 # Local
 from fastPTA.utils import *
-from fastPTA.signals import SMBBH_parameters
+from fastPTA.signals import SMBBH_parameters, CGW_SIGW_parameters
 from fastPTA.get_tensors import get_tensors
 from fastPTA.Fisher_code import compute_fisher
 from fastPTA.MCMC_code import run_MCMC
@@ -27,7 +27,7 @@ fmax = 1e-6
 ### Frequency vector to use in the analyses
 frequency = np.arange(fmin, fmax, 1e-8)
 
-n_pulsars1 = 50
+n_pulsars1 = 100
 n_pulsars2 = 120
 method = "Legendre"
 order = 6
@@ -212,7 +212,7 @@ def test_current_EPTA(
 
     except FileNotFoundError:
         MCMC_data, pdfs = run_MCMC(
-            np.array([[-12, -4], [-5, 8]]),
+            np.array([[-12, -4], [-5, 8]]).T,
             signal_parameters=signal_parameters,
             get_tensors_kwargs=get_tensors_kwargs,
             regenerate_MCMC_data=regenerate_MCMC_data,
@@ -282,15 +282,27 @@ def test_future(
         **pulsar_configuration,
     }
 
+
     get_constraints(
-        "power_law",
-        SMBBH_parameters,
+        "power_law_SIGW",
+        np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
+        np.array([[-14, -5], [-3, 3], [-10, 2], [-1, 0.1], [-10, -5]]).T, 
+        #np.array([[-11, -3], [-2, 6], [-3.7, 1.3], [-0.5, 0.1], [-8, -7.5]]).T,
+        T_obs_yrs=10, 
+        n_frequencies=100,  
         rerun_MCMC=rerun_MCMC,
         path_to_MCMC_data=path_to_MCMC_data,
         path_to_MCMC_chains=path_to_MCMC_chains,
         MCMC_kwargs=MCMC_kwargs,
         get_tensors_kwargs=get_tensors_kwargs,
         generate_catalog_kwargs=generate_catalog_kwargs,
+        parameter_labels=[
+            "$A$",
+            "$n_T$",
+            "$Log_{10}A$",
+            "$Log_{10} \\Delta$",
+            "$Log_{10} f_*$",
+        ],
     )
 
 
@@ -306,17 +318,17 @@ if __name__ == "__main__":
     test_get_tensors()
 
     test_current_EPTA(
-        add_curn=True,
+        add_curn=False,
         rerun_MCMC=False,
         realization=False,
     )
 
     test_future(
-        add_curn=True,
-        regenerate_catalog=True,
+        add_curn=False,
+        regenerate_catalog=False,
         pulsar_configuration=mockSKA10,
         realization=False,
-        rerun_MCMC=False,
+        rerun_MCMC=True,
     )
 
     plt.show(block=True)
