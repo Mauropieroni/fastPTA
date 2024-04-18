@@ -37,6 +37,16 @@ yr = 365.25 * day
 # Frequency associated with 1yr
 f_yr = 1 / yr
 
+# Set the path to the default pulsar parameters
+path_to_default_pulsar_parameters = os.path.join(
+    os.path.dirname(__file__), "defaults/default_pulsar_parameters.yaml"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_pulsar_catalog = os.path.join(
+    os.path.dirname(__file__), "defaults/default_catalog.txt"
+)
+
 
 def characteristic_strain_to_Omega(frequency):
     """
@@ -145,10 +155,6 @@ def load_yaml(path_to_file):
         raw = "".join(stream.readlines())
     return yaml.load(raw, Loader=yaml.SafeLoader)
 
-
-path_to_default_pulsar_parameters = os.path.join(
-    os.path.dirname(__file__), "default_pulsar_parameters.yaml"
-)
 
 default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 

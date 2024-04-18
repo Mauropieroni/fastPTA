@@ -480,7 +480,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
 def get_tensors(
     frequencies,
-    path_to_pulsar_catalog="pulsar_configurations/default_catalog.txt",
+    path_to_pulsar_catalog=path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
     add_curn=False,
     order=0,
@@ -500,7 +500,7 @@ def get_tensors(
         Array of frequencies.
     path_to_pulsar_catalog : str, optional
         Path to the pulsars data file.
-        Default is "pulsar_configurations/default_catalog.txt".
+        Default is path_to_default_pulsar_catalog.
     pta_span_yrs : float, optional
         Average span of the PTA data in years.
         Default is 10.33 years.
