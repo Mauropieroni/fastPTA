@@ -287,7 +287,6 @@ def test_future(
         "power_law_SIGW",
         np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
         np.array([[-14, -5], [-3, 3], [-10, 2], [-1, 0.1], [-10, -5]]).T, 
-        #np.array([[-11, -3], [-2, 6], [-3.7, 1.3], [-0.5, 0.1], [-8, -7.5]]).T,
         T_obs_yrs=10, 
         n_frequencies=100,  
         rerun_MCMC=rerun_MCMC,
