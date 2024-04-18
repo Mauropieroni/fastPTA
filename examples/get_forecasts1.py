@@ -1,7 +1,4 @@
 ## This code has been modified in order to perform a FIM analysis only
-## The get_constraints() function has been modified in order to return the data 
-## However, the contours are different from the ones obtained by Gabriele
-## TO BE CHECKED
 
 import os, sys
 
