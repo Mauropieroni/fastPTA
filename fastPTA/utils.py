@@ -6,49 +6,25 @@ import pandas as pd
 import matplotlib
 import matplotlib.pyplot as plt
 
-from scipy.integrate import simps
+from scipy.integrate import simpson
 from scipy.special import legendre
 
 import jax
 from jax import jit
 import jax.numpy as jnp
 
+
 jax.config.update("jax_enable_x64", True)
 
 # If you want to use your GPU change here
 jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
-# Creates some folders you need to store data/plots
-for k in [
-    "pulsar_configurations",
-    "generated_data",
-    "generated_chains",
-    "plots",
-]:
-    if not os.path.exists(k):
-        os.makedirs(k)
 
-# Setting plotting parameters
-matplotlib.rcParams["text.usetex"] = True
-plt.rc("xtick", labelsize=20)
-plt.rc("ytick", labelsize=20)
-plt.rcParams.update(
-    {"axes.labelsize": 20, "legend.fontsize": 20, "axes.titlesize": 22}
-)
+# Just some constants
+log_A_curn_default = -13.94
+log_gamma_curn_default = 2.71
+integration_points = 10000
 
-# Some other useful things
-cmap_HD = matplotlib.colormaps["coolwarm"]
-cmap1_grid = matplotlib.colormaps["hot"]
-cmap2_grid = matplotlib.colormaps["PiYG"]
-my_colormap = {
-    "red": "#EE6677",
-    "green": "#228833",
-    "blue": "#4477AA",
-    "yellow": "#CCBB44",
-    "purple": "#AA3377",
-    "cyan": "#66CCEE",
-    "gray": "#BBBBBB",
-}
 
 # H0/h = 100 km/s/Mpc expressed in meters
 Hubble_over_h = 3.24e-18
@@ -60,6 +36,16 @@ day = 24 * hour
 yr = 365.25 * day
 # Frequency associated with 1yr
 f_yr = 1 / yr
+
+# Set the path to the default pulsar parameters
+path_to_default_pulsar_parameters = os.path.join(
+    os.path.dirname(__file__), "defaults/default_pulsar_parameters.yaml"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_pulsar_catalog = os.path.join(
+    os.path.dirname(__file__), "defaults/default_catalog.txt"
+)
 
 
 def characteristic_strain_to_Omega(frequency):
@@ -168,6 +154,9 @@ def load_yaml(path_to_file):
     with open(path_to_file, "r+") as stream:
         raw = "".join(stream.readlines())
     return yaml.load(raw, Loader=yaml.SafeLoader)
+
+
+default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 
 
 @jit

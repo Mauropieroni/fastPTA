@@ -4,17 +4,7 @@ import numpy as np
 import pandas as pd
 
 # Local
-from fastPTA.utils import load_yaml
-
-# Setting the path to this file
-file_path = os.path.dirname(__file__)
-if file_path:
-    file_path += "/"
-
-# Default parameters for the pulsars
-EPTAlike = load_yaml(
-    file_path + "../pulsar_configurations/EPTAlike_pulsar_parameters.yaml"
-)
+from fastPTA.utils import load_yaml, default_pulsar_parameters
 
 
 def generate_parameter(n_pulsars, parameter_dict):
@@ -126,23 +116,27 @@ def generate_noise_parameter(
 
 def generate_pulsars_catalog(
     n_pulsars=30,
-    dt_dict=EPTAlike["dt_dict"],
-    T_span_dict=EPTAlike["T_span_dict"],
-    wn_dict=EPTAlike["wn_dict"],
-    dm_noise_log_10_A_dict=EPTAlike["dm_noise_log_10_A_dict"],
-    red_noise_log_10_A_dict=EPTAlike["red_noise_log_10_A_dict"],
-    sv_noise_log_10_A_dict=EPTAlike["sv_noise_log_10_A_dict"],
-    dm_noise_g_dict=EPTAlike["dm_noise_g_dict"],
-    red_noise_g_dict=EPTAlike["red_noise_g_dict"],
-    sv_noise_g_dict=EPTAlike["sv_noise_g_dict"],
-    noise_probabilities_dict=EPTAlike["noise_probabilities_dict"],
-    save_it=False,
+    dt_dict=default_pulsar_parameters["dt_dict"],
+    T_span_dict=default_pulsar_parameters["T_span_dict"],
+    wn_dict=default_pulsar_parameters["wn_dict"],
+    dm_noise_log_10_A_dict=default_pulsar_parameters["dm_noise_log_10_A_dict"],
+    red_noise_log_10_A_dict=default_pulsar_parameters[
+        "red_noise_log_10_A_dict"
+    ],
+    sv_noise_log_10_A_dict=default_pulsar_parameters["sv_noise_log_10_A_dict"],
+    dm_noise_g_dict=default_pulsar_parameters["dm_noise_g_dict"],
+    red_noise_g_dict=default_pulsar_parameters["red_noise_g_dict"],
+    sv_noise_g_dict=default_pulsar_parameters["sv_noise_g_dict"],
+    noise_probabilities_dict=default_pulsar_parameters[
+        "noise_probabilities_dict"
+    ],
+    save_catalog=False,
     outname="pulsar_configurations/new_pulsars_catalog.txt",
 ):
     """
     Generate a catalog of pulsars with specified parameters (mostly timing and
     noise characteristics). The generated catalog is returned as a pandas
-    DataFrame. If save_it is True, the generated catalog is saved to the
+    DataFrame. If save_catalog is True, the generated catalog is saved to the
     specified output file.
 
     Parameters:
@@ -169,7 +163,7 @@ def generate_pulsars_catalog(
         Dictionary containing parameters for generating the tilt for sv noise.
     noise_probabilities_dict : dict, optional
         Dictionary containing noise probabilities.
-    save_it : bool, optional
+    save_catalog : bool, optional
         Flag indicating whether to save the generated catalog to a file,
         default is False.
     outname : str, optional
@@ -221,7 +215,7 @@ def generate_pulsars_catalog(
 
     DF = pd.DataFrame(catalog)
 
-    if save_it:
+    if save_catalog:
         DF.to_csv(outname, sep=" ", index=False)
 
     return DF

@@ -1,4 +1,4 @@
-import setuptools
+from setuptools import setup, find_packages
 
 from fastPTA import __author__, __version__, __url__
 
@@ -6,7 +6,10 @@ from fastPTA import __author__, __version__, __url__
 with open("README.md", "r") as fh:
     long_description = fh.read()
 
-setuptools.setup(
+with open("requirements.txt") as f:
+    required_packages = f.read().splitlines()
+
+setup(
     name="fastPTA",
     description="Code for fast PTA forecasts",
     keywords="PTAs, GWs",
@@ -15,19 +18,7 @@ setuptools.setup(
     url=__url__,
     long_description=long_description,
     long_description_content_type="text/markdown",
-    packages=setuptools.find_packages(),
-    python_requires=">=3.8",
-    install_requires=[
-        "numpy>=1.24.3",
-        "scipy>=1.10.1",
-        "matplotlib>=3.7.4",
-        "pandas>=2.0.3",
-        "tqdm>=4.64.1",
-        "pyyaml>=6.0",
-        "corner>=2.2.1",
-        "emcee>=3.1.2",
-        "jax>=0.4.13",
-        "jaxlib>=0.4.13",
-    ],
-    classifiers=[],
+    packages=find_packages(),
+    install_requires=required_packages,
+    package_data={"fastPTA": ["defaults/*"]},
 )
