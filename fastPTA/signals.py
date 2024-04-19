@@ -6,7 +6,7 @@ import pandas as pd
 import math
 
 ## A fixed frequency point useful to check derivatives
-#frequency_point = 10**(-7)
+# frequency_point = 10**(-7)
 ### Current SMBBH SGWB log_amplitude best-fit
 SMBBH_log_amplitude = -7.1995
 SMBBH_tilt = 2
@@ -25,7 +25,7 @@ CGW_LN_parameters = jnp.array([LN_log_amplitude, LN_log_width, LN_log_pivot])
 
 ### Some values for a BPL spectrum
 BPL_log_amplitude = -5.8
-BPL_log_width = -8.
+BPL_log_width = -8.0
 BPL_tilt_1 = 3
 BPL_tilt_2 = 1.5
 CGW_BPL_parameters = jnp.array(
@@ -33,11 +33,9 @@ CGW_BPL_parameters = jnp.array(
 )
 
 ### Some values for a Tanh spectrum
-Tanh_log_amplitude = -8.
-Tanh_tilt = 8.
-CGW_Tanh_parameters = jnp.array(
-    [Tanh_log_amplitude, Tanh_tilt]
-)
+Tanh_log_amplitude = -8.0
+Tanh_tilt = 8.0
+CGW_Tanh_parameters = jnp.array([Tanh_log_amplitude, Tanh_tilt])
 
 ### Some values for a SIGW spectrum
 SIGW_log_amplitude = -1.7
@@ -47,13 +45,14 @@ CGW_SIGW_parameters = jnp.array(
     [SIGW_log_amplitude, SIGW_log_width, SIGW_log_pivot]
 )
 
-file_path = os.path.dirname(__file__)
 
-cgx = np.loadtxt(file_path + "/data/fvals.txt")
-cgy = np.loadtxt(file_path + "/data/cgvals.txt")
+cgx = np.loadtxt(path_to_defaults + "fvals.txt")
+cgy = np.loadtxt(path_to_defaults + "cgvals.txt")
+
 
 def cg(f):
     return 10 ** jnp.interp(np.log10(f), cgx, cgy)
+
 
 def flat(frequency, parameters):
     """
@@ -169,11 +168,11 @@ def dpower_law(index, frequency, parameters, pivot=f_yr):
 #     return 10**log_amplitude * (frequency_point / pivot) ** tilt
 
 # X = np.arange(1, 10, 0.01)
-# Y = [] 
+# Y = []
 # Ynum = []
 # Z = []
 # Znum = []
-# for i in range(len(X)): 
+# for i in range(len(X)):
 #     Y.append(dpower_law(0, frequency_point, [X[i], SMBBH_tilt], f_yr))
 #     Ynum.append(grad(function_powerlaw, argnums=0)(X[i], SMBBH_tilt, f_yr))
 #     Z.append(dpower_law(1, frequency_point, [SMBBH_log_amplitude, X[i]], f_yr))
@@ -268,13 +267,13 @@ def dlognormal(index, frequency, parameters):
 #     )
 
 # X = np.arange(1, 10, 0.01)
-# Y = [] 
+# Y = []
 # Ynum = []
 # Z = []
 # Znum = []
 # W = []
 # Wnum = []
-# for i in range(len(X)): 
+# for i in range(len(X)):
 #     Y.append(dlognormal(0, frequency_point, [X[i], LN_log_width, LN_log_pivot]))
 #     Ynum.append(grad(function_lognormal, argnums=0)(X[i], LN_log_width, LN_log_pivot))
 #     Z.append(dlognormal(1, frequency_point, [LN_log_amplitude, X[i], LN_log_pivot]))
@@ -397,7 +396,7 @@ def dSMBH_and_lognormal(index, frequency, parameters):
 
 # Check analytical and numerical derivative
 ## Already done for the two separate functions
-    
+
 
 def broken_power_law(frequency, parameters, smoothing=1.5):
     """
@@ -425,11 +424,13 @@ def broken_power_law(frequency, parameters, smoothing=1.5):
     return (
         10**alpha
         * (jnp.abs(a) + jnp.abs(b)) ** smoothing
-        / ((
-            jnp.abs(b) * x ** (-a / smoothing)
-            + jnp.abs(a) * x ** (b / smoothing)
+        / (
+            (
+                jnp.abs(b) * x ** (-a / smoothing)
+                + jnp.abs(a) * x ** (b / smoothing)
+            )
+            ** smoothing
         )
-        ** smoothing)
     )
 
 
@@ -524,7 +525,7 @@ def dbroken_power_law(index, frequency, parameters, smoothing=1.5):
 #     )
 
 # X = np.arange(1, 10, 0.01)
-# Y = [] 
+# Y = []
 # Ynum = []
 # Z = []
 # Znum = []
@@ -532,7 +533,7 @@ def dbroken_power_law(index, frequency, parameters, smoothing=1.5):
 # Wnum = []
 # K = []
 # Knum = []
-# for i in range(len(X)): 
+# for i in range(len(X)):
 #     Y.append(dbroken_power_law(0, frequency_point, [X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2]))
 #     Ynum.append(grad(function_bpl, argnums=0)(X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2))
 #     Z.append(dbroken_power_law(1, frequency_point, [BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2]))
@@ -626,11 +627,11 @@ def tanh(frequency, parameters, pivot=f_yr):
     numpy.ndarray or jax.numpy.ndarray
         Array containing the computed tanh spectrum.
     """
-    
+
     ### unpack parameters
     log_amplitude, tilt = parameters
 
-    return (10**log_amplitude) * (1 + jnp.tanh(frequency/pivot))**tilt
+    return (10**log_amplitude) * (1 + jnp.tanh(frequency / pivot)) ** tilt
 
 
 # def dtanh(index, frequency, parameters, pivot=f_yr):
@@ -663,7 +664,7 @@ def tanh(frequency, parameters, pivot=f_yr):
 
 #     elif index == 1:
 #         dlog_model = (
-#             jnp.log(1 + jnp.tanh(frequency/pivot))              
+#             jnp.log(1 + jnp.tanh(frequency/pivot))
 #         )
 
 #     else:
@@ -671,10 +672,11 @@ def tanh(frequency, parameters, pivot=f_yr):
 
 #     return model * dlog_model
 
-# def function_tanh(frequency, log_amplitude, tilt): 
+# def function_tanh(frequency, log_amplitude, tilt):
 #     return (10**log_amplitude) * (1+jnp.tanh(frequency/f_yr))**tilt
 
 # The following one is if you want ot compute the derivative numerically
+
 
 def dtanh(index, frequency, parameters, pivot=f_yr):
     """
@@ -695,40 +697,51 @@ def dtanh(index, frequency, parameters, pivot=f_yr):
         Array containing the computed derivative of the tanh spectrum with
         respect to the specified parameter.
     """
-    
+
     ### unpack parameters
     log_amplitude, tilt = parameters
 
     model = tanh(frequency, parameters, pivot=f_yr)
 
     dlog_model = []
-    def function_tanh(frequency, log_amplitude, tilt): 
-        return (10**log_amplitude) * (1+jnp.tanh(frequency/f_yr))**tilt 
+
+    def function_tanh(frequency, log_amplitude, tilt):
+        return (10**log_amplitude) * (1 + jnp.tanh(frequency / f_yr)) ** tilt
+
     if index == 0:
         for i in range(len(frequency)):
-            dlog_model.append(grad(function_tanh, argnums=1)(frequency[i],log_amplitude, tilt))
+            dlog_model.append(
+                grad(function_tanh, argnums=1)(
+                    frequency[i], log_amplitude, tilt
+                )
+            )
 
     elif index == 1:
-         for i in range(len(frequency)):  
-            dlog_model.append(grad(function_tanh, argnums=2)(frequency[i], log_amplitude, tilt))
+        for i in range(len(frequency)):
+            dlog_model.append(
+                grad(function_tanh, argnums=2)(
+                    frequency[i], log_amplitude, tilt
+                )
+            )
 
     else:
         raise ValueError("Cannot use that for this signal")
 
     return dlog_model
 
+
 # Check analytical and numerical derivative
 # To use grad() we need a function of the parameters
 
-# def function_tanh(log_amplitude, tilt): 
+# def function_tanh(log_amplitude, tilt):
 #     return (10**log_amplitude) * (1+jnp.tanh(frequency_point/f_yr))**tilt
 
 # X = np.arange(1, 10, 0.01)
-# Y = [] 
+# Y = []
 # Ynum = []
 # Z = []
 # Znum = []
-# for i in range(len(X)): 
+# for i in range(len(X)):
 #     Y.append(dtanh(0, frequency_point, [X[i], Tanh_tilt], f_yr))
 #     Ynum.append(grad(function_tanh, argnums=0)(X[i], Tanh_tilt))
 #     Z.append(dtanh(1, frequency_point, [Tanh_log_amplitude, X[i]], f_yr))
@@ -739,6 +752,7 @@ def dtanh(index, frequency, parameters, pivot=f_yr):
 # plt.loglog(X,Znum, color='cyan', linestyle='dashed', label='$Tilt - numeric$')
 # plt.legend(loc='center left', bbox_to_anchor=(.05, .85), prop={'size': 10})
 # plt.show()
+
 
 def SIGW(frequency, parameters):
     """
@@ -760,22 +774,50 @@ def SIGW(frequency, parameters):
     ### unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
-    x = frequency/(10**log_pivot)
+    x = frequency / (10**log_pivot)
     width = 10**log_width
-    k = x * jnp.exp((3/2) * width**2)
+    k = x * jnp.exp((3 / 2) * width**2)
 
-    return cg(frequency) * (10**log_amplitude)**2 * (
-        ((4/(5 * jnp.sqrt(np.pi))) * x**3 * (1/width) * jnp.exp((9 * width**2)/4)) * (
-            (jnp.log(k)**2 + (1/2) * width**2)
-            * jax.scipy.special.erfc((1/width) 
-            * (jnp.log(k) + (1/2) * jnp.log(3/2)))
-            - (width/(jnp.sqrt(np.pi))) 
-            * jnp.exp(-((jnp.log(k) + (1/2) * jnp.log(3/2))**2)/(width**2)) 
-            * (jnp.log(k) - (1/2) * jnp.log(3/2))
+    return (
+        cg(frequency)
+        * (10**log_amplitude) ** 2
+        * (
+            (
+                (4 / (5 * jnp.sqrt(np.pi)))
+                * x**3
+                * (1 / width)
+                * jnp.exp((9 * width**2) / 4)
+            )
+            * (
+                (jnp.log(k) ** 2 + (1 / 2) * width**2)
+                * jax.scipy.special.erfc(
+                    (1 / width) * (jnp.log(k) + (1 / 2) * jnp.log(3 / 2))
+                )
+                - (width / (jnp.sqrt(np.pi)))
+                * jnp.exp(
+                    -((jnp.log(k) + (1 / 2) * jnp.log(3 / 2)) ** 2) / (width**2)
+                )
+                * (jnp.log(k) - (1 / 2) * jnp.log(3 / 2))
+            )
+            + (0.0659 / (width**2))
+            * x**2
+            * jnp.exp(width**2)
+            * jnp.exp(
+                -((jnp.log(x) + width**2 - (1 / 2) * jnp.log(4 / 3)) ** 2)
+                / (width**2)
+            )
+            + (1 / 3)
+            * jnp.sqrt(2 / np.pi)
+            * x ** (-4)
+            * (1 / width)
+            * jnp.exp(8 * width**2)
+            * jnp.exp(-(jnp.log(x) ** 2) / (2 * width**2))
+            * jax.scipy.special.erfc(
+                (4 * width**2 - jnp.log(x / 4)) / (jnp.sqrt(2) * width)
+            )
         )
-        + (0.0659/(width**2)) * x**2 * jnp.exp(width**2) * jnp.exp(-((jnp.log(x) + width**2 - (1/2) * jnp.log(4/3))**2)/(width**2))
-        + (1/3) * jnp.sqrt(2/np.pi) * x**(-4) * (1/width) * jnp.exp(8 * width**2) * jnp.exp(-(jnp.log(x)**2)/(2 * width**2)) * jax.scipy.special.erfc((4 * width**2 - jnp.log(x/4))/(jnp.sqrt(2) * width))
     )
+
 
 # The following one is if you want ot compute the derivative numerically
 def dSIGW(index, frequency, parameters):
@@ -797,24 +839,101 @@ def dSIGW(index, frequency, parameters):
         Array containing the computed derivative of the tanh spectrum with
         respect to the specified parameter.
     """
-    
+
     ### unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
-    def function_SIGW(log_amplitude, log_width, log_pivot): 
+    def function_SIGW(log_amplitude, log_width, log_pivot):
 
-        return cg(frequency) * (10**log_amplitude)**2 * (
-            ((4/(5 * jnp.sqrt(np.pi))) * (frequency/(10**log_pivot))**3 * (1/(10**log_width)) * jnp.exp((9 * (10**log_width)**2)/4)) * (
-                (jnp.log((frequency/(10**log_pivot)) * jnp.exp((3/2) * (10**log_width)**2))**2 + (1/2) * (10**log_width)**2) * jax.scipy.special.erfc((1/(10**log_width)) * (jnp.log((frequency/(10**log_pivot)) * jnp.exp((3/2) * (10**log_width)**2)) + (1/2) * jnp.log(3/2)))
-                - ((10**log_width)/(jnp.sqrt(np.pi))) * jnp.exp(-((jnp.log((frequency/(10**log_pivot)) * jnp.exp((3/2) * (10**log_width)**2)) + (1/2) * jnp.log(3/2))**2)/((10**log_width)**2)) * (jnp.log((frequency/(10**log_pivot)) * jnp.exp((3/2) * (10**log_width)**2)) - (1/2) * jnp.log(3/2))
+        return (
+            cg(frequency)
+            * (10**log_amplitude) ** 2
+            * (
+                (
+                    (4 / (5 * jnp.sqrt(np.pi)))
+                    * (frequency / (10**log_pivot)) ** 3
+                    * (1 / (10**log_width))
+                    * jnp.exp((9 * (10**log_width) ** 2) / 4)
+                )
+                * (
+                    (
+                        jnp.log(
+                            (frequency / (10**log_pivot))
+                            * jnp.exp((3 / 2) * (10**log_width) ** 2)
+                        )
+                        ** 2
+                        + (1 / 2) * (10**log_width) ** 2
+                    )
+                    * jax.scipy.special.erfc(
+                        (1 / (10**log_width))
+                        * (
+                            jnp.log(
+                                (frequency / (10**log_pivot))
+                                * jnp.exp((3 / 2) * (10**log_width) ** 2)
+                            )
+                            + (1 / 2) * jnp.log(3 / 2)
+                        )
+                    )
+                    - ((10**log_width) / (jnp.sqrt(np.pi)))
+                    * jnp.exp(
+                        -(
+                            (
+                                jnp.log(
+                                    (frequency / (10**log_pivot))
+                                    * jnp.exp((3 / 2) * (10**log_width) ** 2)
+                                )
+                                + (1 / 2) * jnp.log(3 / 2)
+                            )
+                            ** 2
+                        )
+                        / ((10**log_width) ** 2)
+                    )
+                    * (
+                        jnp.log(
+                            (frequency / (10**log_pivot))
+                            * jnp.exp((3 / 2) * (10**log_width) ** 2)
+                        )
+                        - (1 / 2) * jnp.log(3 / 2)
+                    )
+                )
+                + (0.0659 / ((10**log_width) ** 2))
+                * (frequency / (10**log_pivot)) ** 2
+                * jnp.exp((10**log_width) ** 2)
+                * jnp.exp(
+                    -(
+                        (
+                            jnp.log(frequency / (10**log_pivot))
+                            + (10**log_width) ** 2
+                            - (1 / 2) * jnp.log(4 / 3)
+                        )
+                        ** 2
+                    )
+                    / ((10**log_width) ** 2)
+                )
+                + (1 / 3)
+                * jnp.sqrt(2 / np.pi)
+                * (frequency / (10**log_pivot)) ** (-4)
+                * (1 / (10**log_width))
+                * jnp.exp(8 * (10**log_width) ** 2)
+                * jnp.exp(
+                    -(jnp.log(frequency / (10**log_pivot)) ** 2)
+                    / (2 * (10**log_width) ** 2)
+                )
+                * jax.scipy.special.erfc(
+                    (
+                        4 * (10**log_width) ** 2
+                        - jnp.log((frequency / (10**log_pivot)) / 4)
+                    )
+                    / (jnp.sqrt(2) * (10**log_width))
+                )
             )
-            + (0.0659/((10**log_width)**2)) * (frequency/(10**log_pivot))**2 * jnp.exp((10**log_width)**2) * jnp.exp(-((jnp.log(frequency/(10**log_pivot)) + (10**log_width)**2 - (1/2) * jnp.log(4/3))**2)/((10**log_width)**2))
-            + (1/3) * jnp.sqrt(2/np.pi) * (frequency/(10**log_pivot))**(-4) * (1/(10**log_width)) * jnp.exp(8 * (10**log_width)**2) * jnp.exp(-(jnp.log(frequency/(10**log_pivot))**2)/(2 * (10**log_width)**2)) * jax.scipy.special.erfc((4 * (10**log_width)**2 - jnp.log((frequency/(10**log_pivot))/4))/(jnp.sqrt(2) * (10**log_width)))
         )
- 
+
     if index < 3:
-        dlog_model= jacfwd(function_SIGW, argnums=index)(log_amplitude, log_width, log_pivot)
-        
+        dlog_model = jacfwd(function_SIGW, argnums=index)(
+            log_amplitude, log_width, log_pivot
+        )
+
     else:
         raise ValueError("Cannot use that for this signal")
 
@@ -841,7 +960,6 @@ def power_law_SIGW(frequency, parameters):
     return power_law(frequency, parameters[:2]) + SIGW(
         frequency, parameters[2:]
     )
-
 
 
 def dpower_law_SIGW(index, frequency, parameters):
@@ -874,6 +992,7 @@ def dpower_law_SIGW(index, frequency, parameters):
 # Check analytical and numerical derivative
 ## Already done for the two separate functions
 
+
 def get_model(signal_label):
     """
     Retrieve signal and derivative models based on the specified label.
@@ -902,67 +1021,62 @@ def get_model(signal_label):
         - "power_law_lognormal":
             Signal model combining SMBH and log-normal spectrum.
         - "bpl":
-            Broken power law signal model.    
+            Broken power law signal model.
         - "power_law_broken_power_law":
             Signal model combining SMBH and broken power law spectrum.
-        - "tanh": 
+        - "tanh":
             Signal model with a Tanh.
-        - "SIGW": 
+        - "SIGW":
             Signal model for scalar induce GW
-        - "power_law_SIGW"; 
+        - "power_law_SIGW";
             Signal model combining SMBH and SIGW
 
     """
 
     if signal_label == "flat":
-        signal = {"signal_model": flat, 
-                  "dsignal_model": dflat
-        }
-    
+        signal = {"signal_model": flat, "dsignal_model": dflat}
+
     elif signal_label == "power_law":
-        signal = {"signal_model": power_law, 
-                  "dsignal_model": dpower_law
-        }
+        signal = {"signal_model": power_law, "dsignal_model": dpower_law}
 
     elif signal_label == "lognormal":
-        signal = {"signal_model": lognormal, 
-                  "dsignal_model": dlognormal
-        }
+        signal = {"signal_model": lognormal, "dsignal_model": dlognormal}
 
     elif signal_label == "power_law_flat":
-        signal = {"signal_model": SMBH_and_flat,
-                  "dsignal_model": dSMBH_and_flat
+        signal = {
+            "signal_model": SMBH_and_flat,
+            "dsignal_model": dSMBH_and_flat,
         }
 
     elif signal_label == "power_law_lognormal":
-        signal = {"signal_model": SMBH_and_lognormal, 
-                  "dsignal_model": dSMBH_and_lognormal
+        signal = {
+            "signal_model": SMBH_and_lognormal,
+            "dsignal_model": dSMBH_and_lognormal,
         }
 
     elif signal_label == "bpl":
-        signal = {"signal_model": broken_power_law,
-                  "dsignal_model": dbroken_power_law
-        }  
+        signal = {
+            "signal_model": broken_power_law,
+            "dsignal_model": dbroken_power_law,
+        }
 
     elif signal_label == "power_law_broken_power_law":
-        signal = {"signal_model": SMBH_and_broken_power_law,
-                  "dsignal_model": dSMBH_and_broken_power_law
+        signal = {
+            "signal_model": SMBH_and_broken_power_law,
+            "dsignal_model": dSMBH_and_broken_power_law,
         }
 
     elif signal_label == "tanh":
-        signal = {"signal_model": tanh,
-                  "dsignal_model": dtanh
-        }    
+        signal = {"signal_model": tanh, "dsignal_model": dtanh}
 
     elif signal_label == "SIGW":
-        signal = {"signal_model": SIGW,
-                  "dsignal_model": dSIGW
-        }    
+        signal = {"signal_model": SIGW, "dsignal_model": dSIGW}
 
     elif signal_label == "power_law_SIGW":
-        signal = {"signal_model": power_law_SIGW,
-                  "dsignal_model": dpower_law_SIGW
-        } 
+        signal = {
+            "signal_model": power_law_SIGW,
+            "dsignal_model": dpower_law_SIGW,
+        }
 
     else:
         raise ValueError("Cannot use", signal_label)
