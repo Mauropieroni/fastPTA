@@ -475,7 +475,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
     # Ensure Hellings and Downs correlations values are within bounds
     zeta_IJ = jnp.where(zeta_IJ > 1, 1, zeta_IJ)
-    zeta_IJ = jnp.where(zeta_IJ < -1, -1, zeta_IJ)
+    zeta_IJ = jnp.where(zeta_IJ < -1, -1, zeta_IJ)  # type: ignore
     xi_vals = jnp.arccos(zeta_IJ)
 
     # Compute bin edges for binning the Hellings and Downs correlations values
