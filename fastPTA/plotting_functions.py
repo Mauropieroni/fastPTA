@@ -1,9 +1,11 @@
-### Global
+# Global
 import corner
-from matplotlib.patches import Patch
+import matplotlib
+import matplotlib.patches
+import matplotlib.pyplot as plt
 
-### Local
-from fastPTA.utils import *
+import numpy as np
+from scipy.special import legendre
 
 
 # Setting plotting parameters
@@ -15,9 +17,9 @@ plt.rcParams.update(
 )
 
 # Some other useful things
-cmap_HD = matplotlib.colormaps["coolwarm"]
-cmap1_grid = matplotlib.colormaps["hot"]
-cmap2_grid = matplotlib.colormaps["PiYG"]
+cmap_HD = matplotlib.colormaps["coolwarm"]  # type: ignore
+cmap1_grid = matplotlib.colormaps["hot"]  # type: ignore
+cmap2_grid = matplotlib.colormaps["PiYG"]  # type: ignore
 
 my_colormap = {
     "red": "#EE6677",
@@ -140,14 +142,14 @@ def plot_corner(
         chain_labels = [None for i in range(len(samples))]
 
     for i in range(len(samples)):
-        hist_kwargs["color"] = colors[i]
+        hist_kwargs["color"] = colors[i]  # type: ignore
 
         if samples[i].shape[-1] > 1:
             fig = corner.corner(
                 samples[i],
-                color=colors[i],
-                smooth=smooth[i],
-                weights=weights[i],
+                color=colors[i],  # type: ignore
+                smooth=smooth[i],  # type: ignore
+                weights=weights[i],  # type: ignore
                 fig=fig,
                 show_titles=show_titles,
                 plot_density=plot_density,
@@ -162,11 +164,11 @@ def plot_corner(
         else:
             plt.hist(
                 samples[i],
-                color=colors[i],
-                weights=weights[i],
+                color=colors[i],  # type: ignore
+                weights=weights[i],  # type: ignore
                 bins=bins,
                 histtype="step",
-                label=chain_labels[i],
+                label=chain_labels[i],  # type: ignore
                 density=True,
             )
 
@@ -182,9 +184,11 @@ def plot_corner(
     custom_lines = []
 
     if samples[0].shape[-1] > 1:
-        for i in range(len(chain_labels)):
+        for i in range(len(chain_labels)):  # type: ignore
             custom_lines.append(
-                Patch(facecolor=colors[i], label=chain_labels[i])
+                matplotlib.patches.Patch(
+                    facecolor=colors[i], label=chain_labels[i]  # type: ignore
+                )
             )
 
         plt.legend(

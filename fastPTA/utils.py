@@ -1,16 +1,9 @@
 # Global
-import os, yaml
+import os
+import yaml
 import numpy as np
-import pandas as pd
-
-import matplotlib
-import matplotlib.pyplot as plt
-
-from scipy.integrate import simpson
-from scipy.special import legendre
 
 import jax
-from jax import jit
 import jax.numpy as jnp
 
 
@@ -18,12 +11,6 @@ jax.config.update("jax_enable_x64", True)
 
 # If you want to use your GPU change here
 jax.config.update("jax_default_device", jax.devices("cpu")[0])
-
-
-# Just some constants
-log_A_curn_default = -13.94
-log_gamma_curn_default = 2.71
-integration_points = 10000
 
 
 # H0/h = 100 km/s/Mpc expressed in meters
@@ -163,7 +150,7 @@ def load_yaml(path_to_file):
 default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 
 
-@jit
+@jax.jit
 def compute_inverse(matrix):
     """
     A function to compute the inverse of a matrix. Applies rescaling to

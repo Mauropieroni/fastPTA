@@ -1,17 +1,20 @@
 # Global
 import unittest
+
+import numpy as np
+
 from scipy.stats import kstest
 from scipy import stats as scipy_stats
 
 # Local
-from test_utils import *
+import test_utils as tu
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
-@not_a_test
+@tu.not_a_test
 def test_generation(parameter, n_pulsars, pulsar_dictionary):
 
-    test_dictionary = {**test_distributions}
+    test_dictionary = {**tu.test_distributions}
     for k, v in pulsar_dictionary.items():
         if k != "noise_probabilities_dict":
             test_dictionary[k] = v
@@ -20,7 +23,7 @@ def test_generation(parameter, n_pulsars, pulsar_dictionary):
         n_pulsars=n_pulsars, save_catalog=False, **pulsar_dictionary
     )
 
-    x = test_catalog[parameters_to_test[parameter]]
+    x = test_catalog[tu.parameters_to_test[parameter]]
     x = x[x > -40]
 
     if parameter in ["dt", "T_span", "wn"]:
@@ -56,18 +59,18 @@ def test_generation(parameter, n_pulsars, pulsar_dictionary):
 
 class TestCatalogGenerator(unittest.TestCase):
     def test_generation_EPTA(self):
-        for p in parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 30, EPTAlike_test) > 1e-4)
+        for p in tu.parameters_to_test.keys():
+            self.assertTrue(test_generation(p, 30, tu.EPTAlike_test) > 1e-4)
 
     def test_generation_EPTA_noiseless(self):
-        for p in parameters_to_test.keys():
+        for p in tu.parameters_to_test.keys():
             self.assertTrue(
-                test_generation(p, 50, EPTAlike_noiseless_test) > 1e-4
+                test_generation(p, 50, tu.EPTAlike_noiseless_test) > 1e-4
             )
 
     def test_generation_SKAlike(self):
-        for p in parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 500, mockSKA10_test) > 1e-4)
+        for p in tu.parameters_to_test.keys():
+            self.assertTrue(test_generation(p, 500, tu.mockSKA10_test) > 1e-4)
 
 
 if __name__ == "__main__":
