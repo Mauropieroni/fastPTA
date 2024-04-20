@@ -182,10 +182,10 @@ def dpower_law(index, frequency, parameters, pivot=ut.f_yr):
 # Z = []
 # Znum = []
 # for i in range(len(X)):
-#     Y.append(dpower_law(0, frequency_point, [X[i], SMBBH_tilt], f_yr))
-#     Ynum.append(grad(function_powerlaw, argnums=0)(X[i], SMBBH_tilt, f_yr))
-#     Z.append(dpower_law(1, frequency_point, [SMBBH_log_amplitude, X[i]], f_yr))
-#     Znum.append(grad(function_powerlaw, argnums=1)(SMBBH_log_amplitude, X[i], f_yr))
+#     Y.append(dpower_law(0, frequency_point, [X[i], SMBBH_tilt], ut.f_yr))
+#     Ynum.append(grad(function_powerlaw, argnums=0)(X[i], SMBBH_tilt, ut.f_yr))
+#     Z.append(dpower_law(1, frequency_point, [SMBBH_log_amplitude, X[i]], ut.f_yr))
+#     Znum.append(grad(function_powerlaw, argnums=1)(SMBBH_log_amplitude, X[i], ut.f_yr))
 # plt.loglog(X, Y, label='$LogAmplitude - analytic$')
 # plt.loglog(X, Ynum, color='yellow', linestyle='dashed', label='$LogAmplitude - numeric$')
 # plt.loglog(X, Z, label='$Tilt - analytic$')
@@ -620,7 +620,7 @@ def dSMBH_and_broken_power_law(index, frequency, parameters):
 ## Already done for the two separate functions
 
 
-def tanh(frequency, parameters, pivot=f_yr):
+def tanh(frequency, parameters, pivot=ut.f_yr):
     """
     Generate a tanh spectrum.
 
@@ -643,7 +643,7 @@ def tanh(frequency, parameters, pivot=f_yr):
     return (10**log_amplitude) * (1 + jnp.tanh(frequency / pivot)) ** tilt
 
 
-# def dtanh(index, frequency, parameters, pivot=f_yr):
+# def dtanh(index, frequency, parameters, pivot=ut.f_yr):
 #     """
 #     Derivative of the tanh spectrum.
 
@@ -666,7 +666,7 @@ def tanh(frequency, parameters, pivot=f_yr):
 #     ### unpack parameters
 #     log_amplitude, tilt = parameters
 
-#     model = tanh(frequency, parameters, pivot=f_yr)
+#     model = tanh(frequency, parameters, pivot=ut.f_yr)
 
 #     if index == 0:
 #         dlog_model = jnp.log(10)
@@ -682,12 +682,12 @@ def tanh(frequency, parameters, pivot=f_yr):
 #     return model * dlog_model
 
 # def function_tanh(frequency, log_amplitude, tilt):
-#     return (10**log_amplitude) * (1+jnp.tanh(frequency/f_yr))**tilt
+#     return (10**log_amplitude) * (1+jnp.tanh(frequency/ut.f_yr))**tilt
 
 # The following one is if you want ot compute the derivative numerically
 
 
-def dtanh(index, frequency, parameters, pivot=f_yr):
+def dtanh(index, frequency, parameters, pivot=ut.f_yr):
     """
     Derivative of the tanh spectrum.
 
@@ -710,12 +710,12 @@ def dtanh(index, frequency, parameters, pivot=f_yr):
     ### unpack parameters
     log_amplitude, tilt = parameters
 
-    model = tanh(frequency, parameters, pivot=f_yr)
+    model = tanh(frequency, parameters, pivot=ut.f_yr)
 
     dlog_model = []
 
     def function_tanh(frequency, log_amplitude, tilt):
-        return (10**log_amplitude) * (1 + jnp.tanh(frequency / f_yr)) ** tilt
+        return (10**log_amplitude) * (1 + jnp.tanh(frequency / ut.f_yr)) ** tilt
 
     if index == 0:
         for i in range(len(frequency)):
@@ -743,7 +743,7 @@ def dtanh(index, frequency, parameters, pivot=f_yr):
 # To use grad() we need a function of the parameters
 
 # def function_tanh(log_amplitude, tilt):
-#     return (10**log_amplitude) * (1+jnp.tanh(frequency_point/f_yr))**tilt
+#     return (10**log_amplitude) * (1+jnp.tanh(frequency_point/ut.f_yr))**tilt
 
 # X = np.arange(1, 10, 0.01)
 # Y = []
@@ -751,9 +751,9 @@ def dtanh(index, frequency, parameters, pivot=f_yr):
 # Z = []
 # Znum = []
 # for i in range(len(X)):
-#     Y.append(dtanh(0, frequency_point, [X[i], Tanh_tilt], f_yr))
+#     Y.append(dtanh(0, frequency_point, [X[i], Tanh_tilt], ut.f_yr))
 #     Ynum.append(grad(function_tanh, argnums=0)(X[i], Tanh_tilt))
-#     Z.append(dtanh(1, frequency_point, [Tanh_log_amplitude, X[i]], f_yr))
+#     Z.append(dtanh(1, frequency_point, [Tanh_log_amplitude, X[i]], ut.f_yr))
 #     Znum.append(grad(function_tanh, argnums=1)(Tanh_log_amplitude, X[i]))
 # plt.loglog(X, Y, label='$LogAmplitude - analytic$')
 # plt.loglog(X, Ynum, color='yellow', linestyle='dashed', label='$LogAmplitude - numeric$')
