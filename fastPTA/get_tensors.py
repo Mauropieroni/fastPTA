@@ -1,9 +1,31 @@
+# Global
+import numpy as np
+import pandas as pd
+
+import jax
+import jax.numpy as jnp
+
+from scipy.special import legendre
+from scipy.integrate import simpson
+
 # Local
-from fastPTA.utils import *
+import fastPTA.utils as ut
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
-@jit
+jax.config.update("jax_enable_x64", True)
+
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
+
+
+# Just some constants
+log_A_curn_default = -13.94
+log_gamma_curn_default = 2.71
+integration_points = 10000
+
+
+@jax.jit
 def unit_vector(theta, phi):
     """
     Compute the unit vector in 3D Cartesian coordinates given spherical
@@ -34,7 +56,7 @@ def unit_vector(theta, phi):
     ).T
 
 
-@jit
+@jax.jit
 def HD_correlations(zeta_IJ):
     """
     Compute the Hellings and Downs correlations for two line of sights with
@@ -65,7 +87,7 @@ x = jnp.linspace(-1, 1, integration_points)
 HD_value = HD_correlations(x)
 
 
-@jit
+@jax.jit
 def get_WN(WN_par, dt):
     """
     Compute the white noise amplitude for a catalog of pulsars given the
@@ -88,7 +110,7 @@ def get_WN(WN_par, dt):
     return 1e-100 + jnp.array(1e-12 * 2 * WN_par**2 * dt)
 
 
-@jit
+@jax.jit
 def get_pl_colored_noise(frequencies, log10_ampl, gamma):
     """
     Compute power-law colored noise for given frequencies and parameters.
@@ -109,12 +131,14 @@ def get_pl_colored_noise(frequencies, log10_ampl, gamma):
 
     """
 
-    amplitude_prefactor = (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
-    frequency_dependent_term = (f_yr / frequencies)[None, :] ** gamma[:, None]
+    amplitude_prefactor = (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / ut.f_yr**3
+    frequency_dependent_term = (ut.f_yr / frequencies)[None, :] ** gamma[
+        :, None
+    ]
     return amplitude_prefactor[:, None] * frequency_dependent_term
 
 
-@jit
+@jax.jit
 def get_noise_omega(frequencies, noise):
     """
     Takes pulsar noises and convert them in Omega units.
@@ -138,7 +162,7 @@ def get_noise_omega(frequencies, noise):
 
     # Factor to convert to omega units
     convert_to_omega_factor = (
-        strain_to_Omega(frequencies) * convert_to_strain_factor
+        ut.strain_to_Omega(frequencies) * convert_to_strain_factor
     )
 
     # Convert the noise to omega units
@@ -147,7 +171,7 @@ def get_noise_omega(frequencies, noise):
     )
 
 
-@jit
+@jax.jit
 def get_pulsar_noises(
     frequencies,
     WN_par,
@@ -219,7 +243,7 @@ def get_pulsar_noises(
     return WN[:, None] + RN + DM + SV
 
 
-@jit
+@jax.jit
 def transmission_function(frequencies, T_obs):
     """
     Compute the transmission function, which represents the attenuation of
@@ -242,7 +266,7 @@ def transmission_function(frequencies, T_obs):
     return 1 / (1 + 1 / (frequencies * T_obs) ** 6)
 
 
-@jit
+@jax.jit
 def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     """
     Computes the time tensor (i.e., the part of the response depending on the
@@ -271,7 +295,7 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
 
     # Compute thte transmission function for all times and frequencies
     transmission = transmission_function(
-        frequencies[:, None], (Tspan_yr * yr)[None, :]
+        frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
     )
 
     # Return the tensor product weighted by the total observation time
@@ -282,7 +306,7 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     )
 
 
-@jit
+@jax.jit
 def get_response_IJ(zeta_IJ, time_tensor_IJ):
     """
     Compute the response tensor for given angular separations and time tensors.
@@ -338,7 +362,7 @@ def get_HD_Legendre_coefficients(order):
     )
 
 
-@jit
+@jax.jit
 def Legendre_projection(time_tensor_IJ, polynomials_IJ):
     """
     Projects the pulsar angular information onto Legendre polynomials
@@ -397,7 +421,7 @@ def HD_projection_Legendre(zeta_IJ, time_tensor_IJ, order):
     return HD_functions, HD_coefficients
 
 
-@jit
+@jax.jit
 def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     """
     Compute binned projection of the Hellings and Downs correlations.
@@ -480,7 +504,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
 def get_tensors(
     frequencies,
-    path_to_pulsar_catalog=path_to_default_pulsar_catalog,
+    path_to_pulsar_catalog=ut.path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
     add_curn=False,
     order=0,

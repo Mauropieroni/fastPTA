@@ -1,19 +1,29 @@
 # Global
 import unittest
 
+import numpy as np
+
+import jax
+import jax.numpy as jnp
+
 # Local
-from test_utils import *
-from fastPTA.Fisher_code import *
+import test_utils as tu
+from fastPTA.Fisher_code import compute_fisher
+
+jax.config.update("jax_enable_x64", True)
+
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
 
 class TestFisher(unittest.TestCase):
 
     def test_compute_fisher(self):
 
-        data = np.load(Fisher_data_path)
+        data = np.load(tu.Fisher_data_path)
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path,
+            "path_to_pulsar_catalog": tu.test_catalog_path,
             "verbose": True,
         }
 
@@ -28,7 +38,7 @@ class TestFisher(unittest.TestCase):
         self.assertEqual(jnp.sum(jnp.abs(res[6] - data["fisher"])), 0.0)
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path,
+            "path_to_pulsar_catalog": tu.test_catalog_path,
             "method": "legendre",
             "order": 6,
             "verbose": True,
@@ -38,12 +48,12 @@ class TestFisher(unittest.TestCase):
 
         self.assertAlmostEqual(
             jnp.sum(jnp.abs(res_HD_legendre[6] - data["fisher_HD_legendre"])),
-            0.0,
+            0.0,  # type: ignore
             places=10,
         )
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path,
+            "path_to_pulsar_catalog": tu.test_catalog_path,
             "method": "binned",
             "order": 10,
             "verbose": True,
@@ -53,17 +63,17 @@ class TestFisher(unittest.TestCase):
 
         self.assertAlmostEqual(
             jnp.sum(jnp.abs(res_HD_binned[6] - data["fisher_HD_binned"])),
-            0.0,
+            0.0,  # type: ignore
             places=10,
         )
 
     def test_compute_fisher_future(self):
 
         n_frequencies = 100
-        data = np.load(Fisher_data_path2)
+        data = np.load(tu.Fisher_data_path2)
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path3,
+            "path_to_pulsar_catalog": tu.test_catalog_path3,
             "verbose": True,
         }
 
@@ -74,13 +84,18 @@ class TestFisher(unittest.TestCase):
         self.assertEqual(jnp.sum(jnp.abs(res[0] - data["frequency"])), 0.0)
         self.assertEqual(jnp.sum(jnp.abs(res[1] - data["signal"])), 0.0)
         self.assertAlmostEqual(
-            jnp.sum(jnp.abs(res[4] - data["effective_noise"])), 0.0  # type: ignore
-        )  # type: ignore
-        self.assertAlmostEqual(jnp.sum(jnp.abs(res[5] - data["SNR"])), 0.0)  # type: ignore # type: ignore
-        self.assertAlmostEqual(jnp.sum(jnp.abs(res[6] - data["fisher"])), 0.0)  # type: ignore
+            jnp.sum(jnp.abs(res[4] - data["effective_noise"])),
+            0.0,  # type: ignore
+        )
+        self.assertAlmostEqual(
+            jnp.sum(jnp.abs(res[5] - data["SNR"])), 0.0  # type: ignore
+        )
+        self.assertAlmostEqual(
+            jnp.sum(jnp.abs(res[6] - data["fisher"])), 0.0  # type: ignore
+        )
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path3,
+            "path_to_pulsar_catalog": tu.test_catalog_path3,
             "method": "legendre",
             "order": 6,
             "verbose": True,
@@ -97,7 +112,7 @@ class TestFisher(unittest.TestCase):
         )  # type: ignore
 
         get_tensors_kwargs = {
-            "path_to_pulsar_catalog": test_catalog_path3,
+            "path_to_pulsar_catalog": tu.test_catalog_path3,
             "method": "binned",
             "order": 10,
             "verbose": True,
