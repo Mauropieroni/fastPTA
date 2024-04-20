@@ -13,12 +13,6 @@ jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
 
-# Just some constants
-log_A_curn_default = -13.94
-log_gamma_curn_default = 2.71
-integration_points = 10000
-
-
 # H0/h = 100 km/s/Mpc expressed in meters
 Hubble_over_h = 3.24e-18
 # Hour
