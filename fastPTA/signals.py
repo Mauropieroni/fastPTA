@@ -55,8 +55,8 @@ CGW_SIGW_parameters = jnp.array(
 )
 
 
-cgx = np.loadtxt(path_to_defaults + "fvals.txt")
-cgy = np.loadtxt(path_to_defaults + "cgvals.txt")
+cgx = np.loadtxt(ut.path_to_defaults + "fvals.txt")
+cgy = np.loadtxt(ut.path_to_defaults + "cgvals.txt")
 
 
 def cg(f):
