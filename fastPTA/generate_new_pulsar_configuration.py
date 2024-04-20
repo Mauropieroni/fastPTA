@@ -1,10 +1,9 @@
 # Global
-import os, sys
 import numpy as np
 import pandas as pd
 
 # Local
-from fastPTA.utils import load_yaml, default_pulsar_parameters
+from fastPTA.utils import default_pulsar_parameters
 
 
 def generate_parameter(n_pulsars, parameter_dict):
@@ -180,7 +179,9 @@ def generate_pulsars_catalog(
     normed = noise_probabilities / np.sum(noise_probabilities)
 
     catalog = {}
-    catalog["names"] = ["pulsar_" + str(l) for l in (1 + np.arange(n_pulsars))]
+    catalog["names"] = [
+        "pulsar_" + str(ell) for ell in (1 + np.arange(n_pulsars))
+    ]
     catalog["phi"] = np.random.uniform(0.0, 2 * np.pi, n_pulsars)
     catalog["theta"] = np.arccos(np.random.uniform(-1, 1, n_pulsars))
     catalog["dt"] = 10 ** generate_parameter(n_pulsars, dt_dict)
@@ -195,7 +196,7 @@ def generate_pulsars_catalog(
                 red_noise_log_10_A_dict,
                 sv_noise_log_10_A_dict,
             ],
-            noise_probabilities,
+            normed,
             do_filter=True,
         ).T
     )
@@ -208,7 +209,7 @@ def generate_pulsars_catalog(
                 red_noise_g_dict,
                 sv_noise_g_dict,
             ],
-            noise_probabilities,
+            normed,
             do_filter=False,
         ).T
     )

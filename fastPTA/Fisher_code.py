@@ -1,10 +1,19 @@
+# Global
+import jax
+import jax.numpy as jnp
+
 # Local
-from fastPTA.utils import *
+import fastPTA.utils as ut
 from fastPTA.signals import SMBBH_parameters, get_model
 from fastPTA.get_tensors import get_tensors
 
+jax.config.update("jax_enable_x64", True)
 
-@jit
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
+
+
+@jax.jit
 def get_SNR_integrand(signal_tensor, c_inverse):
     """
     Compute the integrand for the Signal-to-Noise Ratio (SNR) (for some set of
@@ -34,7 +43,7 @@ def get_SNR_integrand(signal_tensor, c_inverse):
     return jnp.einsum("ijk,ikj->i", c_bar_SNR, c_bar_SNR)
 
 
-@jit
+@jax.jit
 def get_fisher_integrand(dsignal_tensor, c_inverse):
     """
     Compute the integrand used to compute the Fisher Information Matrix (for
@@ -68,7 +77,7 @@ def get_fisher_integrand(dsignal_tensor, c_inverse):
     return jnp.einsum("aijk,bikj->abi", c_bar, c_bar)
 
 
-@jit
+@jax.jit
 def get_integrands(
     signal,
     dsignal,
@@ -121,7 +130,7 @@ def get_integrands(
     covariance = signal_tensor + noise_tensor
 
     # Invert the covariance
-    c_inverse = compute_inverse(covariance)
+    c_inverse = ut.compute_inverse(covariance)
 
     # This is the SNR integrand
     SNR_integrand = get_SNR_integrand(signal_tensor, c_inverse)
@@ -202,7 +211,7 @@ def compute_fisher(
     """
 
     # Setting the frequency vector from the observation time
-    T_tot = T_obs_yrs * yr
+    T_tot = T_obs_yrs * ut.yr
     fmin = 1 / T_tot
     frequency = fmin * (1 + jnp.arange(n_frequencies))
 

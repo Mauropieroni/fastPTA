@@ -1,9 +1,11 @@
-### Global
+# Global
 import corner
-from matplotlib.patches import Patch
+import matplotlib
+import matplotlib.patches
+import matplotlib.pyplot as plt
 
-### Local
-from fastPTA.utils import *
+import numpy as np
+from scipy.special import legendre
 
 
 # Setting plotting parameters
@@ -184,7 +186,9 @@ def plot_corner(
     if samples[0].shape[-1] > 1:
         for i in range(len(chain_labels)):
             custom_lines.append(
-                Patch(facecolor=colors[i], label=chain_labels[i])
+                matplotlib.patches.Patch(
+                    facecolor=colors[i], label=chain_labels[i]
+                )
             )
 
         plt.legend(

@@ -1,24 +1,34 @@
-### Local
-from fastPTA.utils import *
+# Global
+import jax
+import jax.numpy as jnp
+
+# Local
+import fastPTA.utils as ut
 
 
-### Current SMBBH SGWB log_amplitude best-fit
+jax.config.update("jax_enable_x64", True)
+
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
+
+
+# Current SMBBH SGWB log_amplitude best-fit
 SMBBH_log_amplitude = -7.1995
 SMBBH_tilt = 2
 
-### Current SMBBH SGWB parameters
+# Current SMBBH SGWB parameters
 SMBBH_parameters = jnp.array([SMBBH_log_amplitude, SMBBH_tilt])
 
-### A value for a flat spectrum
+# A value for a flat spectrum
 CGW_flat_parameters = jnp.array([-7.0])
 
-### Some values for a LN spectrum
+# Some values for a LN spectrum
 LN_log_amplitude = -6.45167492
 LN_log_width = -0.91240383
 LN_log_pivot = -7.50455732
 CGW_LN_parameters = jnp.array([LN_log_amplitude, LN_log_width, LN_log_pivot])
 
-### Some values for a BPL spectrum
+# Some values for a BPL spectrum
 BPL_log_amplitude = -5.8
 BPL_log_width = -7.3
 BPL_tilt_1 = 3
@@ -55,7 +65,7 @@ def dflat(index, frequency, parameters):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -75,7 +85,7 @@ def dflat(index, frequency, parameters):
         raise ValueError("Cannot use that for this signal")
 
 
-def power_law(frequency, parameters, pivot=f_yr):
+def power_law(frequency, parameters, pivot=ut.f_yr):
     """
     Generate a power law spectrum.
 
@@ -92,20 +102,20 @@ def power_law(frequency, parameters, pivot=f_yr):
         Array containing the computed power law spectrum.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, tilt = parameters
 
     return 10**log_amplitude * (frequency / pivot) ** tilt
 
 
-def dpower_law(index, frequency, parameters, pivot=f_yr):
+def dpower_law(index, frequency, parameters, pivot=ut.f_yr):
     """
     Derivative of the power law spectrum.
 
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -118,7 +128,7 @@ def dpower_law(index, frequency, parameters, pivot=f_yr):
             respect to the specified parameter.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, tilt = parameters
 
     model = power_law(frequency, parameters)
@@ -152,7 +162,7 @@ def lognormal(frequency, parameters):
         Array containing the computed lognormal spectrum.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
     return 10**log_amplitude * jnp.exp(
@@ -167,7 +177,7 @@ def dlognormal(index, frequency, parameters):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -180,7 +190,7 @@ def dlognormal(index, frequency, parameters):
             respect to the specified parameter.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
     model = lognormal(frequency, parameters)
@@ -237,7 +247,7 @@ def dSMBH_and_lognormal(index, frequency, parameters):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -275,7 +285,7 @@ def broken_power_law(frequency, parameters, smoothing=1.5):
         Array containing the computed broken power law spectrum.
     """
 
-    ### unpack parameters
+    # unpack parameters
     alpha, gamma, a, b = parameters
 
     x = frequency / 10**gamma
@@ -298,7 +308,7 @@ def dbroken_power_law(index, frequency, parameters, smoothing=1.5):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -311,7 +321,7 @@ def dbroken_power_law(index, frequency, parameters, smoothing=1.5):
         respect to the specified parameter.
     """
 
-    ### unpack parameters
+    # unpack parameters
     alpha, gamma, a, b = parameters
 
     model = broken_power_law(frequency, parameters)
@@ -392,7 +402,7 @@ def dSMBH_and_broken_power_law(index, frequency, parameters):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -441,7 +451,7 @@ def dSMBH_and_flat(index, frequency, parameters):
     Parameters:
     -----------
     index : int
-        Index of the parameter with respect to which the derivative is computed.
+        Index of the parameter to differentiate.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray

@@ -1,10 +1,11 @@
 import os
-from fastPTA.utils import *
+import numpy as np
+from fastPTA.utils import load_yaml
 
 
 test_data_path = os.path.join(os.path.dirname(__file__), "test_data/")
 
-### Default parameters for the pulsars
+# Default parameters for the pulsars
 EPTAlike_test = load_yaml(test_data_path + "/EPTAlike_pulsar_parameters.yaml")
 EPTAlike_noiseless_test = load_yaml(
     test_data_path + "/EPTAlike_pulsar_parameters_noiseless.yaml"
