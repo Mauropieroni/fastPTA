@@ -290,49 +290,49 @@ def get_constraints(
 
 
 if __name__ == "__main__":
-    # scan_parameter(
-    #     "power_law_lognormal",
-    #     np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
-    #     0,
-    #     np.linspace(-13, -7, 15),
-    #     n_frequencies=100,
-    #     generate_catalog_kwargs={
-    #         "n_pulsars": 30,
-    #         "save_catalog": True,
-    #         **eu.mockSKA10,
-    #     },
-    #     get_tensors_kwargs={
-    #         "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
-    #         "add_curn": True,
-    #         "regenerate_catalog": False,
-    #     },
-    #     parameter_labels=[
-    #         r"$\alpha_{\rm PL}$",
-    #         r"$n_{\rm T}$",
-    #         r"$\alpha_{\rm LN}$",
-    #         r"$\beta_{\rm LN}$",
-    #         r"$\gamma{\rm LN}$",
-    #     ],
-    # )
+    scan_parameter(
+        "power_law_lognormal",
+        np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
+        0,
+        np.linspace(-13, -7, 15),
+        n_frequencies=100,
+        generate_catalog_kwargs={
+            "n_pulsars": 30,
+            "save_catalog": True,
+            **eu.mockSKA10,
+        },
+        get_tensors_kwargs={
+            "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
+            "add_curn": True,
+            "regenerate_catalog": False,
+        },
+        parameter_labels=[
+            r"$\alpha_{\rm PL}$",
+            r"$n_{\rm T}$",
+            r"$\alpha_{\rm LN}$",
+            r"$\beta_{\rm LN}$",
+            r"$\gamma{\rm LN}$",
+        ],
+    )
 
-    # HD_constraints(
-    #     "power_law",
-    #     SMBBH_parameters,
-    #     get_tensors_kwargs={
-    #         "order": 2,
-    #         "method": "legendre",
-    #         "path_to_pulsar_catalog": "pulsar_configurations/Mock_SKA.txt",
-    #         "add_curn": True,
-    #         "regenerate_catalog": True,
-    #     },
-    #     n_frequencies=200,
-    #     generate_catalog_kwargs={
-    #         "n_pulsars": 30,
-    #         "save_catalog": True,
-    #         "outname": "pulsar_configurations/Mock_SKA.txt",
-    #         **eu.mockSKA10,
-    #     },
-    # )
+    HD_constraints(
+        "power_law",
+        SMBBH_parameters,
+        get_tensors_kwargs={
+            "order": 2,
+            "method": "legendre",
+            "path_to_pulsar_catalog": "pulsar_configurations/Mock_SKA.txt",
+            "add_curn": True,
+            "regenerate_catalog": True,
+        },
+        n_frequencies=200,
+        generate_catalog_kwargs={
+            "n_pulsars": 30,
+            "save_catalog": True,
+            "outname": "pulsar_configurations/Mock_SKA.txt",
+            **eu.mockSKA10,
+        },
+    )
 
     get_constraints(
         "power_law",
@@ -363,30 +363,30 @@ if __name__ == "__main__":
         ],
     )
 
-    # get_constraints(
-    #     "power_law_lognormal",
-    #     np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
-    #     n_frequencies=100,
-    #     rerun_MCMC=True,
-    #     path_to_MCMC_data="generated_data/MCMC_data_ln_future.npz",
-    #     path_to_MCMC_chains="generated_chains/MCMC_chains_ln_future.npz",
-    #     MCMC_kwargs={},
-    #     generate_catalog_kwargs={
-    #         "n_pulsars": 30,
-    #         "save_catalog": True,
-    #         **eu.mockSKA10,
-    #     },
-    #     get_tensors_kwargs={
-    #         "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
-    #         "add_curn": True,
-    #         "regenerate_catalog": False,
-    #     },
-    #     parameter_labels=[
-    #         r"$\alpha_{\rm PL}$",
-    #         r"$n_{\rm T}$",
-    #         r"$\alpha_{\rm LN}$",
-    #         r"$\beta_{\rm LN}$",
-    #         r"$\gamma{\rm LN}$",
-    #     ],
-    # )
+    get_constraints(
+        "power_law_lognormal",
+        np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
+        n_frequencies=100,
+        rerun_MCMC=True,
+        path_to_MCMC_data="generated_data/MCMC_data_ln_future.npz",
+        path_to_MCMC_chains="generated_chains/MCMC_chains_ln_future.npz",
+        MCMC_kwargs={},
+        generate_catalog_kwargs={
+            "n_pulsars": 30,
+            "save_catalog": True,
+            **eu.mockSKA10,
+        },
+        get_tensors_kwargs={
+            "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
+            "add_curn": True,
+            "regenerate_catalog": False,
+        },
+        parameter_labels=[
+            r"$\alpha_{\rm PL}$",
+            r"$n_{\rm T}$",
+            r"$\alpha_{\rm LN}$",
+            r"$\beta_{\rm LN}$",
+            r"$\gamma{\rm LN}$",
+        ],
+    )
     plt.show(block=True)
