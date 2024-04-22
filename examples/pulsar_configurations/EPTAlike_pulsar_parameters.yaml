@@ -1,0 +1,64 @@
+### These parameters would give a configuration similar to the current EPTA
+### set of pulsars, to define new mock catalogs copy and modify this file
+
+### This is specifies the priors for your signal parameters...
+dt_dict:
+    ### This is the delta t 
+    which_distribution: "gaussian"
+    mean: 5.325305761681838
+    std: 0.3292363232490588
+
+T_span_dict:
+    ### Add description
+    which_distribution: "gaussian"
+    mean: 1.0
+    std: 0.0125
+
+wn_dict:
+    ### Add description
+    which_distribution: "gaussian"
+    mean: 0.28413200134629735
+    std: 0.362397515641075
+
+dm_noise_log_10_A_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: -16
+    max: -12.5
+
+red_noise_log_10_A_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: -16
+    max: -12.5
+
+sv_noise_log_10_A_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: -16
+    max: -12.5
+
+dm_noise_g_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: 0.25
+    max: 5.0
+
+red_noise_g_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: 0.25
+    max: 5.0
+
+sv_noise_g_dict:
+    ### Add description
+    which_distribution: "uniform"
+    min: 0.25
+    max: 5.0
+
+noise_probabilities_dict:
+    ### Add description
+    ### probabilities for the different noises to be present
+    red : .9
+    dm : .3
+    sv : 0.05
