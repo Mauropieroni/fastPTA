@@ -1,11 +1,14 @@
 # Global
+import tqdm
 import numpy as np
+import healpy as hp
 import pandas as pd
 
 import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
+from scipy.special import sph_harm
 from scipy.integrate import simpson
 
 # Local
@@ -339,11 +342,11 @@ def get_correlations_lm_IJ(p_I, lm_order, nside):
     )
 
     i = 0
-    for l in tqdm.tqdm(range(lm_order + 1)):
-        for m in jnp.linspace(0, l, l + 1, dtype=int):
+    for ell in tqdm.tqdm(range(lm_order + 1)):
+        for m in jnp.linspace(0, ell, ell + 1, dtype=int):
             if m != 0:
-                sp_lm1 = sph_harm(m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
-                sp_lm2 = sph_harm(-m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp_lm1 = sph_harm(m, ell, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp_lm2 = sph_harm(-m, ell, phi, theta) * jnp.sqrt(4 * jnp.pi)
                 sp1 = (1j / jnp.sqrt(2) * (sp_lm1 - (-1) ** m * sp_lm2)).real
                 sp2 = (1 / jnp.sqrt(2) * (sp_lm2 + (-1) ** m * sp_lm1)).real
                 correlations_lm[i] = jnp.mean(
@@ -356,81 +359,7 @@ def get_correlations_lm_IJ(p_I, lm_order, nside):
                 i += 2
 
             else:
-                sp0 = sph_harm(m, l, phi, theta).real * np.sqrt(4 * jnp.pi)
-                correlations_lm[i] = jnp.mean(
-                    gamma_pq * sp0[None, None, :], axis=-1
-                )
-
-                i += 1
-
-    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
-
-
-def get_response_IJ_lm(p_I, time_tensor_IJ, lm_order, nside):
-    """
-    TO ADD
-
-    """
-
-    # Compute the correlations on lm basis
-    # To understand if a factor 0.5 * jnp.eye(len(zeta_IJ)) is missing!!!!
-    correlations_lm_IJ = get_correlations_lm_IJ(p_I, lm_order, nside)
-
-    # combine the Hellings and Downs part and the time part
-    return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
-
-
-@jax.jit
-def Gamma(p, q, Omega):
-    """
-    TO ADD
-    """
-    pq = jnp.einsum("iv,jv->ij", p, q)
-    pOmega = jnp.einsum("iv,jv->ij", p, Omega)
-    qOmega = jnp.einsum("iv,jv->ij", q, Omega)
-    numerator = (
-        2 * (pq[..., None] - pOmega[:, None, :] * qOmega[None, ...]) ** 2
-    )
-    denominator = (1 + pOmega[:, None, :]) * (1 + qOmega[None, ...])
-    term2 = -(1 - pOmega[:, None, :]) * (1 - qOmega[None, ...])
-    return numerator / (1e-30 + denominator) + term2
-
-
-def get_correlations_lm_IJ(p_I, lm_order, nside):
-    """
-    TO ADD
-    """
-
-    npix = hp.nside2npix(nside)
-    theta, phi = hp.pix2ang(nside, jnp.arange(npix))
-    theta = jnp.array(theta)
-    phi = jnp.array(phi)
-
-    gamma_pq = 3 / 8 * Gamma(p_I, p_I, unit_vector(theta, phi))
-
-    correlations_lm = np.zeros(
-        shape=(int(1 + lm_order) ** 2, len(p_I), len(p_I))
-    )
-
-    i = 0
-    for l in tqdm.tqdm(range(lm_order + 1)):
-        for m in jnp.linspace(0, l, l + 1, dtype=int):
-            if m != 0:
-                sp_lm1 = sph_harm(m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
-                sp_lm2 = sph_harm(-m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
-                sp1 = (1j / jnp.sqrt(2) * (sp_lm1 - (-1) ** m * sp_lm2)).real
-                sp2 = (1 / jnp.sqrt(2) * (sp_lm2 + (-1) ** m * sp_lm1)).real
-                correlations_lm[i] = jnp.mean(
-                    gamma_pq * sp1[None, None, :], axis=-1
-                )
-                correlations_lm[i + 1] = jnp.mean(
-                    gamma_pq * sp2[None, None, :], axis=-1
-                )
-
-                i += 2
-
-            else:
-                sp0 = sph_harm(m, l, phi, theta).real * np.sqrt(4 * jnp.pi)
+                sp0 = sph_harm(m, ell, phi, theta).real * np.sqrt(4 * jnp.pi)
                 correlations_lm[i] = jnp.mean(
                     gamma_pq * sp0[None, None, :], axis=-1
                 )

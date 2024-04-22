@@ -207,7 +207,7 @@ def get_integrands_lm(
     covariance = signal_tensor + noise_tensor
 
     # Invert the covariance
-    c_inverse = compute_inverse(covariance)
+    c_inverse = ut.compute_inverse(covariance)
 
     # This is the SNR integrand
     SNR_integrand = get_SNR_integrand(signal_tensor, c_inverse)
@@ -334,7 +334,7 @@ def compute_fisher(
     )
 
     if anisotropies:
-        signal_lm = 1e-1 * np.ones((1 + lm_order) ** 2)
+        signal_lm = 1e-1 * jnp.ones((1 + lm_order) ** 2)
         signal_lm[0] = 1.0
         # signal_lm[1] = 1.0
         # signal_lm[2] = 1.0
