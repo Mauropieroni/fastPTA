@@ -1,24 +1,14 @@
-# This reproduces the plot in fig xx, yy of the paper
-import os, sys
+# Global
+import tqdm
 import numpy as np
+import matplotlib.pyplot as plt
 
-file_path = os.path.dirname(__file__)
-if file_path:
-    file_path += "/"
-
-from fastPTA.utils import *
+# Local
+import examples_utils as eu
+import fastPTA.utils as ut
+import fastPTA.plotting_functions as pf
 from fastPTA.signals import SMBBH_parameters
 from fastPTA.Fisher_code import compute_fisher
-
-# Default parameters for the pulsars
-EPTAlike = load_yaml(
-    file_path + "../pulsar_configurations/EPTAlike_pulsar_parameters.yaml"
-)
-
-EPTAlike_noiseless = load_yaml(
-    file_path
-    + "../pulsar_configurations/EPTAlike_pulsar_parameters_noiseless.yaml"
-)
 
 
 def T_scaling(
@@ -33,7 +23,7 @@ def T_scaling(
     order=0,
     method="Legendre",
     add_curn=True,
-    default_pulsars=EPTAlike,
+    default_pulsars=eu.EPTAlike,
     add_HD_prior=True,
     signal_labels=[r"$\alpha_{*}$", r"$n_{\rm T}$"],
     save_path="Default",
@@ -118,7 +108,7 @@ def T_scaling(
                             np.zeros(len(signal_parameters)), np.ones(order + 1)
                         )
                     )
-                c_inverse = compute_inverse(fisher)
+                c_inverse = ut.compute_inverse(fisher)
                 errors = np.sqrt(np.diag(c_inverse))
 
                 SNR_iteration[j] = SNR
@@ -148,7 +138,7 @@ def T_scaling(
         T_obs_values,
         SNR_mean,
         yerr=SNR_std,
-        color=my_colormap["cyan"],
+        color=pf.my_colormap["cyan"],
         fmt="o",
         markersize=4,
         linestyle="dashed",
@@ -175,7 +165,7 @@ def T_scaling(
 
     plt.figure(figsize=(6, 4))
     for i in range(len(signal_parameters)):
-        colors = list(my_colormap.keys())
+        colors = list(pf.my_colormap.keys())
         col = colors[np.mod(i, len(colors))]
         plt.errorbar(
             T_obs_values,
@@ -227,7 +217,7 @@ def T_scaling(
                 parameters_mean[:, len(signal_parameters) + i],
                 yerr=parameters_std[:, len(signal_parameters) + i],
                 label=label + str(i),
-                color=cmap_HD(0.1 + i / 1.1 / (order + 1)),
+                color=pf.cmap_HD(0.1 + i / 1.1 / (order + 1)),
             )
 
         plt.xlabel(r"$T_{\rm obs} \rm [yr]$")
@@ -251,7 +241,7 @@ def N_scaling(
     order=0,
     method="Legendre",
     add_curn=True,
-    default_pulsars=EPTAlike,
+    default_pulsars=eu.EPTAlike,
     add_HD_prior=True,
     signal_labels=[r"$\alpha_{*}$", r"$n_{\rm T}$"],
     save_path="Default",
@@ -328,7 +318,7 @@ def N_scaling(
                         )
                     )
 
-                c_inverse = compute_inverse(fisher)
+                c_inverse = ut.compute_inverse(fisher)
                 errors = np.sqrt(np.diag(c_inverse))
 
                 SNR_iteration[j] = SNR
@@ -359,7 +349,7 @@ def N_scaling(
         N_pulsars,
         SNR_mean,
         yerr=SNR_std,
-        color=my_colormap["cyan"],
+        color=pf.my_colormap["cyan"],
         fmt="o",
         markersize=4,
         linestyle="dashed",
@@ -382,7 +372,7 @@ def N_scaling(
 
     plt.figure(figsize=(6, 4))
     for i in range(len(signal_parameters)):
-        colors = list(my_colormap.keys())
+        colors = list(pf.my_colormap.keys())
         col = colors[np.mod(i, len(colors))]
         plt.errorbar(
             N_pulsars,
@@ -424,7 +414,7 @@ def N_scaling(
                 parameters_mean[:, len(signal_parameters) + i],
                 yerr=parameters_std[:, len(signal_parameters) + i],
                 label=label + str(i),
-                color=cmap_HD(0.1 + i / 1.1 / (order + 1)),
+                color=pf.cmap_HD(0.1 + i / 1.1 / (order + 1)),
             )
 
             plt.loglog(
@@ -447,5 +437,5 @@ def N_scaling(
 if __name__ == "__main__":
     N_scaling()
     N_scaling(order=6)
-    T_scaling(T_max_yrs=1e3)
+    T_scaling(T_max_yrs=1e3)  # type: ignore
     plt.show(block=True)

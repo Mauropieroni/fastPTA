@@ -1,15 +1,23 @@
-# Setting the path to this file
-import os, sys
+# Global
+import numpy as np
+import pandas as pd
 
-file_path = os.path.dirname(__file__)
-if file_path:
-    file_path += "/"
+import jax
+import jax.numpy as jnp
 
-sys.path.append(os.path.join(file_path, "../fastPTA/"))
+from scipy.special import legendre
+from scipy.integrate import simpson
 
 # Local
-from utils import *
-from generate_new_pulsar_configuration import generate_pulsars_catalog
+import fastPTA.utils as ut
+from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
+
+
+jax.config.update("jax_enable_x64", True)
+
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
+
 
 # Just some constants
 log_A_curn_default = -13.94
@@ -17,7 +25,7 @@ log_gamma_curn_default = 2.71
 integration_points = 10000
 
 
-@jit
+@jax.jit
 def unit_vector(theta, phi):
     """
     Compute the unit vector in 3D Cartesian coordinates given spherical
@@ -48,7 +56,7 @@ def unit_vector(theta, phi):
     ).T
 
 
-@jit
+@jax.jit
 def HD_correlations(zeta_IJ):
     """
     Compute the Hellings and Downs correlations for two line of sights with
@@ -75,11 +83,11 @@ def HD_correlations(zeta_IJ):
 
 
 # Some default values to compute the HD curve
-x = jnp.linspace(-1, 1, 10000)
+x = jnp.linspace(-1, 1, integration_points)
 HD_value = HD_correlations(x)
 
 
-@jit
+@jax.jit
 def get_WN(WN_par, dt):
     """
     Compute the white noise amplitude for a catalog of pulsars given the
@@ -102,7 +110,7 @@ def get_WN(WN_par, dt):
     return 1e-100 + jnp.array(1e-12 * 2 * WN_par**2 * dt)
 
 
-@jit
+@jax.jit
 def get_pl_colored_noise(frequencies, log10_ampl, gamma):
     """
     Compute power-law colored noise for given frequencies and parameters.
@@ -123,14 +131,14 @@ def get_pl_colored_noise(frequencies, log10_ampl, gamma):
 
     """
 
-    amplitude_prefactor = (
-        (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / f_yr**3
-    )
-    frequency_dependent_term = (f_yr / frequencies)[None, :] ** gamma[:, None]
+    amplitude_prefactor = (10**log10_ampl) ** 2 / 12.0 / jnp.pi**2 / ut.f_yr**3
+    frequency_dependent_term = (ut.f_yr / frequencies)[None, :] ** gamma[
+        :, None
+    ]
     return amplitude_prefactor[:, None] * frequency_dependent_term
 
 
-@jit
+@jax.jit
 def get_noise_omega(frequencies, noise):
     """
     Takes pulsar noises and convert them in Omega units.
@@ -154,7 +162,7 @@ def get_noise_omega(frequencies, noise):
 
     # Factor to convert to omega units
     convert_to_omega_factor = (
-        strain_to_Omega(frequencies) * convert_to_strain_factor
+        ut.strain_to_Omega(frequencies) * convert_to_strain_factor
     )
 
     # Convert the noise to omega units
@@ -163,7 +171,7 @@ def get_noise_omega(frequencies, noise):
     )
 
 
-@jit
+@jax.jit
 def get_pulsar_noises(
     frequencies,
     WN_par,
@@ -235,7 +243,7 @@ def get_pulsar_noises(
     return WN[:, None] + RN + DM + SV
 
 
-@jit
+@jax.jit
 def transmission_function(frequencies, T_obs):
     """
     Compute the transmission function, which represents the attenuation of
@@ -258,7 +266,7 @@ def transmission_function(frequencies, T_obs):
     return 1 / (1 + 1 / (frequencies * T_obs) ** 6)
 
 
-@jit
+@jax.jit
 def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     """
     Computes the time tensor (i.e., the part of the response depending on the
@@ -287,7 +295,7 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
 
     # Compute thte transmission function for all times and frequencies
     transmission = transmission_function(
-        frequencies[:, None], (Tspan_yr * yr)[None, :]
+        frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
     )
 
     # Return the tensor product weighted by the total observation time
@@ -298,7 +306,7 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     )
 
 
-@jit
+@jax.jit
 def Gamma(p, q, Omega):
     """
     TO ADD
@@ -372,7 +380,81 @@ def get_response_IJ_lm(p_I, time_tensor_IJ, lm_order, nside):
     return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
 
 
-@jit
+@jax.jit
+def Gamma(p, q, Omega):
+    """
+    TO ADD
+    """
+    pq = jnp.einsum("iv,jv->ij", p, q)
+    pOmega = jnp.einsum("iv,jv->ij", p, Omega)
+    qOmega = jnp.einsum("iv,jv->ij", q, Omega)
+    numerator = (
+        2 * (pq[..., None] - pOmega[:, None, :] * qOmega[None, ...]) ** 2
+    )
+    denominator = (1 + pOmega[:, None, :]) * (1 + qOmega[None, ...])
+    term2 = -(1 - pOmega[:, None, :]) * (1 - qOmega[None, ...])
+    return numerator / (1e-30 + denominator) + term2
+
+
+def get_correlations_lm_IJ(p_I, lm_order, nside):
+    """
+    TO ADD
+    """
+
+    npix = hp.nside2npix(nside)
+    theta, phi = hp.pix2ang(nside, jnp.arange(npix))
+    theta = jnp.array(theta)
+    phi = jnp.array(phi)
+
+    gamma_pq = 3 / 8 * Gamma(p_I, p_I, unit_vector(theta, phi))
+
+    correlations_lm = np.zeros(
+        shape=(int(1 + lm_order) ** 2, len(p_I), len(p_I))
+    )
+
+    i = 0
+    for l in tqdm.tqdm(range(lm_order + 1)):
+        for m in jnp.linspace(0, l, l + 1, dtype=int):
+            if m != 0:
+                sp_lm1 = sph_harm(m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp_lm2 = sph_harm(-m, l, phi, theta) * jnp.sqrt(4 * jnp.pi)
+                sp1 = (1j / jnp.sqrt(2) * (sp_lm1 - (-1) ** m * sp_lm2)).real
+                sp2 = (1 / jnp.sqrt(2) * (sp_lm2 + (-1) ** m * sp_lm1)).real
+                correlations_lm[i] = jnp.mean(
+                    gamma_pq * sp1[None, None, :], axis=-1
+                )
+                correlations_lm[i + 1] = jnp.mean(
+                    gamma_pq * sp2[None, None, :], axis=-1
+                )
+
+                i += 2
+
+            else:
+                sp0 = sph_harm(m, l, phi, theta).real * np.sqrt(4 * jnp.pi)
+                correlations_lm[i] = jnp.mean(
+                    gamma_pq * sp0[None, None, :], axis=-1
+                )
+
+                i += 1
+
+    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
+
+
+def get_response_IJ_lm(p_I, time_tensor_IJ, lm_order, nside):
+    """
+    TO ADD
+
+    """
+
+    # Compute the correlations on lm basis
+    # To understand if a factor 0.5 * jnp.eye(len(zeta_IJ)) is missing!!!!
+    correlations_lm_IJ = get_correlations_lm_IJ(p_I, lm_order, nside)
+
+    # combine the Hellings and Downs part and the time part
+    return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
+
+
+@jax.jit
 def get_response_IJ(zeta_IJ, time_tensor_IJ):
     """
     Compute the response tensor for given angular separations and time tensors.
@@ -422,13 +504,13 @@ def get_HD_Legendre_coefficients(order):
     return jnp.array(
         [
             # Project onto Legendre polynomials
-            simps(legendre(i)(x) * HD_value, x=x) * l_coeffs[i]
+            simpson(legendre(i)(x) * HD_value, x=x) * l_coeffs[i]
             for i in range(order + 1)
         ]
     )
 
 
-@jit
+@jax.jit
 def Legendre_projection(time_tensor_IJ, polynomials_IJ):
     """
     Projects the pulsar angular information onto Legendre polynomials
@@ -487,7 +569,7 @@ def HD_projection_Legendre(zeta_IJ, time_tensor_IJ, order):
     return HD_functions, HD_coefficients
 
 
-@jit
+@jax.jit
 def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     """
     Compute binned projection of the Hellings and Downs correlations.
@@ -541,7 +623,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
     # Ensure Hellings and Downs correlations values are within bounds
     zeta_IJ = jnp.where(zeta_IJ > 1, 1, zeta_IJ)
-    zeta_IJ = jnp.where(zeta_IJ < -1, -1, zeta_IJ)
+    zeta_IJ = jnp.where(zeta_IJ < -1, -1, zeta_IJ)  # type: ignore
     xi_vals = jnp.arccos(zeta_IJ)
 
     # Compute bin edges for binning the Hellings and Downs correlations values
@@ -570,7 +652,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
 
 def get_tensors(
     frequencies,
-    path_to_pulsars="pulsar_configurations/EPTAlike_medians_curn.txt",
+    path_to_pulsar_catalog=ut.path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
     add_curn=False,
     order=0,
@@ -591,9 +673,9 @@ def get_tensors(
     -----------
     frequencies : numpy.ndarray or jax.numpy.ndarray
         Array of frequencies.
-    path_to_pulsars : str, optional
+    path_to_pulsar_catalog : str, optional
         Path to the pulsars data file.
-        Default is "pulsar_configurations/EPTAlike_medians_curn.txt".
+        Default is path_to_default_pulsar_catalog.
     pta_span_yrs : float, optional
         Average span of the PTA data in years.
         Default is 10.33 years.
@@ -634,10 +716,10 @@ def get_tensors(
     try:
         if regenerate_catalog:
             raise FileNotFoundError
-        pulsars_DF = pd.read_csv(path_to_pulsars, sep=" ")
+        pulsars_DF = pd.read_csv(path_to_pulsar_catalog, sep=" ")
 
     except FileNotFoundError:
-        generate_catalog_kwargs["outname"] = path_to_pulsars
+        generate_catalog_kwargs["outname"] = path_to_pulsar_catalog
         pulsars_DF = generate_pulsars_catalog(**generate_catalog_kwargs)
 
     # unpack all parameters

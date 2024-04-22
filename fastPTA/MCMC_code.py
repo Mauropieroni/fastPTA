@@ -3,20 +3,21 @@ import time
 import numpy as np
 import emcee
 
-# Setting the path to this file
-import os, sys
-
-file_path = os.path.dirname(__file__)
-if file_path:
-    file_path += "/"
-
-sys.path.append(os.path.join(file_path, "../fastPTA/"))
+import jax
+import jax.numpy as jnp
 
 # Local
-from utils import *
-from get_tensors import get_tensors
-from signals import SMBBH_parameters, get_model
+import fastPTA.utils as ut
+from fastPTA.signals import SMBBH_parameters, get_model
+from fastPTA.get_tensors import get_tensors
 
+jax.config.update("jax_enable_x64", True)
+
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
+
+
+# Setting some constants
 i_max_default = 100
 R_convergence_default = 1e-1
 R_criterion_default = "mean_squared"
@@ -234,7 +235,7 @@ def get_MCMC_data(
         print("\nRegenerating MCMC data")
 
         # Setting the frequency vector from the observation time
-        T_tot = T_obs_yrs * yr
+        T_tot = T_obs_yrs * ut.yr
         fmin = 1 / T_tot
         frequency = fmin * (1 + np.arange(n_frequencies))
 
@@ -354,7 +355,7 @@ def log_prior(parameters, prior_parameters, which_prior="flat"):
     return log_p
 
 
-@jit
+@jax.jit
 def log_likelihood(
     frequency,
     signal_value,
@@ -389,7 +390,7 @@ def log_likelihood(
     covariance = response_IJ * signal_value[:, None, None] + strain_omega
 
     # Inverse of the covariance
-    c_inverse = compute_inverse(covariance)
+    c_inverse = ut.compute_inverse(covariance)
 
     # Log determinant
     sign, logdet = jnp.linalg.slogdet(covariance)
@@ -621,7 +622,7 @@ def run_MCMC(
         state = sampler.run_mcmc(state, MCMC_iteration_steps, progress=True)
 
         # Get Gelman-Rubin at this step
-        R_array = get_R(sampler.get_chain())
+        R_array = ut.get_R(sampler.get_chain())
 
         if R_criterion.lower() == "mean_squared":
             R = np.sqrt(np.mean(R_array**2))
