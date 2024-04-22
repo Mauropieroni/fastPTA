@@ -642,6 +642,6 @@ def run_MCMC(
     print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))
 
     print("Storing as", path_to_MCMC_chains)
-    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)
+    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)  # type: ignore
 
     return samples, pdfs
