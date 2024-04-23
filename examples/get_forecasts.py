@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import examples_utils as eu
 import fastPTA.utils as ut
 import fastPTA.plotting_functions as pf
-from fastPTA.signals import SMBBH_parameters, CGW_LN_parameters
+from fastPTA.signals import SMBBH_parameters, CGW_LN_parameters, CGW_SIGW_parameters
 from fastPTA.Fisher_code import compute_fisher
 from fastPTA.MCMC_code import run_MCMC
 from fastPTA.plotting_functions import (
@@ -230,7 +230,7 @@ def get_constraints(
         pdfs = MCMC_results["pdfs"]
 
     except FileNotFoundError:
-        if not priors:
+        if not np.any(priors):
             priors = signal_parameters[None, :] + 5 * np.array(
                 [-errors, errors]
             )
@@ -249,7 +249,7 @@ def get_constraints(
         np.ones(MCMC_data.shape[0]),  # type: ignore
     ]
     smooth = [1.0, 1.0]
-
+    
     ranges = [
         (
             signal_parameters[i] - 5 * errors[i],
@@ -290,103 +290,84 @@ def get_constraints(
 
 
 if __name__ == "__main__":
-    scan_parameter(
-        "power_law_lognormal",
-        np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
-        0,
-        np.linspace(-13, -7, 15),
-        n_frequencies=100,
-        generate_catalog_kwargs={
-            "n_pulsars": 30,
-            "save_catalog": True,
-            **eu.mockSKA10,
-        },
-        get_tensors_kwargs={
-            "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
-            "add_curn": True,
-            "regenerate_catalog": False,
-        },
-        parameter_labels=[
-            r"$\alpha_{\rm PL}$",
-            r"$n_{\rm T}$",
-            r"$\alpha_{\rm LN}$",
-            r"$\beta_{\rm LN}$",
-            r"$\gamma{\rm LN}$",
-        ],
-    )
+    # scan_parameter(
+    #     "power_law_SIGW",
+    #     np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
+    #     0,
+    #     np.linspace(-7, 4, 15),
+    #     n_frequencies=100,
+    #     generate_catalog_kwargs={
+    #         "n_pulsars": 60,
+    #         "save_catalog": True,
+    #         **eu.mockSKA10,
+    #     },
+    #     get_tensors_kwargs={
+    #         "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
+    #         "add_curn": True,
+    #         "regenerate_catalog": False,
+    #     },
+    #     parameter_labels=[
+    #         r"$A$",
+    #         r"$n_T$",
+    #         r"$Log_{10}A$",
+    #         r"$Log_{10} \\Delta$",
+    #         r"$Log_{10} f_*$",
+    #     ],
+    # )
 
-    HD_constraints(
-        "power_law",
-        SMBBH_parameters,
-        get_tensors_kwargs={
-            "order": 2,
-            "method": "legendre",
-            "path_to_pulsar_catalog": "pulsar_configurations/Mock_SKA.txt",
-            "add_curn": True,
-            "regenerate_catalog": True,
-        },
-        n_frequencies=200,
-        generate_catalog_kwargs={
-            "n_pulsars": 30,
-            "save_catalog": True,
-            "outname": "pulsar_configurations/Mock_SKA.txt",
-            **eu.mockSKA10,
-        },
-    )
+    # HD_constraints(
+    #     "power_law_SIGW",
+    #     np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
+    #     get_tensors_kwargs={
+    #         "order": 2,
+    #         "method": "legendre",
+    #         "path_to_pulsar_catalog": "pulsar_configurations/Mock_SKA.txt",
+    #         "add_curn": True,
+    #         "regenerate_catalog": True,
+    #     },
+    #     n_frequencies=200,
+    #     generate_catalog_kwargs={
+    #         "n_pulsars": 30,
+    #         "save_catalog": True,
+    #         "outname": "pulsar_configurations/Mock_SKA.txt",
+    #         **eu.mockSKA10,
+    #     },
+    # )
 
     get_constraints(
-        "power_law",
-        SMBBH_parameters,
-        n_frequencies=30,
-        rerun_MCMC=True,
-        path_to_MCMC_data="generated_data/MCMC_data_pl.npz",
-        path_to_MCMC_chains="generated_chains/MCMC_chains_pl.npz",
+        "SIGW",
+        CGW_SIGW_parameters,
+        #np.array([[-6.3, -5.82759], [1.63571, 2.36429], [-0.722385, -0.277615], [-0.585211, -0.0168488], [-7.93543, -7.66457]]).T,
+        n_frequencies=100,
+        rerun_MCMC=False,
+        path_to_MCMC_data="generated_data/MCMC_data_SIGW.npz",
+        path_to_MCMC_chains="generated_chains/MCMC_chains_SIGW.npz",
         MCMC_kwargs={
+            "regenerate_MCMC_data": False,
             "realization": False,
+            "i_max": 20,
+            "R_convergence": 1e-1,
+            "R_criterion": "max",
+            "burnin_steps": 300,
+            "MCMC_iteration_steps": 500,
         },
         generate_catalog_kwargs={
             "n_pulsars": 60,
             "save_catalog": True,
-            **eu.EPTAlike,
+            **eu.EPTAlike_noiseless,
         },
         get_tensors_kwargs={
-            "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
-            "add_curn": True,
-            "regenerate_catalog": False,
+            "path_to_pulsar_catalog": "pulsar_configurations/noiseless.txt",
+            "add_curn": False,
+            "regenerate_catalog": True,
         },
         parameter_labels=[
-            r"$\alpha_{\rm PL}$",
-            r"$n_{\rm T}$",
-            r"$\alpha_{\rm LN}$",
-            r"$\beta_{\rm LN}$",
-            r"$\gamma{\rm LN}$",
+            #"$A$",
+            #"$n_T$",
+            "$Log_{10}A$",
+            "$Log_{10} \\Delta$",
+            "$Log_{10} f_*$",
         ],
     )
 
-    get_constraints(
-        "power_law_lognormal",
-        np.concatenate([SMBBH_parameters, CGW_LN_parameters]),
-        n_frequencies=100,
-        rerun_MCMC=True,
-        path_to_MCMC_data="generated_data/MCMC_data_ln_future.npz",
-        path_to_MCMC_chains="generated_chains/MCMC_chains_ln_future.npz",
-        MCMC_kwargs={},
-        generate_catalog_kwargs={
-            "n_pulsars": 30,
-            "save_catalog": True,
-            **eu.mockSKA10,
-        },
-        get_tensors_kwargs={
-            "path_to_pulsar_catalog": "pulsar_configurations/future.txt",
-            "add_curn": True,
-            "regenerate_catalog": False,
-        },
-        parameter_labels=[
-            r"$\alpha_{\rm PL}$",
-            r"$n_{\rm T}$",
-            r"$\alpha_{\rm LN}$",
-            r"$\beta_{\rm LN}$",
-            r"$\gamma{\rm LN}$",
-        ],
-    )
     plt.show(block=True)
