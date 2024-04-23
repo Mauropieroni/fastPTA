@@ -7,7 +7,11 @@ import matplotlib.pyplot as plt
 import examples_utils as eu
 import fastPTA.utils as ut
 import fastPTA.plotting_functions as pf
-from fastPTA.signals import SMBBH_parameters, CGW_LN_parameters, CGW_SIGW_parameters
+from fastPTA.signals import (
+    SMBBH_parameters,
+    CGW_LN_parameters,
+    CGW_SIGW_parameters,
+)
 from fastPTA.Fisher_code import compute_fisher
 from fastPTA.MCMC_code import run_MCMC
 from fastPTA.plotting_functions import (
@@ -249,7 +253,7 @@ def get_constraints(
         np.ones(MCMC_data.shape[0]),  # type: ignore
     ]
     smooth = [1.0, 1.0]
-    
+
     ranges = [
         (
             signal_parameters[i] - 5 * errors[i],
@@ -337,9 +341,9 @@ if __name__ == "__main__":
     get_constraints(
         "SIGW",
         CGW_SIGW_parameters,
-        #np.array([[-6.3, -5.82759], [1.63571, 2.36429], [-0.722385, -0.277615], [-0.585211, -0.0168488], [-7.93543, -7.66457]]).T,
+        # np.array([[-6.3, -5.82759], [1.63571, 2.36429], [-0.722385, -0.277615], [-0.585211, -0.0168488], [-7.93543, -7.66457]]).T,
         n_frequencies=100,
-        rerun_MCMC=False,
+        rerun_MCMC=True,
         path_to_MCMC_data="generated_data/MCMC_data_SIGW.npz",
         path_to_MCMC_chains="generated_chains/MCMC_chains_SIGW.npz",
         MCMC_kwargs={
@@ -353,7 +357,7 @@ if __name__ == "__main__":
         },
         generate_catalog_kwargs={
             "n_pulsars": 60,
-            "save_catalog": True,
+            "save_catalog": False,  # True,
             **eu.EPTAlike_noiseless,
         },
         get_tensors_kwargs={
@@ -362,8 +366,8 @@ if __name__ == "__main__":
             "regenerate_catalog": True,
         },
         parameter_labels=[
-            #"$A$",
-            #"$n_T$",
+            # "$A$",
+            # "$n_T$",
             "$Log_{10}A$",
             "$Log_{10} \\Delta$",
             "$Log_{10} f_*$",
