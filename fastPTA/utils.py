@@ -9,8 +9,10 @@ import jax.numpy as jnp
 
 jax.config.update("jax_enable_x64", True)
 
+
 # If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
+which_device = "cpu"
+jax.config.update("jax_default_device", jax.devices(which_device)[0])
 
 
 # H0/h = 100 km/s/Mpc expressed in meters
