@@ -3,7 +3,10 @@ import numpy as np
 import pandas as pd
 
 # Local
-from fastPTA.utils import default_pulsar_parameters
+from fastPTA.utils import (
+    default_pulsar_parameters,
+    path_to_default_NANOGrav_positions,
+)
 
 
 def generate_parameter(n_pulsars, parameter_dict):
@@ -131,6 +134,7 @@ def generate_pulsars_catalog(
     ],
     save_catalog=False,
     outname="pulsar_configurations/new_pulsars_catalog.txt",
+    use_ng_positions=False,
 ):
     """
     Generate a catalog of pulsars with specified parameters (mostly timing and
@@ -168,6 +172,9 @@ def generate_pulsars_catalog(
     outname : str, optional
         Name of the output file to save the generated catalog,
         default is "pulsar_configurations/test_pulsars.txt".
+    use_ng_positions : bool, optional
+        Flag indicating whether to use NANOGrav positions for pulsars,
+        default is False.
 
     Returns:
     --------
@@ -179,11 +186,22 @@ def generate_pulsars_catalog(
     normed = noise_probabilities / np.sum(noise_probabilities)
 
     catalog = {}
-    catalog["names"] = [
-        "pulsar_" + str(ell) for ell in (1 + np.arange(n_pulsars))
-    ]
-    catalog["phi"] = np.random.uniform(0.0, 2 * np.pi, n_pulsars)
-    catalog["theta"] = np.arccos(np.random.uniform(-1, 1, n_pulsars))
+
+    if use_ng_positions:
+        data_ng = np.loadtxt(
+            path_to_default_NANOGrav_positions, skiprows=1, dtype=np.str_
+        )
+        n_pulsars = len(data_ng)
+        catalog["names"] = data_ng[:, 0]
+        catalog["phi"] = data_ng[:, 1].astype(float)
+        catalog["theta"] = data_ng[:, 2].astype(float)
+    else:
+        catalog["names"] = [
+            "pulsar_" + str(ell) for ell in (1 + np.arange(n_pulsars))
+        ]
+        catalog["phi"] = np.random.uniform(0.0, 2 * np.pi, n_pulsars)
+        catalog["theta"] = np.arccos(np.random.uniform(-1, 1, n_pulsars))
+
     catalog["dt"] = 10 ** generate_parameter(n_pulsars, dt_dict)
     catalog["Tspan"] = 10 ** generate_parameter(n_pulsars, T_span_dict)
     catalog["wn"] = 10 ** generate_parameter(n_pulsars, wn_dict)
