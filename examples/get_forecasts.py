@@ -9,7 +9,6 @@ import fastPTA.utils as ut
 import fastPTA.plotting_functions as pf
 from fastPTA.signals import (
     SMBBH_parameters,
-    CGW_LN_parameters,
     CGW_SIGW_parameters,
 )
 from fastPTA.Fisher_code import compute_fisher
@@ -168,7 +167,7 @@ def get_constraints(
     signal_label,
     signal_parameters,
     priors=[],
-    T_obs_yrs=10.33,
+    T_obs_yrs=16.03,
     n_frequencies=30,
     rerun_MCMC=True,
     path_to_MCMC_data="generated_data/MCMC_data.npz",
@@ -226,6 +225,10 @@ def get_constraints(
 
     get_tensors_kwargs["regenerate_catalog"] = False
 
+    # MCMC_results = np.load(path_to_MCMC_chains)
+    # MCMC_data = MCMC_results["samples"]
+    # pdfs = MCMC_results["pdfs"]
+
     try:
         if rerun_MCMC:
             raise FileNotFoundError("Flag forces MCMC chains regeneration")
@@ -234,11 +237,19 @@ def get_constraints(
         pdfs = MCMC_results["pdfs"]
 
     except FileNotFoundError:
-        if not np.any(priors):
-            priors = signal_parameters[None, :] + 5 * np.array(
-                [-errors, errors]
-            )
 
+        print("Entered")
+
+        if not np.any(priors):
+            # priors = signal_parameters[None, :] + 5 * np.array(
+            #     [-errors, errors]
+            # )
+            priors = np.array([[signal_parameters[0] - 5 * errors[0], signal_parameters[0] + 5 * errors[0]],
+                              [signal_parameters[1] - 5 * errors[1], signal_parameters[1] + 5 * errors[1]],
+                              [max([-3.5, signal_parameters[2] - 5 * errors[2]]), min([-0.5, signal_parameters[2] + 5 * errors[2]])],
+                              [max([-1.5, signal_parameters[3] - 5 * errors[3]]), min([0.9, signal_parameters[3] + 5 * errors[3]])],
+                              [signal_parameters[4] - 5 * errors[4], signal_parameters[4] + 5 * errors[4]]]).T
+            print(priors)
         MCMC_data, pdfs = run_MCMC(
             priors,
             **fisher_kwargs,
@@ -339,15 +350,13 @@ if __name__ == "__main__":
     # )
 
     get_constraints(
-        "SIGW",
-        CGW_SIGW_parameters,
-        # np.array([[-6.3, -5.82759], [1.63571, 2.36429], [-0.722385, -0.277615], [-0.585211, -0.0168488], [-7.93543, -7.66457]]).T,
-        n_frequencies=100,
+        "power_law_SIGW",
+        np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
+        n_frequencies=14,
         rerun_MCMC=True,
-        path_to_MCMC_data="generated_data/MCMC_data_SIGW.npz",
-        path_to_MCMC_chains="generated_chains/MCMC_chains_SIGW.npz",
+        path_to_MCMC_data="generated_data/MCMC_data_pl_SIGW_68p.npz",
+        path_to_MCMC_chains="generated_chains/MCMC_chains_pl_SIGW_68p.npz",
         MCMC_kwargs={
-            "regenerate_MCMC_data": False,
             "realization": False,
             "i_max": 20,
             "R_convergence": 1e-1,
@@ -356,21 +365,21 @@ if __name__ == "__main__":
             "MCMC_iteration_steps": 500,
         },
         generate_catalog_kwargs={
-            "n_pulsars": 60,
-            "save_catalog": False,  # True,
-            **eu.EPTAlike_noiseless,
+            "n_pulsars": 68,
+            "save_catalog": False,
+            **eu.EPTAlike,
         },
         get_tensors_kwargs={
-            "path_to_pulsar_catalog": "pulsar_configurations/noiseless.txt",
+            "path_to_pulsar_catalog": "pulsar_configurations/EPTA68.txt",
             "add_curn": False,
-            "regenerate_catalog": True,
+            "regenerate_catalog": False,
         },
         parameter_labels=[
-            # "$A$",
-            # "$n_T$",
-            "$Log_{10}A$",
-            "$Log_{10} \\Delta$",
-            "$Log_{10} f_*$",
+            "$\\alpha_{PL}$",
+            "$n_T$",
+            "$\mathrm{log}_{10}A_{\zeta}$",
+            "$\mathrm{log}_{10} \\Delta$",
+            "$\mathrm{log}_{10} (f_*/\mathrm{Hz})$",
         ],
     )
 
