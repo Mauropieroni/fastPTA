@@ -958,7 +958,6 @@ def dpower_law_SIGW(index, frequency, parameters):
 # plt.show()
 
 
-
 def get_model(signal_label):
     """
     Retrieve signal and derivative models based on the specified label.

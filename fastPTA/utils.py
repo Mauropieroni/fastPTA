@@ -9,8 +9,10 @@ import jax.numpy as jnp
 
 jax.config.update("jax_enable_x64", True)
 
+
 # If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
+which_device = "cpu"
+jax.config.update("jax_default_device", jax.devices(which_device)[0])
 
 
 # H0/h = 100 km/s/Mpc expressed in meters
@@ -36,6 +38,11 @@ path_to_default_pulsar_parameters = os.path.join(
 # Set the path to the default pulsar catalog
 path_to_default_pulsar_catalog = os.path.join(
     path_to_defaults, "default_catalog.txt"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_NANOGrav_positions = os.path.join(
+    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
 )
 
 
