@@ -1,20 +1,17 @@
 # Global
 import jax
 import jax.numpy as jnp
-
 import numpy as np
 
 # Local
 import fastPTA.utils as ut
 
+# If you want to use your GPU change here
+from jax import grad, jacfwd
+
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
 jax.config.update("jax_enable_x64", True)
-
-# If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
-from jax import grad, jacfwd
-from scipy import special
-
 
 # Current SMBBH SGWB log_amplitude best-fit
 SMBBH_log_amplitude = -7.1995
@@ -41,15 +38,15 @@ CGW_BPL_parameters = jnp.array(
     [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, BPL_tilt_2]
 )
 
-### Some values for a Tanh spectrum
+# Some values for a Tanh spectrum
 Tanh_log_amplitude = -8.0
 Tanh_tilt = 8.0
 CGW_Tanh_parameters = jnp.array([Tanh_log_amplitude, Tanh_tilt])
 
-### Some values for a SIGW spectrum
-SIGW_log_amplitude = -1.7
+# Some values for a SIGW spectrum
+SIGW_log_amplitude = -2
 SIGW_log_width = np.log10(0.5)
-SIGW_log_pivot = -7.8
+SIGW_log_pivot = -8.45
 CGW_SIGW_parameters = jnp.array(
     [SIGW_log_amplitude, SIGW_log_width, SIGW_log_pivot]
 )
@@ -170,8 +167,8 @@ def dpower_law(index, frequency, parameters, pivot=ut.f_yr):
     return model * dlog_model
 
 
-## Check analytical and numerical derivative
-## To use grad() we need a function of the parameters
+# Check analytical and numerical derivative
+# To use grad() we need a function of the parameters
 
 # def function_powerlaw(log_amplitude, tilt, pivot):
 #     return 10**log_amplitude * (frequency_point / pivot) ** tilt
@@ -267,8 +264,8 @@ def dlognormal(index, frequency, parameters):
     return model * dlog_model
 
 
-## Check analytical and numerical derivative
-## To use grad() we need a function of the parameters
+# Check analytical and numerical derivative
+# To use grad() we need a function of the parameters
 
 # def function_lognormal(log_amplitude, log_width, log_pivot):
 #     return 10**log_amplitude * jnp.exp(
@@ -351,7 +348,7 @@ def dSMBH_and_flat(index, frequency, parameters):
 
 
 # Check analytical and numerical derivative
-## Already done for the two separate functions
+# Already done for the two separate functions
 
 
 def SMBH_and_lognormal(frequency, parameters):
@@ -404,7 +401,7 @@ def dSMBH_and_lognormal(index, frequency, parameters):
 
 
 # Check analytical and numerical derivative
-## Already done for the two separate functions
+# Already done for the two separate functions
 
 
 def broken_power_law(frequency, parameters, smoothing=1.5):
@@ -617,7 +614,7 @@ def dSMBH_and_broken_power_law(index, frequency, parameters):
 
 
 # Check analytical and numerical derivative
-## Already done for the two separate functions
+# Already done for the two separate functions
 
 
 def tanh(frequency, parameters, pivot=ut.f_yr):
@@ -637,7 +634,7 @@ def tanh(frequency, parameters, pivot=ut.f_yr):
         Array containing the computed tanh spectrum.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, tilt = parameters
 
     return (10**log_amplitude) * (1 + jnp.tanh(frequency / pivot)) ** tilt
@@ -707,10 +704,8 @@ def dtanh(index, frequency, parameters, pivot=ut.f_yr):
         respect to the specified parameter.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, tilt = parameters
-
-    model = tanh(frequency, parameters, pivot=ut.f_yr)
 
     dlog_model = []
 
@@ -780,7 +775,7 @@ def SIGW(frequency, parameters):
         Array containing the computed lognormal spectrum.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
     x = frequency / (10**log_pivot)
@@ -849,94 +844,11 @@ def dSIGW(index, frequency, parameters):
         respect to the specified parameter.
     """
 
-    ### unpack parameters
+    # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
     def function_SIGW(log_amplitude, log_width, log_pivot):
-
-        return (
-            cg(frequency)
-            * (10**log_amplitude) ** 2
-            * (
-                (
-                    (4 / (5 * jnp.sqrt(np.pi)))
-                    * (frequency / (10**log_pivot)) ** 3
-                    * (1 / (10**log_width))
-                    * jnp.exp((9 * (10**log_width) ** 2) / 4)
-                )
-                * (
-                    (
-                        jnp.log(
-                            (frequency / (10**log_pivot))
-                            * jnp.exp((3 / 2) * (10**log_width) ** 2)
-                        )
-                        ** 2
-                        + (1 / 2) * (10**log_width) ** 2
-                    )
-                    * jax.scipy.special.erfc(
-                        (1 / (10**log_width))
-                        * (
-                            jnp.log(
-                                (frequency / (10**log_pivot))
-                                * jnp.exp((3 / 2) * (10**log_width) ** 2)
-                            )
-                            + (1 / 2) * jnp.log(3 / 2)
-                        )
-                    )
-                    - ((10**log_width) / (jnp.sqrt(np.pi)))
-                    * jnp.exp(
-                        -(
-                            (
-                                jnp.log(
-                                    (frequency / (10**log_pivot))
-                                    * jnp.exp((3 / 2) * (10**log_width) ** 2)
-                                )
-                                + (1 / 2) * jnp.log(3 / 2)
-                            )
-                            ** 2
-                        )
-                        / ((10**log_width) ** 2)
-                    )
-                    * (
-                        jnp.log(
-                            (frequency / (10**log_pivot))
-                            * jnp.exp((3 / 2) * (10**log_width) ** 2)
-                        )
-                        - (1 / 2) * jnp.log(3 / 2)
-                    )
-                )
-                + (0.0659 / ((10**log_width) ** 2))
-                * (frequency / (10**log_pivot)) ** 2
-                * jnp.exp((10**log_width) ** 2)
-                * jnp.exp(
-                    -(
-                        (
-                            jnp.log(frequency / (10**log_pivot))
-                            + (10**log_width) ** 2
-                            - (1 / 2) * jnp.log(4 / 3)
-                        )
-                        ** 2
-                    )
-                    / ((10**log_width) ** 2)
-                )
-                + (1 / 3)
-                * jnp.sqrt(2 / np.pi)
-                * (frequency / (10**log_pivot)) ** (-4)
-                * (1 / (10**log_width))
-                * jnp.exp(8 * (10**log_width) ** 2)
-                * jnp.exp(
-                    -(jnp.log(frequency / (10**log_pivot)) ** 2)
-                    / (2 * (10**log_width) ** 2)
-                )
-                * jax.scipy.special.erfc(
-                    (
-                        4 * (10**log_width) ** 2
-                        - jnp.log((frequency / (10**log_pivot)) / 4)
-                    )
-                    / (jnp.sqrt(2) * (10**log_width))
-                )
-            )
-        )
+        return SIGW(frequency, (log_amplitude, log_width, log_pivot))
 
     if index < 3:
         dlog_model = jacfwd(function_SIGW, argnums=index)(
@@ -999,7 +911,52 @@ def dpower_law_SIGW(index, frequency, parameters):
 
 
 # Check analytical and numerical derivative
-## Already done for the two separate functions
+# Already done for the two separate functions
+
+# filedata = np.load('MCMC_data_pl_SIGW_SKA200.npz')
+# filechains = np.load('MCMC_chains_pl_SIGW_SKA200.npz')
+# frequency = np.logspace(-9, -7, num = 200)
+# print(len(frequency))
+
+# dataplSIGW = np.zeros(shape=(200, 5000))
+# datapl = np.zeros(shape=(200, 5000))
+# dataSIGW = np.zeros(shape=(200, 5000))
+# for j in range(5000):
+#     y = random.randint(0, len(filechains['samples'])-1)
+#     dataplSIGW[:,j] = power_law_SIGW(frequency, filechains['samples'][y][:])
+#     datapl[:,j] = power_law(frequency, filechains['samples'][y][:2])
+#     dataSIGW[:,j] = SIGW(frequency, filechains['samples'][y][2:])
+# quant025plSIGW = np.quantile(dataplSIGW, 0.025, axis=1)
+# quant16plSIGW = np.quantile(dataplSIGW, 0.16, axis=1)
+# quant84plSIGW = np.quantile(dataplSIGW, 0.84, axis=1)
+# quant975plSIGW = np.quantile(dataplSIGW, 0.975, axis=1)
+
+# quant025pl = np.quantile(datapl, 0.025, axis=1)
+# quant16pl = np.quantile(datapl, 0.16, axis=1)
+# quant84pl = np.quantile(datapl, 0.84, axis=1)
+# quant975pl = np.quantile(datapl, 0.975, axis=1)
+
+# quant025SIGW = np.quantile(dataSIGW, 0.025, axis=1)
+# quant16SIGW = np.quantile(dataSIGW, 0.16, axis=1)
+# quant84SIGW = np.quantile(dataSIGW, 0.84, axis=1)
+# quant975SIGW = np.quantile(dataSIGW, 0.975, axis=1)
+# plt.rcParams["text.usetex"] = True
+# plt.rcParams["font.family"] = "serif"
+# plt.rcParams["font.size"] = "18"
+# plt.fill_between(frequency, quant025SIGW, quant975SIGW, color="orange", alpha=0.4)
+# plt.fill_between(frequency, quant16SIGW, quant84SIGW, color="darkorange", alpha=0.4)
+# plt.loglog(frequency, SIGW(frequency, [-1.5, np.log10(0.5), -7.8]), color = 'chocolate',  alpha=0.8)
+# plt.fill_between(frequency, quant025plSIGW, quant975plSIGW, color="mediumpurple", alpha=0.7)
+# plt.fill_between(frequency, quant16plSIGW, quant84plSIGW, color="rebeccapurple", alpha=0.7)
+# plt.loglog(frequency, power_law_SIGW(frequency, [-7.1995, 2, -1.5, np.log10(0.5), -7.8]), color = 'indigo', alpha=0.8)
+# plt.fill_between(frequency, quant025pl, quant975pl, color="limegreen", alpha=0.4)
+# plt.fill_between(frequency, quant16pl, quant84pl, color="forestgreen", alpha=0.4)
+# plt.loglog(frequency, power_law(frequency, [-7.1995, 2]), color = 'darkgreen',  alpha=0.8)
+# plt.xlabel(r"$f \mathrm{[Hz]}$")
+# plt.ylabel(r"$h^2 \Omega_{GW}$")
+# plt.ylim((1e-19,1e-5))
+# plt.show()
+
 
 
 def get_model(signal_label):
