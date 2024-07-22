@@ -1,11 +1,14 @@
 # Global
+import tqdm
 import numpy as np
+import healpy as hp
 import pandas as pd
 
 import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
+from scipy.special import sph_harm
 from scipy.integrate import simpson
 
 # Local
@@ -14,9 +17,7 @@ from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
 jax.config.update("jax_enable_x64", True)
-
-# If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
+jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
 
 # Just some constants
@@ -47,13 +48,57 @@ def unit_vector(theta, phi):
         the given spherical coordinates.
 
     """
-    return jnp.array(
-        [
-            jnp.sin(theta) * jnp.cos(phi),
-            jnp.sin(theta) * jnp.sin(phi),
-            jnp.cos(theta),
-        ]
-    ).T
+
+    # Compute the x component of the unit vector
+    x_term = jnp.sin(theta) * jnp.cos(phi)
+
+    # Compute the y component of the unit vector
+    y_term = jnp.sin(theta) * jnp.sin(phi)
+
+    # Compute the z component of the unit vector
+    z_term = jnp.cos(theta)
+
+    # Assemble the unit vector and return it with the right shape
+    return jnp.array([x_term, y_term, z_term]).T
+
+
+@jax.jit
+def dot_product(theta_1, phi_1, theta_2, phi_2):
+    """
+    Compute the dot product of two unit vectors given their spherical
+    coordinates. Theta is the polar angle (co-latitude) and phi is the
+    azimuthal angle (longitude). The input angles theta and phi should be given
+    in radians.
+
+    Parameters:
+    -----------
+    theta_1 : numpy.ndarray or jax.numpy.ndarray
+        Array of angles in radians representing the polar angle (co-latitude)
+        of the first vector.
+    phi_1 : numpy.ndarray or jax.numpy.ndarray
+        Array of angles in radians representing the azimuthal angle (longitude)
+        of the first vector.
+    theta_2 : numpy.ndarray or jax.numpy.ndarray
+        Array of angles in radians representing the polar angle (co-latitude)
+        of the second vector.
+    phi_2 : numpy.ndarray or jax.numpy.ndarray
+        Array of angles in radians representing the azimuthal angle (longitude)
+        of the second vector.
+
+    Returns:
+    --------
+    dot_product : numpy.ndarray or jax.numpy.ndarray
+        Array of dot products computed for the given unit vectors.
+
+    """
+
+    # Sum of the product of x and y components
+    term1 = jnp.sin(theta_1) * jnp.sin(theta_2) * jnp.cos(phi_1 - phi_2)
+
+    # The product of the z components
+    term2 = jnp.cos(theta_1) * jnp.cos(theta_2)
+
+    return term1 + term2
 
 
 @jax.jit
@@ -74,16 +119,18 @@ def HD_correlations(zeta_IJ):
 
     """
 
-    # The 1e-15 term is added to regularize the log
-    diff_IJ = 0.5 * (1.0 - zeta_IJ) + 1e-15
+    # Compute the difference between 1 and p_I dot p_j and divide by 2
+    diff_IJ = 0.5 * (1.0 - zeta_IJ)
 
     # This function does not include the Kronecker-Delta term for pulsar
     # self-correlations
-    return 0.5 + 1.5 * diff_IJ * (jnp.log(diff_IJ) - 1 / 6)
+    return jnp.where(
+        diff_IJ > 0.0, 0.5 + 1.5 * diff_IJ * (jnp.log(diff_IJ) - 1 / 6), 0.5
+    )
 
 
 # Some default values to compute the HD curve
-x = jnp.linspace(-1, 1, integration_points)
+x = jnp.linspace(-1.0, 1.0, integration_points)
 HD_value = HD_correlations(x)
 
 
@@ -91,8 +138,8 @@ HD_value = HD_correlations(x)
 def get_WN(WN_par, dt):
     """
     Compute the white noise amplitude for a catalog of pulsars given the
-    the white noise amplitudes and sampling rates. The time step dt should be
-    provided in seconds.
+    the white noise amplitudes and sampling rates (see Eq. 5 of 2404.02864).
+    The time step dt should be provided in seconds.
 
     Parameters:
     -----------
@@ -107,6 +154,7 @@ def get_WN(WN_par, dt):
         Array of white noise amplitudes.
 
     """
+
     return 1e-100 + jnp.array(1e-12 * 2 * WN_par**2 * dt)
 
 
@@ -135,6 +183,7 @@ def get_pl_colored_noise(frequencies, log10_ampl, gamma):
     frequency_dependent_term = (ut.f_yr / frequencies)[None, :] ** gamma[
         :, None
     ]
+
     return amplitude_prefactor[:, None] * frequency_dependent_term
 
 
@@ -181,12 +230,13 @@ def get_pulsar_noises(
     gamma_dm,
     log10_A_sv,
     gamma_sv,
-    Tspan_yr,
     dt,
 ):
     """
     Compute noise components for given parameters and frequencies.
-    The components included are:
+
+    The components included are (see Eq. 4 of 2404.02864):
+
     - White noise (WN) with parameter WN_par.
     - Red noise (RN) with (log10)amplitudes log10_A_red and power-law indices
     gamma_red.
@@ -213,8 +263,6 @@ def get_pulsar_noises(
         Array of base-10 logarithm of amplitudes for scattering variation noise.
     gamma_sv : numpy.ndarray or jax.numpy.ndarray
         Array of power-law indices for scattering variation noise.
-    Tspan_yr : float
-        Array of time spans in years.
     dt : float
         Array of time steps in seconds.
 
@@ -246,8 +294,9 @@ def get_pulsar_noises(
 @jax.jit
 def transmission_function(frequencies, T_obs):
     """
-    Compute the transmission function, which represents the attenuation of
-    signals, for some frequencies given the observation time.
+    Compute the transmission function (see Eq. 3 of 2404.02864), which
+    represents the attenuation of signals, for some frequencies given the
+    observation time.
 
     Parameters:
     -----------
@@ -263,6 +312,7 @@ def transmission_function(frequencies, T_obs):
         observation time.
 
     """
+
     return 1 / (1 + 1 / (frequencies * T_obs) ** 6)
 
 
@@ -289,21 +339,407 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
 
     """
 
-    # Do a mesh of the observation times and pick the minimium in each pair
+    # Do a mesh of the observation times
     time_1, time_2 = jnp.meshgrid(Tspan_yr, Tspan_yr)
+    # pick the minimium time in each pair
     time_IJ = jnp.min(jnp.array([time_1, time_2]), axis=0)
 
-    # Compute thte transmission function for all times and frequencies
+    # Compute the transmission function for all times and frequencies
     transmission = transmission_function(
         frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
     )
 
+    # Build the tensor product of the two transimission function
+    transmission_tensor = transmission[:, :, None] * transmission[:, None, :]
+
     # Return the tensor product weighted by the total observation time
-    return jnp.sqrt(
-        (time_IJ / pta_span_yrs)[None, ...]
-        * transmission[:, :, None]
-        * transmission[:, None, :]
+    return jnp.sqrt((time_IJ / pta_span_yrs)[None, ...] * transmission_tensor)
+
+
+@jax.jit
+def gamma_pulsar_pair_analytical(
+    theta_1, phi_1, theta_2, phi_2, theta_k, phi_k
+):
+    """
+    Compute the analytical expression for the gamma function (see Eq. 13 of
+    2407.xxxxx).
+
+    Parameters:
+    -----------
+    theta_1 : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the first pulsar.
+    phi_1 : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the first pulsar.
+    theta_2 : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the second pulsar.
+    phi_2 : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the second pulsar.
+    theta_k : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the pixel vectors.
+    phi_k : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the pixel vectors.
+
+    Returns:
+    --------
+    gamma : numpy.ndarray or jax.numpy.ndarray
+        Array of gamma values computed for the given pulsar pairs and pixel
+        vectors.
+
+    """
+
+    # Compute p_dot_k
+    p_dot_k = dot_product(theta_k, phi_k, theta_1, phi_1)
+
+    # Compute q_dot_k
+    q_dot_k = dot_product(theta_k, phi_k, theta_2, phi_2)
+
+    # Compute p_dot_q
+    p_dot_q = dot_product(theta_1, phi_1, theta_2, phi_2)
+
+    # This is the second term
+    second_term = -(1.0 - p_dot_k) * (1.0 - q_dot_k)
+
+    # This is the numerator of the first term
+    numerator = 2.0 * (p_dot_q - p_dot_k * q_dot_k) ** 2.0
+
+    # This is the denominator of the first term
+    denominator = (1.0 + p_dot_k) * (1.0 + q_dot_k)
+
+    # Where the denominator is non zero, just numerator / denominator,
+    # where it's zero a bit more care is needed, if pI != pJ is zero
+    first_term = jnp.where(denominator != 0.0, numerator / denominator, 0.0)
+
+    conditions = (
+        (denominator == 0.0)
+        & (phi_1 - phi_2 == 0.0)
+        & (theta_1 - theta_2 == 0.0)
     )
+
+    # Correct first term where the denominator is zero and pI = pJ
+    first_term = jnp.where(
+        conditions, -2.0 * second_term, first_term  # type: ignore
+    )
+
+    # Sum all the terms up
+    return first_term + second_term
+
+
+@jax.jit
+def gamma_analytical(theta, phi, theta_k, phi_k):
+    """
+    Compute the analytical expression for the gamma function (see Eq. 13 of
+    2407.xxxxx).
+
+    Parameters:
+    -----------
+    theta : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the pulsars.
+    phi : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the pulsars.
+    theta_k : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the pixel vectors.
+    phi_k : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the pixel vectors.
+
+    Returns:
+    --------
+    gamma : numpy.ndarray or jax.numpy.ndarray
+        Array of gamma values computed for all pulsar pairs and for all pixels
+        The shape will be ulsar index, pulsar index, pixel index
+
+    """
+
+    return gamma_pulsar_pair_analytical(
+        theta[:, None, None],
+        phi[:, None, None],
+        theta[None, :, None],
+        phi[None, :, None],
+        theta_k[None, None, :],
+        phi_k[None, None, :],
+    )
+
+
+@jax.jit
+def gamma(p_I, hat_k):
+    """
+    Compute the gamma function (see Eq. 13 of  2407.xxxxx).
+
+    Parameters:
+    -----------
+    p_I : numpy.ndarray or jax.numpy.ndarray
+        2D Array of unit vectors representing the pulsar directions.
+        Assumed to have shape (N, 3), N is the number of pulsars.
+
+    hat_k : numpy.ndarray or jax.numpy.ndarray
+        Array of unit vectors representing the pixel directions.
+        Assumed to have shape (P, 3), P is the number of pixels.
+
+    Returns:
+    --------
+    gamma : numpy.ndarray or jax.numpy.ndarray
+        3D array of gamma values computed for all pulsar pairs and pixels
+        The shape will be (N, N, P) where  N is the number of pulsars and P is
+        the number of pixels.
+
+    """
+
+    # This is the dot product of the unit vectors pointing towards the pulsars
+    pIpJ = jnp.einsum("iv,jv->ij", p_I, p_I)
+
+    # This is the dot product of p_I and hat_k
+    pIdotk = jnp.einsum("iv,jv->ij", p_I, hat_k)
+
+    # Create the sum and difference vectors to use later
+    sum = 1 + pIdotk
+    diff = 1 - pIdotk
+
+    # Compute the second term
+    second_term = -diff[:, None, :] * diff[None, ...]
+
+    # This is the pIdotk * pJdotk term in the numerator of the first term
+    pk_qk = pIdotk[:, None, :] * pIdotk[None, ...]
+
+    # Get the numerator of the first term
+    numerator = 2 * (pIpJ[..., None] - pk_qk) ** 2
+
+    # Get the denominator of the first term
+    denominator = sum[:, None, :] * sum[None, ...]
+
+    # Where the denominator is non zero, just numerator / denominator
+    first_term = jnp.where(denominator != 0.0, numerator / denominator, 0.0)
+
+    # Correct first term where the denominator is zero and pI = pJ
+    first_term = jnp.where(
+        ((denominator == 0.0) & (jnp.bool_(jnp.floor(pk_qk)))),
+        -2.0 * second_term,
+        first_term,
+    )
+
+    # Sum the two terms and return
+    return first_term + second_term
+
+
+def get_sort_indexes(l_max):
+    """
+    Given the maximum ell value, this function returns the indexes to sort the
+    spherical harmonics coefficients as returned by map2alm of healpy (see
+    https://healpy.readthedocs.io/en/latest/). The coefficients are sorted in
+    the following way:
+
+    - First all the negative m values for a given ell are sorted in decreasing
+        order.
+    - Then the m=0 values are sorted.
+    - Finally all the positive m values for a given ell are sorted in increasing
+        order.
+
+    Parameters:
+    -----------
+    l_max : int
+        Maximum ell value.
+
+    Returns:
+    --------
+    m_grid : numpy.ndarray
+        Array of m values.
+
+    sort_indexes : numpy.ndarray
+        Array of indexes to sort the spherical harmonics coefficients.
+
+    """
+
+    # Create arrays for l and m
+    l_values = np.arange(l_max + 1)
+    m_values = np.arange(l_max + 1)
+
+    # Create a grid of all possible (l, m) pairs
+    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing="xy")
+
+    # Flatten the grid
+    l_flat = l_grid.flatten()
+    m_flat = m_grid.flatten()
+
+    # Select only the m values that are allowed for a given ell
+    l_grid = l_flat[np.abs(m_flat) <= l_flat]
+    m_grid = m_flat[np.abs(m_flat) <= l_flat]
+
+    # Create a vector with all the m<0 and then all the m>=0
+    mm = np.append(-np.flip(m_grid[m_grid > 0]), m_grid)
+
+    # Create a vector with all the ls corresponding to mm
+    ll = np.append(np.flip(l_grid[m_grid > 0]), l_grid)
+
+    # Return the sorted indexes
+    return m_grid, np.lexsort((mm, ll))
+
+
+def spherial_harmonics_projection(quantity, l_max):
+    """
+    Compute the spherical harmonics projection of a given quantity. Quantity
+    should be an array in pixel space, and compatible with healpy (see
+    https://healpy.readthedocs.io/en/latest/). The spherical harmonics
+    coefficients are sorted as described in the get_sort_indexes function.
+
+    Parameters:
+    -----------
+    quantity : numpy.ndarray
+        Array of quantities to project on spherical harmonics.
+
+    l_max : int
+        Maximum ell value.
+
+    Returns:
+    --------
+    real_alm : numpy.ndarray
+        Array of real spherical harmonics coefficients, with len (l_max + 1)**2
+
+    """
+
+    # Get the complex alm coefficients.
+    # These are sorted with the m values and are only for m>=0
+    alm = hp.map2alm(quantity, lmax=l_max)
+
+    # Create arrays the m_values and the indexes to sort
+    m_grid, sort_indexes = get_sort_indexes(l_max)
+
+    # Select only the m values that are allowed for a given ell
+    m_p = m_grid[m_grid > 0]
+
+    # Build the real alm selecting imaginary and real part
+    negative_m = np.flip(np.sqrt(2) * (-1) ** m_p * alm[m_grid > 0].imag)
+    positive_m = np.sqrt(2) * (-1) ** m_p * alm[m_grid > 0].real
+
+    # Concatenate the negative, zero and positive m values
+    real_alm = np.concatenate((negative_m, alm[m_grid == 0].real, positive_m))
+
+    # Sort with the indexes
+    return real_alm[sort_indexes]
+
+
+def spherial_harmonics_projection_pulsars(quantity, l_max):
+    """
+    Compute the spherical harmonics projection of a the correlation matrix
+    given quantity.
+
+    TBD: This function should use the fact that quantity is symmetric in the
+    pulsar pulsar indexes to reduce computations and increase efficiency.
+
+    Parameters:
+    -----------
+    quantity : numpy.ndarray
+        3D array to be projected on spherical harmonics. Should have shape
+        (N, N, P), where N is the number of pulsars and P is the number of
+        pixels, which should be compatible with healpy
+        (see https://healpy.readthedocs.io/en/latest/).
+
+    l_max : int
+        Maximum ell value.
+
+    Returns:
+    --------
+    real_alm : numpy.ndarray
+        3D array of real spherical harmonics coefficients.
+        It has shape ( (l_max + 1)**2, N, N), where N is the number of pulsars.
+
+    """
+
+    # Get the shape of the quantity to project on spherical harmonics
+    shape = list(quantity.shape)
+
+    # Reshape quantity so that it can be passed to hp.map2alm
+    qquantity = np.reshape(quantity, (int(shape[0] ** 2), shape[-1]))
+
+    # Get all the alms
+    real_alm = np.apply_along_axis(
+        spherial_harmonics_projection, 1, qquantity, l_max
+    )
+
+    # Reshape to get the same shape as before
+    return np.reshape(real_alm, (shape[0], shape[0], real_alm.shape[-1])).T
+
+
+def get_correlations_lm_IJ(p_I, l_max, nside):
+    """
+    Compute the correlations in spherical harmonics basis for a given pulsar
+    catalog. The correlations are computed up to a maximum ell value l_max and
+    for a given nside.
+
+    Parameters:
+    -----------
+    p_I : numpy.ndarray
+        2D array containing signal data, assumed to have shape (N, M, M)
+        Array of unit vectors representing the pulsar directions.
+
+    l_max : int
+        Maximum ell value.
+
+    nside : int
+        Resolution parameter for the HEALPix grid.
+
+    Returns:
+    --------
+    correlations_lm : numpy.ndarray
+        3D array of correlations computed in spherical harmonics basis.
+        It has shape ( (l_max + 1)**2, N, N), where N is the number of pulsars.
+
+    """
+
+    # Given nside get a pixelization of the sky
+    npix = hp.nside2npix(nside)
+    theta_k, phi_k = hp.pix2ang(nside, jnp.arange(npix))
+    theta_k = jnp.array(theta_k)
+    phi_k = jnp.array(phi_k)
+
+    # Get the k vector (i.e., the sky direction) for all the pixels
+    hat_k = unit_vector(theta_k, phi_k)
+
+    # Compute gamma in all the pixels
+    gamma_pq = 3 / 8 * gamma(p_I, hat_k)
+
+    # Project gamma onto spherical harmonics
+    correlations_lm = spherial_harmonics_projection_pulsars(gamma_pq, l_max)
+
+    # Multiply by 1 + delta_{IJ} and return
+    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
+
+
+def get_response_IJ_lm(p_I, time_tensor_IJ, l_max, nside):
+    """
+    Compute the response tensor for given angular separations and time tensors.
+
+    Parameters:
+    -----------
+    p_I : numpy.ndarray
+        2D array containing signal data, assumed to have shape (N, M, M)
+        Array of unit vectors representing the pulsar directions.
+    """
+
+    # Compute the correlations on lm basis
+    correlations_lm_IJ = get_correlations_lm_IJ(p_I, l_max, nside)
+
+    # combine the Hellings and Downs part and the time part
+    return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
+
+
+@jax.jit
+def get_chi_tensor_IJ(zeta_IJ):
+    """
+    Computes the chi_IJ tensor as expressed in eq. 15 of
+    https://arxiv.org/pdf/2404.02864.pdf for given angular separations.
+
+    Parameters:
+    -----------
+    zeta_IJ : numpy.ndarray or jax.numpy.ndarray
+        Array of angular separations for all pulsar pairs.
+
+    Returns:
+    --------
+    chi_IJ : numpy.ndarray or jax.numpy.ndarray
+        chi_IJ tensor for all the pulsars pairs.
+
+    """
+
+    # Compute HD and add the self correlation term
+    return HD_correlations(zeta_IJ) + 0.5 * jnp.eye(len(zeta_IJ))
 
 
 @jax.jit
@@ -326,8 +762,8 @@ def get_response_IJ(zeta_IJ, time_tensor_IJ):
 
     """
 
-    # Compute HD and add the self correlation term
-    chi_tensor_IJ = HD_correlations(zeta_IJ) + 0.5 * jnp.eye(len(zeta_IJ))
+    # Compute the chi_IJ tensor for the angular separations
+    chi_tensor_IJ = get_chi_tensor_IJ(zeta_IJ)
 
     # combine the Hellings and Downs part and the time part
     return time_tensor_IJ * chi_tensor_IJ[None, ...]
@@ -362,6 +798,33 @@ def get_HD_Legendre_coefficients(order):
     )
 
 
+def get_polynomials_IJ(zeta_IJ, order):
+    """
+    Compute Legendre polynomials for given angular separations and order.
+
+    Parameters:
+    -----------
+    zeta_IJ : numpy.ndarray or jax.numpy.ndarray
+        Array of angular separations between pairs of pulsars.
+    order : int
+        Maximum order of Legendre polynomials.
+
+    Returns:
+    --------
+    polynomials_IJ : numpy.ndarray or jax.numpy.ndarray
+        Array of Legendre polynomials computed for the given angular separations
+        and order.
+
+    """
+
+    polynomials_IJ = []
+
+    for i in range(order + 1):
+        polynomials_IJ.append(legendre(i)(zeta_IJ))
+
+    return jnp.array(polynomials_IJ)
+
+
 @jax.jit
 def Legendre_projection(time_tensor_IJ, polynomials_IJ):
     """
@@ -371,9 +834,11 @@ def Legendre_projection(time_tensor_IJ, polynomials_IJ):
     -----------
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
         Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies.
+        all the pulsars and for all frequencies. The shape is (
+        len(frequencies), len(pulsars), len(pulsars)
     polynomials_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of Legendre polynomials.
+        Array of Legendre polynomials. The shape is (order + 1, len(pulsars),
+        len(pulsars)
 
     Returns:
     --------
@@ -381,6 +846,7 @@ def Legendre_projection(time_tensor_IJ, polynomials_IJ):
         Legendre projection
 
     """
+
     return time_tensor_IJ[None, ...] * polynomials_IJ[:, None, ...]
 
 
@@ -413,7 +879,7 @@ def HD_projection_Legendre(zeta_IJ, time_tensor_IJ, order):
     HD_coefficients = get_HD_Legendre_coefficients(order)
 
     # Gets the values of the HD polynomials for all angular separations
-    polynomials_IJ = jnp.array([legendre(i)(zeta_IJ) for i in range(order + 1)])
+    polynomials_IJ = get_polynomials_IJ(zeta_IJ, order)
 
     # Projects the pulsar catalog onto Legendre polynomials
     HD_functions = Legendre_projection(time_tensor_IJ, polynomials_IJ)
@@ -443,6 +909,7 @@ def binned_projection(zeta_IJ, time_tensor_IJ, masks):
         Binned projection of the Hellings and Downs correlations.
 
     """
+
     return (
         time_tensor_IJ - jnp.eye(len(zeta_IJ))[None, ...] * time_tensor_IJ
     ) * masks[:, None, ...]
@@ -509,6 +976,9 @@ def get_tensors(
     add_curn=False,
     order=0,
     method="legendre",
+    anisotropies=False,
+    l_max=0,
+    nside=16,
     regenerate_catalog=False,
     **generate_catalog_kwargs
 ):
@@ -585,9 +1055,6 @@ def get_tensors(
     phi = jnp.array(pulsars_DF["phi"].values)
     pi_vec = unit_vector(theta, phi)
 
-    # compute angular separations
-    zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)
-
     # get noises for all pulsars
     noise = get_pulsar_noises(
         frequencies,
@@ -598,7 +1065,6 @@ def get_tensors(
         gamma_dm,
         log10_A_sv,
         gamma_sv,
-        Tspan_yr,
         dt,
     )
 
@@ -616,8 +1082,15 @@ def get_tensors(
     # get the time tensor
     time_tensor_IJ = get_time_tensor(frequencies, pta_span_yrs, Tspan_yr)
 
-    # compute the response
-    response_IJ = get_response_IJ(zeta_IJ, time_tensor_IJ)
+    # compute angular separations
+    zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)
+
+    if not anisotropies:
+        # compute the response
+        response_IJ = get_response_IJ(zeta_IJ, time_tensor_IJ)
+
+    else:
+        response_IJ = get_response_IJ_lm(pi_vec, time_tensor_IJ, l_max, nside)
 
     # and if needed the HD part
     if order > 0 and method.lower() == "legendre":
