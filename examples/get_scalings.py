@@ -437,5 +437,5 @@ def N_scaling(
 if __name__ == "__main__":
     N_scaling()
     N_scaling(order=6)
-    T_scaling(T_max_yrs=1e3) # type: ignore
+    T_scaling(T_max_yrs=1e3)  # type: ignore
     plt.show(block=True)
