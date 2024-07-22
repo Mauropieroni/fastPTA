@@ -12,9 +12,7 @@ from fastPTA.signals import SMBBH_parameters, get_model
 from fastPTA.get_tensors import get_tensors
 
 jax.config.update("jax_enable_x64", True)
-
-# If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
+jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
 
 # Setting some constants
@@ -456,6 +454,118 @@ def log_posterior(
     return lp + log_lik
 
 
+@jax.jit
+def log_likelihood_lm(
+    frequency,
+    signal_lm,
+    signal_value,
+    response_IJ,
+    strain_omega,
+    data,
+):
+    """
+    Compute the logarithm of the likelihood assujming a Whittle likelihood.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray
+        Array containing frequency bins.
+    signal_value : numpy.ndarray
+        Array containing the signal evaluated in all frequency bins.
+    response_IJ : numpy.ndarray
+        Array containing response function.
+    strain_omega : numpy.ndarray
+        Array containing strain noise.
+    data : numpy.ndarray
+        Array containing the observed data.
+
+    Returns:
+    --------
+    float
+        Logarithm of the likelihood.
+
+    """
+
+    signal_lm_f = signal_lm[:, None] * signal_value[None, :]
+
+    # Assemble the signal tensor
+    signal_tensor = jnp.sum(response_IJ * signal_lm_f[..., None, None], axis=0)
+
+    # Covariance of the data
+    covariance = signal_tensor + strain_omega
+
+    # Inverse of the covariance
+    c_inverse = ut.compute_inverse(covariance)
+
+    # Log determinant
+    sign, logdet = jnp.linalg.slogdet(covariance)
+
+    # data term
+    data_term = jnp.abs(jnp.einsum("ijk,ikj->i", c_inverse, data))
+
+    # return the likelihood
+    return -jnp.sum(logdet + data_term)
+
+
+def log_posterior_lm(
+    signal_parameters,
+    frequency,
+    signal_model,
+    response_IJ,
+    strain_omega,
+    data,
+    prior_parameters,
+    which_prior="flat",
+):
+    """
+    Compute the logarithm of the posterior probability summing log likelihood
+    and prior.
+
+    Parameters:
+    -----------
+    signal_parameters : numpy.ndarray
+        Array containing parameters of the signal model.
+    frequency : numpy.ndarray
+        Array containing frequency bins.
+    signal_model : callable
+        Function representing the signal model.
+    response_IJ : numpy.ndarray
+        Array containing response function.
+    strain_omega : numpy.ndarray
+        Array containing strain noise.
+    data : numpy.ndarray
+        Array containing the observed data.
+    prior_parameters : numpy.ndarray
+        Array containing prior parameters.
+    which_prior : str, optional
+        Type of prior distribution to use (default is "flat").
+
+    Returns:
+    --------
+    float
+        Logarithm of the posterior probability.
+
+    """
+
+    lp = log_prior(signal_parameters, prior_parameters)
+
+    if not jnp.isfinite(lp):
+        return -jnp.inf
+
+    signal_value = signal_model(frequency, signal_parameters[:2])
+
+    log_lik = log_likelihood_lm(
+        frequency,
+        signal_parameters[2:],
+        signal_value,
+        response_IJ,
+        strain_omega,
+        data,
+    )
+
+    return lp + log_lik
+
+
 def run_MCMC(
     priors,
     T_obs_yrs=10.33,
@@ -555,13 +665,24 @@ def run_MCMC(
 
     """
 
+    if "anisotropies" in get_tensors_kwargs.keys():
+        anisotropies = get_tensors_kwargs["anisotropies"]
+    else:
+        anisotropies = False
+
+    # This is not used now
+    # if "lm_order" in get_tensors_kwargs.keys():
+    #     lm_order = get_tensors_kwargs["lm_order"]
+    # else:
+    #     lm_order = False
+
     # Get the data
     frequency, MCMC_data, response_IJ, strain_omega = get_MCMC_data(
         regenerate_MCMC_data,
         T_obs_yrs=T_obs_yrs,
         n_frequencies=n_frequencies,
         signal_label=signal_label,
-        signal_parameters=signal_parameters,
+        signal_parameters=signal_parameters[:2],
         realization=realization,
         save_MCMC_data=save_MCMC_data,
         path_to_MCMC_data=path_to_MCMC_data,
@@ -600,9 +721,11 @@ def run_MCMC(
     # Kwargs for the posterior
     kwargs = {"which_prior": which_prior}
 
+    posterior_to_use = log_posterior_lm if anisotropies else log_posterior
+
     # Set the sampler
     sampler = emcee.EnsembleSampler(
-        nwalkers, ndims, log_posterior, args=args, kwargs=kwargs
+        nwalkers, ndims, posterior_to_use, args=args, kwargs=kwargs
     )
 
     start = time.perf_counter()
