@@ -5,6 +5,7 @@ import numpy as np
 
 from scipy.stats import kstest
 from scipy import stats as scipy_stats
+from sympy import N
 
 # Local
 import test_utils as tu
@@ -32,8 +33,7 @@ def test_generation(parameter, n_pulsars, pulsar_dictionary):
         x = np.cos(x)
 
     dist = test_dictionary[parameter + "_dict"]
-    # This is a Kolmogorov–Smirnov test to check whether the pulsars in the
-    # catalog are distributed as expected
+    # This is a Kolmogorov–Smirnov test to check whether the pulsars in the catalog are distributed as expected
 
     if dist["which_distribution"] == "uniform" and len(x) > 3:
         _stats, p = kstest(
@@ -59,18 +59,55 @@ def test_generation(parameter, n_pulsars, pulsar_dictionary):
 
 class TestCatalogGenerator(unittest.TestCase):
     def test_generation_EPTA(self):
+        """
+        Test the generation of pulsar catalogs with EPTA-like noise parameters
+
+        """
+
         for p in tu.parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 30, tu.EPTAlike_test) > 1e-4)
+            self.assertTrue(test_generation(p, 30, tu.EPTAlike_test) > 1e-4)  # type: ignore
 
     def test_generation_EPTA_noiseless(self):
+        """
+        Test the generation of a noiseless pulsar catalogs
+
+        """
+
         for p in tu.parameters_to_test.keys():
             self.assertTrue(
-                test_generation(p, 50, tu.EPTAlike_noiseless_test) > 1e-4
+                test_generation(p, 50, tu.EPTAlike_noiseless_test) > 1e-4  # type: ignore
             )
 
     def test_generation_SKAlike(self):
+        """
+        Test the generation of pulsar catalogs with EPTA-like noise parameters
+
+        """
+
         for p in tu.parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 500, tu.mockSKA10_test) > 1e-4)
+            self.assertTrue(test_generation(p, 500, tu.mockSKA10_test) > 1e-4)  # type: ignore
+
+    def test_generation_ng_positions(self):
+        """
+        Test the generation of pulsar catalogs with NANOgrav positions
+
+        """
+
+        test_catalog = generate_pulsars_catalog(
+            n_pulsars=30, save_catalog=False, use_ng_positions=True
+        )
+
+        data_ng = np.loadtxt(tu.NANOGrav_positions, skiprows=1, dtype=np.str_)
+
+        self.assertEqual(
+            np.sum(np.abs(test_catalog["phi"] - data_ng[:, 1].astype(float))),
+            0.0,
+        )
+
+        self.assertEqual(
+            np.sum(np.abs(test_catalog["theta"] - data_ng[:, 2].astype(float))),
+            0.0,
+        )
 
 
 if __name__ == "__main__":
