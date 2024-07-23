@@ -12,7 +12,8 @@ from fastPTA.utils import (
 def generate_parameter(n_pulsars, parameter_dict):
     """
     Generate the parameters for a given number of pulsars based on specified
-    info in parameter_dict. Supported distribution types are 'gaussian' and 'uniform'.
+    info in parameter_dict. Supported distribution types are 'gaussian' and
+    'uniform'.
 
     Parameters:
     -----------
@@ -35,6 +36,7 @@ def generate_parameter(n_pulsars, parameter_dict):
         Generated parameters for the catalog of pulsars.
 
     """
+
     if parameter_dict["which_distribution"] == "gaussian":
         data = np.random.normal(
             parameter_dict["mean"], parameter_dict["std"], n_pulsars
@@ -180,6 +182,7 @@ def generate_pulsars_catalog(
     --------
     DataFrame
         Generated catalog of pulsars with specified parameters.
+
     """
 
     noise_probabilities = np.array(list(noise_probabilities_dict.values()))
@@ -195,6 +198,7 @@ def generate_pulsars_catalog(
         catalog["names"] = data_ng[:, 0]
         catalog["phi"] = data_ng[:, 1].astype(float)
         catalog["theta"] = data_ng[:, 2].astype(float)
+
     else:
         catalog["names"] = [
             "pulsar_" + str(ell) for ell in (1 + np.arange(n_pulsars))
