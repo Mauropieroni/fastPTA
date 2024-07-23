@@ -5,7 +5,6 @@ import numpy as np
 
 from scipy.stats import kstest
 from scipy import stats as scipy_stats
-from sympy import N
 
 # Local
 import test_utils as tu
