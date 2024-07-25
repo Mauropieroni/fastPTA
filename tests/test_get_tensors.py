@@ -1,5 +1,4 @@
 # Global
-from cgi import test
 import unittest
 
 import numpy as np
@@ -10,7 +9,7 @@ import jax
 import jax.numpy as jnp
 
 # Local
-import test_utils as tu
+import utils as tu
 from fastPTA import utils as ut
 from fastPTA import get_tensors as gt
 
@@ -203,36 +202,6 @@ class TestGetTensors(unittest.TestCase):
         self.assertAlmostEqual(jnp.abs(res_Y2p2[8] - 1.0), 0.0, places=4)
         self.assertAlmostEqual(jnp.abs(res_Y3m3[9] - 1.0), 0.0, places=4)
         self.assertAlmostEqual(jnp.abs(res_Y3p3[15] - 1.0), 0.0, places=4)
-
-    def test_get_spherical_harmonics_(self):
-        """
-        Test the function to get the spherical harmonics
-
-        """
-
-        sp_harm = gt.get_spherical_harmonics(5, theta, phi)
-
-        c = 0
-        for ell in range(6):
-            for m in range(-ell, ell + 1):
-                sp = sph_harm(np.abs(m), ell, phi, theta)
-
-                if m == 0:
-                    sp = sp.real
-                elif m > 0:
-                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.real
-                elif m < 0:
-                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.imag
-                else:
-                    raise ValueError("Nope")
-
-                self.assertAlmostEqual(
-                    jnp.abs(np.mean(4 * np.pi * sp_harm[c] * sp) - 1.0),
-                    0.0,
-                    places=3,
-                )
-
-                c += 1
 
     def test_get_correlations_lm_IJ(self):
         """

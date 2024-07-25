@@ -8,7 +8,7 @@ import jax
 import jax.numpy as jnp
 
 # Local
-import test_utils as tu
+import utils as tu
 
 import fastPTA.utils as ut
 from fastPTA import Fisher_code as Fc

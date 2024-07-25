@@ -7,7 +7,7 @@ from scipy.stats import kstest
 from scipy import stats as scipy_stats
 
 # Local
-import test_utils as tu
+import utils as tu
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
