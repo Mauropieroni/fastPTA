@@ -9,7 +9,7 @@ chex>=0.1.85; python_version>='3.9'
 chex==0.1.7; python_version<'3.9'
 healpy>=1.16.6; python_version>='3.9'
 healpy==1.16.2; python_version<'3.9'
-typing_extensions==4.10.0; python_version=='3.11'
+typing_extensions>=4.10.0; python_version=='3.11'
 
 matplotlib>=3.7.4
 pandas>=2.0.3

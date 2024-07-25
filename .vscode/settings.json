@@ -1,0 +1,8 @@
+{
+    "python.analysis.autoImportCompletions": true,
+    "[python]": {
+        "editor.rulers": [80],
+        "editor.defaultFormatter": "ms-python.black-formatter",
+        "editor.formatOnSave": true,
+    }
+}

@@ -118,15 +118,25 @@ def generate_MCMC_data(
         # Generate gaussian data with the right std for the noise
         noise_data = generate_gaussian(0, noise_std)
 
-        # Combine to get nn
-        noise_part = noise_data[:, :, None] * np.conj(noise_data[:, None, :])
+        # Combine to get nn take the real part only since the likelihood is
+        # real and is multiplied by a 2 to keep track of that
+        noise_part = np.real(
+            noise_data[:, :, None] * np.conj(noise_data[:, None, :])
+        )
+
+        # Since we work with variables of f only (already integrated over theta
+        # and phi), each signal component should be generated independently
+        signal_std = signal_std[:, None, None] * np.ones_like(
+            np.real(noise_part)
+        )
 
         # Generate gaussian data with the right std for the signal
         signal_data = generate_gaussian(0, signal_std)
 
         # The response projects the signal in the different pulsar combinations
-        signal_part = (
-            response_IJ * (signal_data * np.conj(signal_data))[:, None, None]
+        # as for the noise, take the real part only
+        signal_part = response_IJ * np.real(
+            signal_data * np.conjugate(signal_data)
         )
 
     else:
@@ -394,7 +404,7 @@ def log_likelihood(
     sign, logdet = jnp.linalg.slogdet(covariance)
 
     # data term
-    data_term = jnp.abs(jnp.einsum("ijk,ikj->i", c_inverse, data))
+    data_term = jnp.einsum("ijk,ikj->i", c_inverse, data)
 
     # return the likelihood
     return -jnp.sum(logdet + data_term)
@@ -765,6 +775,6 @@ def run_MCMC(
     print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))
 
     print("Storing as", path_to_MCMC_chains)
-    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)
+    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)  # type: ignore
 
     return samples, pdfs

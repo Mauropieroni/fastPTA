@@ -1,5 +1,4 @@
 # Global
-from bdb import effective
 import unittest
 
 import numpy as np

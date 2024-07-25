@@ -198,7 +198,6 @@ def generate_pulsars_catalog(
         catalog["names"] = data_ng[:, 0]
         catalog["phi"] = data_ng[:, 1].astype(float)
         catalog["theta"] = data_ng[:, 2].astype(float)
-
     else:
         catalog["names"] = [
             "pulsar_" + str(ell) for ell in (1 + np.arange(n_pulsars))
