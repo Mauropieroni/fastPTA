@@ -11,6 +11,7 @@ EPTAlike_noiseless_test = load_yaml(
     test_data_path + "/EPTAlike_pulsar_parameters_noiseless.yaml"
 )
 mockSKA10_test = load_yaml(test_data_path + "/mockSKA10_pulsar_parameters.yaml")
+NANOGrav_positions = test_data_path + "/NANOGrav_positions.txt"
 
 test_catalog_path = test_data_path + "test_catalog.txt"
 test_catalog_path2 = test_data_path + "test_catalog2.txt"

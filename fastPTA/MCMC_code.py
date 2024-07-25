@@ -759,7 +759,7 @@ def run_MCMC(
         i += 1
 
     # Samples and pdfs
-    samples = sampler.get_chain(flat=True)
+    samples = np.array(sampler.get_chain(flat=True))
     pdfs = sampler.lnprobability
 
     print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))

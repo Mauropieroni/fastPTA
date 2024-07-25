@@ -45,6 +45,11 @@ path_to_default_NANOGrav_positions = os.path.join(
     os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
 )
 
+# Set the path to the default pulsar catalog
+path_to_default_NANOGrav_positions = os.path.join(
+    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
+)
+
 
 def characteristic_strain_to_Omega(frequency):
     """
