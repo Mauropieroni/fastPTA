@@ -343,6 +343,7 @@ if __name__ == "__main__":
         path_to_MCMC_chains="generated_chains/MCMC_chains_pl.npz",
         MCMC_kwargs={
             "realization": False,
+            "regenerate_MCMC_data": True,
         },
         generate_catalog_kwargs={
             "n_pulsars": 60,
