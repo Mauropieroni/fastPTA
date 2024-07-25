@@ -529,70 +529,13 @@ def gamma(p_I, hat_k):
     return first_term + second_term
 
 
-def get_sort_indexes(l_max):
-    """
-    Given the maximum ell value, this function returns the indexes to sort the
-    spherical harmonics coefficients as returned by map2alm of healpy (see
-    https://healpy.readthedocs.io/en/latest/). The coefficients are sorted in
-    the following way:
-
-    - First all the negative m values for a given ell are sorted with
-        decreasing order.
-    - Then the m=0 values are sorted.
-    - Finally all the positive m values for a given ell are sorted with
-        increasing order.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    l_grid : numpy.ndarray
-        Array of l values.
-    m_grid : numpy.ndarray
-        Array of m values.
-    ll : numpy.ndarray
-        Array of l values corresponding to the sorted indexes.
-    mm : numpy.ndarray
-        Array of m values corresponding to the sorted indexes.
-    sort_indexes : numpy.ndarray
-        Array of indexes to sort the spherical harmonics coefficients.
-
-    """
-
-    # Create arrays for l and m
-    l_values = np.arange(l_max + 1)
-    m_values = np.arange(l_max + 1)
-
-    # Create a grid of all possible (l, m) pairs
-    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing="xy")
-
-    # Flatten the grid
-    l_flat = l_grid.flatten()
-    m_flat = m_grid.flatten()
-
-    # Select only the m values that are allowed for a given ell
-    l_grid = l_flat[np.abs(m_flat) <= l_flat]
-    m_grid = m_flat[np.abs(m_flat) <= l_flat]
-
-    # Create a vector with all the m<0 and then all the m>=0
-    mm = np.append(-np.flip(m_grid[m_grid > 0]), m_grid)
-
-    # Create a vector with all the ls corresponding to mm
-    ll = np.append(np.flip(l_grid[m_grid > 0]), l_grid)
-
-    # Return the sorted indexes
-    return l_grid, m_grid, ll, mm, np.lexsort((mm, ll))
-
-
 def spherical_harmonics_projection(quantity, l_max):
     """
     Compute the spherical harmonics projection of a given quantity. Quantity
     should be an array in pixel space, and compatible with healpy (see
     https://healpy.readthedocs.io/en/latest/). The spherical harmonics
-    coefficients are sorted as described in the get_sort_indexes function.
+    coefficients are sorted as described in the get_sort_indexes function in
+    utils.
 
     Parameters:
     -----------
@@ -614,7 +557,7 @@ def spherical_harmonics_projection(quantity, l_max):
     alm = hp.map2alm(quantity, lmax=l_max)
 
     # Create arrays the m_values and the indexes to sort
-    inds = get_sort_indexes(l_max)
+    inds = ut.get_sort_indexes(l_max)
 
     # Unpack m_grid and sorted_indexes
     m_grid = inds[1]
@@ -710,72 +653,6 @@ def get_correlations_lm_IJ_spherical_harmonics_basis(p_I, l_max, gamma_pq):
     return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
 
 
-def get_spherical_harmonics(l_max, theta, phi):
-    """
-    Compute the spherical harmonics for a given maximum ell value and for a
-    given set of theta and phi values.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-    theta : numpy.ndarray or jax.numpy.ndarray
-        Array of polar angles (co-latitudes).
-    phi : numpy.ndarray or jax.numpy.ndarray
-        Array of azimuthal angles (longitudes).
-
-    Returns:
-    --------
-    all_spherical_harmonics : numpy.ndarray
-        2D array of spherical harmonics computed for the given maximum ell
-        value, and theta and phi values. The shape will be (lm, pp), where pp
-        is the number of theta and phi values, and lm = (l_max + 1)**2 is the
-        number of spherical harmonics coefficients.
-
-    """
-
-    # Create arrays the m_values and the indexes to sort
-    inds = get_sort_indexes(l_max)
-
-    # Unpack m_grid and sorted_indexes
-    l_grid = inds[0]
-    m_grid = inds[1]
-    sorted_indexes = inds[-1]
-
-    # Compute all the spherical harmonics
-    spherical_harmonics = sph_harm(
-        m_grid[:, None], l_grid[:, None], phi[None, :], theta[None, :]
-    )
-
-    # Select only the m values that are allowed for a given ell
-    m_p = m_grid[m_grid > 0.0]
-
-    # Pick only m = 0
-    m0 = spherical_harmonics[m_grid == 0.0].real
-
-    # Build the positive m values
-    positive = (
-        np.sqrt(2.0)
-        * (-1.0) ** m_p[:, None]
-        * spherical_harmonics[m_grid > 0.0].real
-    )
-
-    # Build the negative m values
-    negative = (
-        np.sqrt(2.0)
-        * (-1.0) ** m_p[:, None]
-        * spherical_harmonics[m_grid > 0.0].imag
-    )
-
-    # Concatenate the negative, zero and positive m values
-    all_spherical_harmonics = np.concatenate(
-        (np.flip(negative, axis=0), m0, positive), axis=0
-    )
-
-    # Return sorted
-    return all_spherical_harmonics[sorted_indexes]
-
-
 def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
     """
     Compute the correlations in sqrt basis for a given pulsar catalog. The
@@ -811,7 +688,7 @@ def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
     npix = hp.nside2npix(theta_k)
 
     # spherical harmonis with shape (lm, pp)
-    spherical_harmonics = get_spherical_harmonics(l_max, theta_k, phi_k)
+    spherical_harmonics = ut.get_spherical_harmonics(l_max, theta_k, phi_k)
 
     # Quadratic spherical_harmonics basis with shape (lm, lm, pp)
     quadratic = spherical_harmonics[:, None] * spherical_harmonics[None, :]

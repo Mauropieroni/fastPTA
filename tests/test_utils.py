@@ -1,60 +1,100 @@
-import os
+# Global
+import unittest
+
 import numpy as np
-from fastPTA.utils import load_yaml
+import healpy as hp
+from scipy.special import sph_harm
+
+# Local
+import utils as tu
+from fastPTA import utils as ut
 
 
-test_data_path = os.path.join(os.path.dirname(__file__), "test_data/")
-
-# Default parameters for the pulsars
-EPTAlike_test = load_yaml(test_data_path + "/EPTAlike_pulsar_parameters.yaml")
-EPTAlike_noiseless_test = load_yaml(
-    test_data_path + "/EPTAlike_pulsar_parameters_noiseless.yaml"
-)
-mockSKA10_test = load_yaml(test_data_path + "/mockSKA10_pulsar_parameters.yaml")
-NANOGrav_positions = test_data_path + "/NANOGrav_positions.txt"
-
-test_catalog_path = test_data_path + "test_catalog.txt"
-test_catalog_path2 = test_data_path + "test_catalog2.txt"
-test_catalog_path3 = test_data_path + "test_catalog3.txt"
-get_tensors_data_path = test_data_path + "get_tensors.npz"
-get_correlations_lm_IJ_data_path = test_data_path + "get_correlations_lm_IJ.npz"
-get_tensors_Binned_data_path = test_data_path + "get_tensors_Binned.npz"
-get_tensors_Legendre_data_path = test_data_path + "get_tensors_Legendre.npz"
-Fisher_data_path = test_data_path + "Fisher_data.npz"
-Fisher_data_path2 = test_data_path + "Fisher_data2.npz"
-
-parameters_to_test = {
-    "phi": "phi",
-    "theta": "theta",
-    "dt": "dt",
-    "T_span": "Tspan",
-    "wn": "wn",
-    "dm_noise_log_10_A": "log10_A_dm",
-    "red_noise_log_10_A": "log10_A_red",
-    "sv_noise_log_10_A": "log10_A_sv",
-    "dm_noise_g": "g_dm",
-    "red_noise_g": "g_red",
-    "sv_noise_g": "g_sv",
-}
+nside = 64
+npix = hp.nside2npix(nside)
+theta, phi = hp.pix2ang(nside, np.arange(npix))
 
 
-test_distributions = {
-    "phi_dict": {"which_distribution": "uniform", "min": 0, "max": 2 * np.pi},
-    "theta_dict": {"which_distribution": "uniform", "min": -1, "max": 1},
-}
+class TestGetTensors(unittest.TestCase):
+
+    def test_get_sort_indexes(self):
+        """
+        Test the function to get the (l,m) pairs sorted correctly
+
+        """
+
+        data = np.loadtxt(tu.lm_indexes)
+        inds = ut.get_sort_indexes(5)
+
+        self.assertTrue(np.allclose(inds[2][inds[-1]], data[:, 0]))
+        self.assertTrue(np.allclose(inds[3][inds[-1]], data[:, 1]))
+
+    def test_complex_to_real(self):
+        """
+        Test the function to go from complex to real spherical harmonics coefficients
+
+        """
+
+        l_max = 2
+        n_tot = np.sum(1 + np.arange(l_max + 1))
+
+        m_grid = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 2.0], dtype=int)
+        m_positive = m_grid[m_grid > 0.0]
+
+        vals = np.random.normal(0.0, 1.0, n_tot) + 1j * np.random.normal(
+            0.0, 1.0, n_tot
+        )
+
+        test_vals = np.array(
+            [
+                vals[0].real,
+                -np.sqrt(2) * vals[2].imag,
+                vals[1].real,
+                -np.sqrt(2) * vals[2].real,
+                np.sqrt(2) * vals[5].imag,
+                -np.sqrt(2) * vals[4].imag,
+                vals[3].real,
+                -np.sqrt(2) * vals[4].real,
+                np.sqrt(2) * vals[5].real,
+            ]
+        )
+
+        result = ut.complex_to_real_conversion(vals, l_max, m_grid, m_positive)
+
+        self.assertTrue(np.allclose(result, test_vals))
+
+    def test_get_spherical_harmonics(self):
+        """
+        Test the function to get the spherical harmonics
+
+        """
+
+        sp_harm = ut.get_spherical_harmonics(5, theta, phi)
+
+        c = 0
+        for ell in range(6):
+            for m in range(-ell, ell + 1):
+                sp = sph_harm(np.abs(m), ell, phi, theta)
+
+                if m == 0:
+                    sp = sp.real
+                elif m > 0:
+                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.real
+                elif m < 0:
+                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.imag
+                else:
+                    raise ValueError("Nope")
+
+                # Checks that (with the correct normalization) the scalar
+                # product is 1 withing 3 decimal places
+                self.assertAlmostEqual(
+                    np.abs(np.mean(4 * np.pi * sp_harm[c] * sp) - 1.0),
+                    0.0,
+                    places=3,
+                )
+
+                c += 1
 
 
-get_tensor_labels = [
-    "strain_omega",
-    "response_IJ",
-    "HD_functions_IJ",
-    "HD_coefficients",
-]
-
-
-def not_a_test(object):
-    object.__test__ = False
-    return object
-
-
-test_frequency = np.arange(1e-10, 1e-6, 1e-8)
+if __name__ == "__main__":
+    unittest.main(verbosity=2)
