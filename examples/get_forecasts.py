@@ -244,11 +244,30 @@ def get_constraints(
             # priors = signal_parameters[None, :] + 5 * np.array(
             #     [-errors, errors]
             # )
-            priors = np.array([[signal_parameters[0] - 5 * errors[0], signal_parameters[0] + 5 * errors[0]],
-                              [signal_parameters[1] - 5 * errors[1], signal_parameters[1] + 5 * errors[1]],
-                              [max([-3.5, signal_parameters[2] - 5 * errors[2]]), min([-0.5, signal_parameters[2] + 5 * errors[2]])],
-                              [max([-1.5, signal_parameters[3] - 5 * errors[3]]), min([0.9, signal_parameters[3] + 5 * errors[3]])],
-                              [signal_parameters[4] - 5 * errors[4], signal_parameters[4] + 5 * errors[4]]]).T
+            priors = np.array(
+                [
+                    [
+                        signal_parameters[0] - 5 * errors[0],
+                        signal_parameters[0] + 5 * errors[0],
+                    ],
+                    [
+                        signal_parameters[1] - 5 * errors[1],
+                        signal_parameters[1] + 5 * errors[1],
+                    ],
+                    [
+                        max([-3.5, signal_parameters[2] - 5 * errors[2]]),
+                        min([-0.5, signal_parameters[2] + 5 * errors[2]]),
+                    ],
+                    [
+                        max([-1.5, signal_parameters[3] - 5 * errors[3]]),
+                        min([0.9, signal_parameters[3] + 5 * errors[3]]),
+                    ],
+                    [
+                        signal_parameters[4] - 5 * errors[4],
+                        signal_parameters[4] + 5 * errors[4],
+                    ],
+                ]
+            ).T
             print(priors)
         MCMC_data, pdfs = run_MCMC(
             priors,
@@ -363,6 +382,7 @@ if __name__ == "__main__":
             "R_criterion": "max",
             "burnin_steps": 300,
             "MCMC_iteration_steps": 500,
+            "regenerate_MCMC_data": True,
         },
         generate_catalog_kwargs={
             "n_pulsars": 68,
