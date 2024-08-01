@@ -2,8 +2,9 @@
 import os
 import yaml
 import numpy as np
+import healpy as hp
 
-import wigners
+from wigners import clebsch_gordan
 
 import jax
 import jax.numpy as jnp
@@ -165,26 +166,102 @@ def load_yaml(path_to_file):
 default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 
 
-def get_sort_indexes(l_max, indexing="xy"):
+def get_l_max_real(real_spherical_harmonics):
     """
-    Given the maximum ell value, this function returns the indexes to sort the
-    spherical harmonics coefficients as returned by map2alm of healpy (see
-    https://healpy.readthedocs.io/en/latest/). The coefficients are sorted in
-    the following way:
+    Given the real spherical harmonics coefficients, this function returns the
+    maximum ell value.
 
-    - First all the negative m values for a given ell are sorted with
-        decreasing order.
-    - Then the m=0 values are sorted.
-    - Finally all the positive m values for a given ell are sorted with
-        increasing order.
+    Parameters:
+    -----------
+    real_spherical_harmonics : numpy.ndarray
+        Array of real spherical harmonics coefficients. If dimension is > 1, lm
+        must be the first index
+
+    Returns:
+    --------
+    l_max : int
+        Maximum ell value.
+
+    """
+
+    return int(np.sqrt(len(real_spherical_harmonics)) - 1)
+
+
+def get_l_max_complex(complex_spherical_harmonics):
+    """
+    Given the complex spherical harmonics coefficients, this function returns
+    the maximum ell value.
+
+    Parameters:
+    -----------
+    complex_spherical_harmonics : numpy.ndarray
+        Array of complex spherical harmonics coefficients. If dimension is > 1,
+        lm must be the first index
+
+    Returns:
+    --------
+    l_max : int
+        Maximum ell value.
+
+    """
+
+    return int(np.sqrt(1.0 + 8.0 * len(complex_spherical_harmonics)) / 2 - 1.5)
+
+
+def get_n_coefficients_complex(l_max):
+    """
+    Given the maximum ell value, this function returns the number of spherical
+    harmonics coefficients for the complex representation.
 
     Parameters:
     -----------
     l_max : int
         Maximum ell value.
-    indexing : str
-        Indexing scheme to use for lm. Default is 'xy' which assumes sorting
-        according to m, l.
+
+    Returns:
+    --------
+    n_coefficients : int
+        Number of spherical harmonics coefficients.
+
+    """
+
+    return int((l_max + 1) * (l_max + 2) / 2)
+
+
+def get_n_coefficients_real(l_max):
+    """
+    Given the maximum ell value, this function returns the number of spherical
+    harmonics coefficients for the real representation.
+
+    Parameters:
+    -----------
+    l_max : int
+        Maximum ell value.
+
+    Returns:
+    --------
+    n_coefficients : int
+        Number of spherical harmonics coefficients.
+
+    """
+
+    return int((l_max + 1) ** 2)
+
+
+def get_sort_indexes(l_max):
+    """
+    Given the maximum ell value, this function returns the indexes to sort the
+    indexes of the spherical harmonics coefficients when going from real to
+    complex representation and viceversa.
+
+    The complex representation is assumed to be sorted as in map2alm of healpy
+    (see https://healpy.readthedocs.io/en/latest/) i.e. according to (m, l).
+    The ouput allows to sort the real representation according to (l, m).
+
+    Parameters:
+    -----------
+    l_max : int
+        Maximum ell value.
 
     Returns:
     --------
@@ -206,7 +283,7 @@ def get_sort_indexes(l_max, indexing="xy"):
     m_values = np.arange(l_max + 1)
 
     # Create a grid of all possible (l, m) pairs
-    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing=indexing)  # type: ignore
+    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing="xy")
 
     # Flatten the grid
     l_flat = l_grid.flatten()
@@ -226,9 +303,59 @@ def get_sort_indexes(l_max, indexing="xy"):
     return l_grid, m_grid, ll, mm, np.lexsort((mm, ll))
 
 
-def complex_to_real_conversion(
-    spherical_harmonics, l_max, m_grid, m_positive, indexing="xy"
-):
+def spherical_harmonics_projection(quantity, l_max):
+    """
+    Compute the spherical harmonics projection of a given quantity. Quantity
+    should be an array in pixel space, and compatible with healpy (see
+    https://healpy.readthedocs.io/en/latest/). The spherical harmonics
+    coefficients are sorted as described in the get_sort_indexes function in
+    utils.
+
+    Parameters:
+    -----------
+    quantity : numpy.ndarray
+        Array of quantities to project on spherical harmonics.
+    l_max : int
+        Maximum ell value.
+
+    Returns:
+    --------
+    real_alm : numpy.ndarray
+        Array of real spherical harmonics coefficients, with len
+        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
+
+    """
+
+    # Get the complex alm coefficients.
+    # These are sorted with the m values and are only for m>=0
+    alm = hp.map2alm(quantity, lmax=l_max)
+
+    # Create arrays the m_values and the indexes to sort
+    inds = get_sort_indexes(l_max)
+
+    # Unpack m_grid and sorted_indexes
+    m_grid = inds[1]
+    sorted_indexes = inds[-1]
+
+    # Compute the sign for the m > 0 values
+    sign = (-1.0) ** m_grid[m_grid > 0]
+
+    # The m != 0 values are multiplied by sqrt(2) and then take real/imag part
+    positive_alm = np.sqrt(2.0) * alm[m_grid > 0]
+
+    # Build the real alm selecting imaginary and real part and sort in the two
+    # blocks in ascending order
+    negative_m = np.flip(sign * positive_alm.imag)
+    positive_m = sign * positive_alm.real
+
+    # Concatenate the negative, zero and positive m values
+    real_alm = np.concatenate((negative_m, alm[m_grid == 0.0].real, positive_m))
+
+    # Sort with the indexes
+    return real_alm[sorted_indexes]
+
+
+def complex_to_real_conversion(spherical_harmonics):
     """
     Converts the complex spherical harmonics (or the coefficients) to real
     spherical harmonics (or the coefficients).
@@ -239,16 +366,6 @@ def complex_to_real_conversion(
         2D (or 1D) array of complex spherical harmonics coefficients.
         If 2D, the shape is (lm, pp), where lm runs over l,m (with m > 0), and
         pp is the number of theta and phi values. If 1D, the shape is (lm,).
-    l_max : int
-        Maximum ell value.
-    m_grid : numpy.ndarray
-        Array of m values.
-    m_positive : numpy.ndarray
-        2D (or 1D) array of positive m values, this should have the same shape
-        as spherical_harmonics
-    indexing : str
-        Indexing scheme to use for lm. Default is 'xy' which assumes sorting
-        according to m, l.
 
     Returns:
     --------
@@ -259,206 +376,198 @@ def complex_to_real_conversion(
 
     """
 
+    # Get the right value of l_max from the input complex coefficients
+    l_max = get_l_max_complex(spherical_harmonics)
+
     # Create arrays the m_values and the indexes to sort
-    inds = get_sort_indexes(l_max, indexing=indexing)
+    _, m_grid, _, _, sort_indexes = get_sort_indexes(l_max)
 
     # Pick only m = 0
-    zero = spherical_harmonics[m_grid == 0.0].real
+    zero_m = spherical_harmonics[m_grid == 0.0].real
 
-    # Build the positive m values
-    positive = (
-        np.sqrt(2.0)
-        * (-1.0) ** m_positive
-        * spherical_harmonics[m_grid > 0.0].real
-    )
+    # Compute the sign for the m > 0 values
+    sign = (-1.0) ** m_grid[m_grid > 0]
 
-    # Build the negative m values
-    negative = (
-        np.sqrt(2.0)
-        * (-1.0) ** m_positive
-        * spherical_harmonics[m_grid > 0.0].imag
-    )
+    # The m != 0 values are multiplied by sqrt(2) and then take real/imag part
+    positive_spherical = np.sqrt(2.0) * spherical_harmonics[m_grid > 0.0]
+
+    # Build the m > 0 values
+    positive_m = np.einsum("i,i...->i...", sign, positive_spherical.real)
+
+    # Build the m < 0 values
+    negative_m = np.einsum("i,i...->i...", sign, positive_spherical.imag)
 
     # Concatenate the negative, zero and positive m values
     all_spherical_harmonics = np.concatenate(
-        (np.flip(negative, axis=0), zero, positive), axis=0
+        (np.flip(negative_m, axis=0), zero_m, positive_m), axis=0
     )
 
     # Return spherical harmonics (coefficients) sorted by l and m
-    return all_spherical_harmonics[inds[-1]]
+    return all_spherical_harmonics[sort_indexes]
 
 
-def real_to_complex_old(clm_real):
+def real_to_complex_conversion(real_spherical_harmonics):
     """
-    Converts the real spherical harmonics coefficients to complex spherical ....
-    """
+    Converts the real spherical harmonics (or the coefficients) back to complex
+    spherical harmonics (or the coefficients).
 
-    l_max = np.rint(np.sqrt(len(clm_real))).astype(int) - 1
-    clm_complex = np.zeros(
-        (l_max + 1, l_max + 1), dtype=np.cdouble
-    )  # for non-negative M in complex spherical harmonics basis
-    i = 0
-    for L in range(l_max + 1):
-        for M in range(L + 1):
-            if M == 0:
-                clm_complex[L, M] = clm_real[i]
-                i += 1
-            else:
-                clm_complex[L, M] = (
-                    ((-1) ** M)
-                    * (-1j * clm_real[i] + clm_real[i + 1])
-                    / np.sqrt(2.0)
-                )
-                i += 2
+    Parameters:
+    -----------
+    real_spherical_harmonics : numpy.ndarray
+        1D array of real spherical harmonics coefficients.
+        The shape is (lm,), where lm runs over l,m (with -l <= m <= l).
+    l_max : int
+        Maximum ell value.
 
-    return clm_complex
-
-
-def real_to_complex(clm_real):
-    """
-    Converts the real spherical harmonics coefficients to complex spherical ....
+    Returns:
+    --------
+    complex_spherical_harmonics : numpy.ndarray
+        1D array of complex spherical harmonics coefficients.
+        The shape is (lm,), where lm runs over l,m (with m >= 0).
     """
 
-    # l_max is the maximum ell value, the +1 used later is to count ell = 0 too
-    l_max = np.rint(np.sqrt(len(clm_real))).astype(int) - 1
+    # Get the right value of l_max from the input real coefficients
+    l_max = get_l_max_real(real_spherical_harmonics)
 
-    # Initialize the complex (M > 0 only) spherical harmonics coefficients
-    clm_complex = np.zeros((l_max + 1, l_max + 1), dtype=np.cdouble)
+    # Get sort indexes
+    _, _, _, mm, sort_indexes = get_sort_indexes(l_max)
 
-    i = 0
-    for L in range(l_max + 1):
-        for M in range(L + 1):
-            if M == 0:
-                clm_complex[L, M] = clm_real[i]
-                i += 1
-            else:
-                clm_complex[L, M] = (
-                    ((-1) ** M)
-                    * (-1j * clm_real[i] + clm_real[i + 1])
-                    / np.sqrt(2.0)
-                )
-                i += 2
+    # Reorder the input real coefficients to the original order
+    ordered_real_spherical_harmonics = np.zeros_like(real_spherical_harmonics)
+    ordered_real_spherical_harmonics[sort_indexes] = real_spherical_harmonics
 
-    return clm_complex
+    # Split the ordered real coefficients into negative, zero, and positive m values
+    zero_m = ordered_real_spherical_harmonics[mm == 0]
+    positive_m = ordered_real_spherical_harmonics[mm > 0]
+    negative_m = ordered_real_spherical_harmonics[mm < 0]
 
+    # Compute the corresponding m values for positive and negative m
+    m_positive = mm[mm > 0]
 
-def complex_to_real_old(clm_complex):
-    l_max = np.shape(clm_complex)[0] - 1
-    clm_real = np.zeros((l_max + 1) ** 2)
-    i = 0
-    for ell in range(l_max + 1):
-        for m in range(ell + 1):
-            if m == 0:
-                clm_real[i] = clm_complex[ell, m].real
-                i += 1
-            else:
-                clm_real[i] = (
-                    -((-1) ** m) * np.sqrt(2.0) * clm_complex[ell, m].imag
-                )  # negative m
-                clm_real[i + 1] = (
-                    ((-1) ** m) * np.sqrt(2.0) * clm_complex[ell, m].real
-                )  # positive m
-                i += 2
+    # Reconstruct the complex coefficients
+    complex_positive_m = (positive_m + 1j * negative_m[::-1]) / (
+        np.sqrt(2.0) * (-1.0) ** m_positive
+    )
 
-    return clm_real
+    # Combine zero and positive m values to form the full complex coefficients
+    complex_spherical_harmonics = np.concatenate(
+        (zero_m, complex_positive_m), axis=0
+    )
+
+    return complex_spherical_harmonics
 
 
-def complex_to_real(clm_complex):
-    l_max = np.shape(clm_complex)[0] - 1
-    clm_real = np.zeros((l_max + 1) ** 2)
-    i = 0
-    for ell in range(l_max + 1):
-        for m in range(ell + 1):
-            if m == 0:
-                clm_real[i] = clm_complex[ell, m].real
-                i += 1
-            else:
-                clm_real[i] = (
-                    -((-1) ** m) * np.sqrt(2.0) * clm_complex[ell, m].imag
-                )  # negative m
-                clm_real[i + 1] = (
-                    ((-1) ** m) * np.sqrt(2.0) * clm_complex[ell, m].real
-                )  # positive m
-                i += 2
+def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
+    """
+    Convert the sqrt basis to the linear basis.
 
-    return clm_real
+    Parameters:
+    -----------
+    gLM_grid : numpy.ndarray
+        Array of sqrt basis coefficients.
+    l_max_lin : int
+        Maximum ell value for the linear basis.
+    real_basis_input : bool
+        If True, the input is in the real basis. Default is False.
 
+    Returns:
+    --------
+    clm_real : numpy.ndarray
+        Array of real coefficients in the linear basis.
+    """
 
-def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_in=True):
-
-    if real_basis_in:
-        gLM_complex = real_to_complex(gLM_grid)
+    if real_basis_input:
+        gLM_complex = real_to_complex_conversion(gLM_grid)
     else:
         gLM_complex = gLM_grid
 
-    l_max_sqrt = np.shape(gLM_complex)[0] - 1
+    l_max_sqrt = get_l_max_complex(gLM_complex)
 
     if l_max_lin < 0:
         l_max_lin = 2 * l_max_sqrt
 
-    clm_complex = np.zeros((l_max_lin + 1, l_max_lin + 1), dtype=np.cdouble)
-    gLnegM_complex = ((-1) ** np.arange(l_max_sqrt + 1))[
-        np.newaxis, :
-    ] * np.conj(gLM_complex)
+    n_coefficients = get_n_coefficients_complex(l_max_lin)
 
-    for ell in range(l_max_lin + 1):
-        for m in range(ell + 1):
-            for L1 in range(l_max_sqrt + 1):
-                L2_grid_all = np.arange(l_max_sqrt + 1)
-                mask_L2 = (np.abs(L1 - L2_grid_all) <= ell) * (
-                    L2_grid_all >= ell - L1
-                )  # conditions from lmin and l_max_lin selection rules
-                L2_grid = L2_grid_all[mask_L2]
-                for L2 in L2_grid:
-                    cg0 = wigners.clebsch_gordan(L1, 0, L2, 0, ell, 0)
-                    if cg0 != 0.0:
-                        prefac = np.sqrt(
-                            (2.0 * L1 + 1.0)
-                            * (2.0 * L2 + 1.0)
-                            / (4.0 * np.pi * (2.0 * ell + 1.0))
+    clm_complex = np.zeros(n_coefficients, dtype=np.cdouble)
+
+    l_lin, m_lin, _, _, _ = get_sort_indexes(l_max_lin)
+
+    l_sqrt, m_sqrt, _, _, _ = get_sort_indexes(l_max_sqrt)
+
+    gLnegM_complex = (-1) ** np.abs(m_sqrt) * np.conj(gLM_complex)
+
+    L_grid_all = np.arange(l_max_sqrt + 1)
+
+    for ind_linear in range(len(m_lin)):
+        m = m_lin[ind_linear]
+        ell = l_lin[ind_linear]
+
+        for L1 in L_grid_all:
+
+            # Build a mask using the conditions from the selection rules
+            mask_L2 = (np.abs(L1 - L_grid_all) <= ell) * (
+                L_grid_all >= ell - L1
+            )
+
+            # Run over the L2 allowed by the mask
+            for L2 in L_grid_all[mask_L2]:
+                # Compute the Clebsch-Gordan coefficient for all ms = 0
+                cg0 = clebsch_gordan(L1, 0, L2, 0, ell, 0)
+
+                if cg0 != 0.0:
+                    prefac = np.sqrt(
+                        (2.0 * L1 + 1.0)
+                        * (2.0 * L2 + 1.0)
+                        / (4.0 * np.pi * (2.0 * ell + 1.0))
+                    )
+
+                    # These are all the values of M1 to use
+                    M1_grid_all = np.arange(-L1, L1 + 1)
+
+                    # Enforce m +M1 + M2 = 0
+                    M2_grid_all = m - M1_grid_all
+
+                    # Check that the values of M2 are consistent with L2
+                    mask_M = np.abs(M2_grid_all) <= L2
+
+                    # Apply the mask
+                    M1_grid = M1_grid_all[mask_M]
+                    M2_grid = M2_grid_all[mask_M]
+
+                    for iM in range(len(M1_grid)):
+                        # Get the values of M1 and M2
+                        M1 = M1_grid[iM]
+                        M2 = M2_grid[iM]
+
+                        # Compute the Clebsch-Gordan coefficient for ms neq 0
+                        cg1 = clebsch_gordan(L1, M1, L2, M2, ell, m)
+
+                        # Mask to get the corresponding value of  gLM_complex
+                        b1_mask = (l_sqrt == L1) & (m_sqrt == np.abs(M1))
+                        b2_mask = (l_sqrt == L2) & (m_sqrt == np.abs(M2))
+
+                        b1 = (
+                            gLM_complex[b1_mask]
+                            if M1 >= 0
+                            else gLnegM_complex[b1_mask]
                         )
-                        M1_grid_all = np.arange(-L1, L1 + 1)
-                        M2_grid_all = m - M1_grid_all
-                        mask_M = np.abs(M2_grid_all) <= L2
-                        M1_grid = M1_grid_all[mask_M]
-                        M2_grid = M2_grid_all[mask_M]
-                        for iM, M1 in enumerate(M1_grid):
-                            M2 = M2_grid[iM]
-                            cg1 = wigners.clebsch_gordan(L1, M1, L2, M2, ell, m)
-                            b1 = (
-                                gLM_complex[L1, M1]
-                                if M1 >= 0
-                                else gLnegM_complex[L1, -M1]
-                            )
-                            b2 = (
-                                gLM_complex[L2, M2]
-                                if M2 >= 0
-                                else gLnegM_complex[L2, -M2]
-                            )
-                            clm_complex[ell, m] += prefac * cg0 * cg1 * b1 * b2
 
-    clm_real = complex_to_real(clm_complex)
+                        b2 = (
+                            gLM_complex[b2_mask]
+                            if M2 >= 0
+                            else gLnegM_complex[b2_mask]
+                        )
 
-    return clm_real
+                        # Multiply everything and sum to the right index
+                        clm_complex[ind_linear] += prefac * cg0 * cg1 * b1 * b2
+
+    return complex_to_real_conversion(clm_complex)
 
 
-def wrapper_sqrt_to_lin_conversion(arg_grid):
-    if len(arg_grid.shape) > 1:  # not real_basis_in for sqrt_to_lin_conversion
-        l_max_lin = int(np.real(arg_grid[0, 1]))
-        arg_grid[0, 1] = 0.0
-
-        return sqrt_to_lin_conversion(
-            arg_grid, l_max_lin=l_max_lin, real_basis_in=False
-        )
-    return sqrt_to_lin_conversion(
-        arg_grid[:-1], l_max_lin=int(arg_grid[-1]), real_basis_in=True
-    )
-
-
-def get_spherical_harmonics(l_max, theta, phi):
+def get_real_spherical_harmonics(l_max, theta, phi):
     """
-    Compute the spherical harmonics for a given maximum ell value and for a
-    given set of theta and phi values.
+    Compute the real spherical harmonics for a given maximum ell value and for
+    a given set of theta and phi values.
 
     Parameters:
     -----------
@@ -491,13 +600,8 @@ def get_spherical_harmonics(l_max, theta, phi):
         m_grid[:, None], l_grid[:, None], phi[None, :], theta[None, :]
     )
 
-    # Select only the m values that are allowed for a given ell
-    m_positive = m_grid[m_grid > 0.0]
-
     # Return sorted
-    return complex_to_real_conversion(
-        spherical_harmonics, l_max, m_grid, m_positive[:, None]
-    )
+    return complex_to_real_conversion(spherical_harmonics)
 
 
 @jax.jit
