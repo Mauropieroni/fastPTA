@@ -457,113 +457,6 @@ def real_to_complex_conversion(real_spherical_harmonics):
     return complex_spherical_harmonics
 
 
-def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
-    """
-    Convert the sqrt basis to the linear basis.
-
-    Parameters:
-    -----------
-    gLM_grid : numpy.ndarray
-        Array of sqrt basis coefficients.
-    l_max_lin : int
-        Maximum ell value for the linear basis.
-    real_basis_input : bool
-        If True, the input is in the real basis. Default is False.
-
-    Returns:
-    --------
-    clm_real : numpy.ndarray
-        Array of real coefficients in the linear basis.
-    """
-
-    if real_basis_input:
-        gLM_complex = real_to_complex_conversion(gLM_grid)
-    else:
-        gLM_complex = gLM_grid
-
-    l_max_sqrt = get_l_max_complex(gLM_complex)
-
-    if l_max_lin < 0:
-        l_max_lin = 2 * l_max_sqrt
-
-    n_coefficients = get_n_coefficients_complex(l_max_lin)
-
-    clm_complex = np.zeros(n_coefficients, dtype=np.cdouble)
-
-    l_lin, m_lin, _, _, _ = get_sort_indexes(l_max_lin)
-
-    l_sqrt, m_sqrt, _, _, _ = get_sort_indexes(l_max_sqrt)
-
-    gLnegM_complex = (-1) ** np.abs(m_sqrt) * np.conj(gLM_complex)
-
-    L_grid_all = np.arange(l_max_sqrt + 1)
-
-    for ind_linear in range(len(m_lin)):
-        m = m_lin[ind_linear]
-        ell = l_lin[ind_linear]
-
-        for L1 in L_grid_all:
-
-            # Build a mask using the conditions from the selection rules
-            mask_L2 = (np.abs(L1 - L_grid_all) <= ell) * (
-                L_grid_all >= ell - L1
-            )
-
-            # Run over the L2 allowed by the mask
-            for L2 in L_grid_all[mask_L2]:
-                # Compute the Clebsch-Gordan coefficient for all ms = 0
-                cg0 = clebsch_gordan(L1, 0, L2, 0, ell, 0)
-
-                if cg0 != 0.0:
-                    prefac = np.sqrt(
-                        (2.0 * L1 + 1.0)
-                        * (2.0 * L2 + 1.0)
-                        / (4.0 * np.pi * (2.0 * ell + 1.0))
-                    )
-
-                    # These are all the values of M1 to use
-                    M1_grid_all = np.arange(-L1, L1 + 1)
-
-                    # Enforce m +M1 + M2 = 0
-                    M2_grid_all = m - M1_grid_all
-
-                    # Check that the values of M2 are consistent with L2
-                    mask_M = np.abs(M2_grid_all) <= L2
-
-                    # Apply the mask
-                    M1_grid = M1_grid_all[mask_M]
-                    M2_grid = M2_grid_all[mask_M]
-
-                    for iM in range(len(M1_grid)):
-                        # Get the values of M1 and M2
-                        M1 = M1_grid[iM]
-                        M2 = M2_grid[iM]
-
-                        # Compute the Clebsch-Gordan coefficient for ms neq 0
-                        cg1 = clebsch_gordan(L1, M1, L2, M2, ell, m)
-
-                        # Mask to get the corresponding value of  gLM_complex
-                        b1_mask = (l_sqrt == L1) & (m_sqrt == np.abs(M1))
-                        b2_mask = (l_sqrt == L2) & (m_sqrt == np.abs(M2))
-
-                        b1 = (
-                            gLM_complex[b1_mask]
-                            if M1 >= 0
-                            else gLnegM_complex[b1_mask]
-                        )
-
-                        b2 = (
-                            gLM_complex[b2_mask]
-                            if M2 >= 0
-                            else gLnegM_complex[b2_mask]
-                        )
-
-                        # Multiply everything and sum to the right index
-                        clm_complex[ind_linear] += prefac * cg0 * cg1 * b1 * b2
-
-    return complex_to_real_conversion(clm_complex)
-
-
 def get_real_spherical_harmonics(l_max, theta, phi):
     """
     Compute the real spherical harmonics for a given maximum ell value and for
@@ -604,6 +497,254 @@ def get_real_spherical_harmonics(l_max, theta, phi):
     return complex_to_real_conversion(spherical_harmonics)
 
 
+def get_CL_from_real_clm(clm_real):
+    """
+    Compute the angular power spectrum from the spherical harmonics coefficients.
+
+    Parameters:
+    -----------
+    clm_real : numpy.ndarray
+        Array of spherical harmonics coefficients, if dimension > 1 the first
+        axis must run over the coefficients.
+
+    Returns:
+    --------
+    CL : numpy.ndarray
+        Array of angular power spectrum.
+
+    """
+
+    # Get the shape of the input coefficients
+    clm_shape = clm_real.shape
+
+    # Get the maximum ell value
+    l_max = get_l_max_real(clm_real)
+
+    # Compute the angular power spectrum
+    CL = np.zeros(tuple([l_max + 1] + list(clm_shape[1:])))
+
+    # A counter for the coefficients used up to that value of ell
+    i = 0
+
+    for ell in range(0, l_max + 1):
+        # Average the square of the coefficients for all ms at fixed ell
+        CL[ell] = np.mean(clm_real[i : i + 2 * ell + 1] ** 2, axis=0)
+
+        # Update the counter
+        i += 2 * ell + 1
+
+    return CL
+
+
+def get_Cl_limits(
+    means,
+    cov,
+    shape_params,
+    n_points=int(1e4),
+    limit_cl=0.95,
+    max_iter=100,
+    prior=5.0 / (4.0 * np.pi),
+):
+    """
+    Compute the upper limit on the angular power spectrum from the means and
+    covariance matrix of the spherical harmonics coefficients.
+
+    Parameters:
+    -----------
+    means : numpy.ndarray
+        Array of means for the spherical harmonics coefficients.
+    cov : numpy.ndarray
+        Array of covariance matrix for the spherical harmonics coefficients.
+    shape_params : int
+        Number of parameters for the SGWB shape.
+    n_points : int, optional
+        Number of points to generate.
+    limit_cl : float, optional
+        Quantile to compute the upper limit.
+    max_iter : int, optional
+        Maximum number of iterations to generate points.
+    prior : float, optional
+        Prior value to restrict the points.
+
+    Returns:
+    --------
+    Cl_limits : numpy.ndarray
+        Array of upper limits on the angular power spectrum from the covariance
+    Cl_limits_prior : numpy.ndarray
+        Array of upper limits on the angular power spectrum including the prior
+
+    """
+
+    # Generate gaussian data from the covariance matrix
+    data = np.random.multivariate_normal(
+        means, cov, n_points, check_valid="ignore", tol=1e-4
+    )
+
+    # Select only the points that are within the prior
+    data_prior = data[np.max(np.abs(data[:, shape_params:]), axis=-1) <= prior]
+
+    # Initialize the counter and the length of the data
+    i_add = 0
+    len_restricted = len(data_prior)
+
+    # Use a while loop to generate enough points
+    while len_restricted < n_points and i_add < max_iter:
+
+        # Generate more points
+        add_data = np.random.multivariate_normal(
+            means, cov, 10 * n_points, check_valid="ignore", tol=1e-4
+        )
+
+        # Select only the points that are within the prior and append
+        data_prior = np.append(
+            data_prior,
+            add_data[
+                np.max(np.abs(add_data[:, shape_params:]), axis=-1) <= prior
+            ],
+            axis=0,
+        )
+
+        # Update the counter and the length of the data
+        len_restricted = len(data_prior)
+        i_add += 1
+
+    # Compute the angular power spectra without and with the prior
+    correlations_lm = get_CL_from_real_clm(data.T[shape_params - 1 :])[1:]
+    correlations_lm_prior = get_CL_from_real_clm(
+        data_prior.T[shape_params - 1 :]
+    )[1:]
+
+    # Compute the upper limits without the prior
+    Cl_limits = np.quantile(correlations_lm, limit_cl, axis=-1)
+
+    # And with the prior if there are enough points
+    if len_restricted == 0:
+        Cl_limits_prior = np.nan * Cl_limits
+
+    else:
+        Cl_limits_prior = np.quantile(correlations_lm_prior, limit_cl, axis=-1)
+
+    return Cl_limits, Cl_limits_prior
+
+
+def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
+    """
+    Convert the sqrt basis to the linear basis.
+
+    Parameters:
+    -----------
+    gLM_grid : numpy.ndarray
+        Array of sqrt basis coefficients.
+    l_max_lin : int
+        Maximum ell value for the linear basis.
+    real_basis_input : bool
+        If True, the input is in the real basis. Default is False.
+
+    Returns:
+    --------
+    clm_real : numpy.ndarray
+        Array of real coefficients in the linear basis.
+
+    """
+
+    # If gLM are in the real basis convert the complex basis
+    if real_basis_input:
+        gLM_complex = real_to_complex_conversion(gLM_grid)
+    else:
+        gLM_complex = gLM_grid
+
+    # Get the maximum ell value for the sqrt basis
+    l_max_sqrt = get_l_max_complex(gLM_complex)
+
+    # Get the grid of all possible L values for the sqrt basis
+    L_grid_all = np.arange(l_max_sqrt + 1)
+
+    # If the maximum ell value for the linear basis is not provided, set it
+    if l_max_lin < 0:
+        l_max_lin = 2 * l_max_sqrt
+
+    # Get the number of coefficients for the linear basis
+    n_coefficients = get_n_coefficients_complex(l_max_lin)
+
+    # Initialize the array for the linear basis
+    clm_complex = np.zeros(n_coefficients, dtype=np.cdouble)
+
+    # Get the indexes for the linear and sqrt basis
+    l_lin, m_lin, _, _, _ = get_sort_indexes(l_max_lin)
+    l_sqrt, m_sqrt, _, _, _ = get_sort_indexes(l_max_sqrt)
+
+    # Compute the sign for the gLM with m < 0
+    gLnegM_complex = (-1) ** np.abs(m_sqrt) * np.conj(gLM_complex)
+
+    for ind_linear in range(len(m_lin)):
+        # Get the values of ell and m
+        m = m_lin[ind_linear]
+        ell = l_lin[ind_linear]
+
+        for L1 in L_grid_all:
+
+            # Build a mask using the conditions from the selection rules
+            mask_L2 = (np.abs(L1 - L_grid_all) <= ell) * (
+                L_grid_all >= ell - L1
+            )
+
+            # Run over the L2 allowed by the mask
+            for L2 in L_grid_all[mask_L2]:
+                # Compute the Clebsch-Gordan coefficient for all ms = 0
+                cg0 = clebsch_gordan(L1, 0, L2, 0, ell, 0)
+
+                # If the coefficient is not zero compute the prefactor
+                if cg0 != 0.0:
+                    prefac = np.sqrt(
+                        (2.0 * L1 + 1.0)
+                        * (2.0 * L2 + 1.0)
+                        / (4.0 * np.pi * (2.0 * ell + 1.0))
+                    )
+
+                    # These are all the values of M1 to use
+                    M1_grid_all = np.arange(-L1, L1 + 1)
+
+                    # Enforce m +M1 + M2 = 0
+                    M2_grid_all = m - M1_grid_all
+
+                    # Check that the values of M2 are consistent with L2
+                    mask_M = np.abs(M2_grid_all) <= L2
+
+                    # Apply the mask
+                    M1_grid = M1_grid_all[mask_M]
+                    M2_grid = M2_grid_all[mask_M]
+
+                    for iM in range(len(M1_grid)):
+                        # Get the values of M1 and M2
+                        M1 = M1_grid[iM]
+                        M2 = M2_grid[iM]
+
+                        # Compute the Clebsch-Gordan coefficient for ms neq 0
+                        cg1 = clebsch_gordan(L1, M1, L2, M2, ell, m)
+
+                        # Mask to get the corresponding value of gLM_complex
+                        b1_mask = (l_sqrt == L1) & (m_sqrt == np.abs(M1))
+                        b2_mask = (l_sqrt == L2) & (m_sqrt == np.abs(M2))
+
+                        # Get the values of gLM_complex for the given L and M
+                        b1 = (
+                            gLM_complex[b1_mask]
+                            if M1 >= 0
+                            else gLnegM_complex[b1_mask]
+                        )
+
+                        b2 = (
+                            gLM_complex[b2_mask]
+                            if M2 >= 0
+                            else gLnegM_complex[b2_mask]
+                        )
+
+                        # Multiply everything and sum to the right index
+                        clm_complex[ind_linear] += prefac * cg0 * cg1 * b1 * b2
+
+    return complex_to_real_conversion(clm_complex)
+
+
 @jax.jit
 def compute_inverse(matrix):
     """
@@ -636,8 +777,8 @@ def compute_inverse(matrix):
 
 def get_R(samples):
     """
-    Computes the Gelman-Rubin (GR) statistic for convergence assessment. The GR
-    statistic is a convergence diagnostic used to assess whether multiple
+    Computes the Gelman-Rubin (GR) statistic for convergence assessment. The
+    GR statistic is a convergence diagnostic used to assess whether multiple
     Markov chains have converged to the same distribution. Values close to 1
     indicate convergence. For details see
     https://en.wikipedia.org/wiki/Gelman-Rubin_statistic
