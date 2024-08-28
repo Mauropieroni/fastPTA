@@ -9,7 +9,11 @@ These catalogs can then be used to perform Fisher forecasts of MCMC runs.
 - [alternatively `python3 -m pip install -e ./fastPTA`, to have changes in the code propagate instantaneously; do not delete `fastPTA` in this case!]
 
 # To test:
-- After installation (see above) you can run `$pytest $(cd fastPTA/)'. A series of tests will run to check everything works fine.
+- After installation (see above) you can run
+  ```
+  pytest $(cd fastPTA/)
+  ```
+A series of tests will run to check everything works fine.
  
 # Some examples:
 - Navigate to examples for some scripts and jupyter notebooks explaining how to use the code
