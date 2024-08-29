@@ -1,5 +1,4 @@
 # Global
-import tqdm
 import numpy as np
 import healpy as hp
 import pandas as pd
@@ -8,7 +7,6 @@ import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
-from scipy.special import sph_harm
 from scipy.integrate import simpson
 
 # Local
@@ -44,8 +42,9 @@ def unit_vector(theta, phi):
     Returns:
     --------
     unit_vec : numpy.ndarray or jax.numpy.ndarray
-        Array of unit vectors in 3D Cartesian coordinates corresponding to
-        the given spherical coordinates.
+        2D array of unit vectors in 3D Cartesian coordinates corresponding to
+        the given spherical coordinates. The shape will be (N, 3), where N is
+        the number of unit vectors.
 
     """
 
@@ -110,12 +109,15 @@ def HD_correlations(zeta_IJ):
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations zeta_IJ.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
 
     Returns:
     --------
     HD correlations : numpy.ndarray or jax.numpy.ndarray
-        Array of correlations computed for the angular separations zeta_IJ.
+        2D array of correlations computed for the angular separations zeta_IJ.
+        The array has shape (N, N), where N is the number of pulsars.
 
     """
 
@@ -135,7 +137,7 @@ HD_value = HD_correlations(x)
 
 
 @jax.jit
-def get_WN(WN_par, dt):
+def get_WN(WN_parameters, dt):
     """
     Compute the white noise amplitude for a catalog of pulsars given the
     the white noise amplitudes and sampling rates (see Eq. 5 of 2404.02864).
@@ -143,7 +145,7 @@ def get_WN(WN_par, dt):
 
     Parameters:
     -----------
-    WN_par : numpy.ndarray or jax.numpy.ndarray
+    WN_parameters : numpy.ndarray or jax.numpy.ndarray
         White noise parameters for the pulsar.
     dt : numpy.ndarray or jax.numpy.ndarray
         Time steps for the pulsar.
@@ -155,7 +157,7 @@ def get_WN(WN_par, dt):
 
     """
 
-    return 1e-100 + jnp.array(1e-12 * 2 * WN_par**2 * dt)
+    return 1e-100 + jnp.array(1e-12 * 2 * WN_parameters**2 * dt)
 
 
 @jax.jit
@@ -201,8 +203,9 @@ def get_noise_omega(frequencies, noise):
 
     Returns:
     --------
-    numpy.ndarray
-        Noise converted to Omega units.
+    noise_omega : numpy.ndarray or jax.numpy.ndarray
+        Noise converted to Omega units. The shape will be (F, N, N), where F
+        is the number of frequencies and N is the number of pulsars.
 
     """
 
@@ -269,8 +272,9 @@ def get_pulsar_noises(
     Returns:
     --------
     noise : numpy.ndarray or jax.numpy.ndarray
-        Array of noise components computed for the given parameters and
-        frequencies.
+        3D array of noise components computed for the given parameters and
+        frequencies. The shape will be (F, N, N), where F is the number of
+        frequencies and N is the number of pulsars.
 
     """
 
@@ -334,8 +338,10 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     Returns:
     --------
     time_tensor : numpy.ndarray or jax.numpy.ndarray
-        Time tensor computed for the given frequencies, PTA span, and
-        individual pulsar spans.
+        3D array representing the time tensor computed for the given
+        frequencies, PTA span, and individual pulsar spans. It has shape
+        (F, N, N), where F is the number of frequencies and N is the number
+        of pulsars.
 
     """
 
@@ -362,7 +368,7 @@ def gamma_pulsar_pair_analytical(
 ):
     """
     Compute the analytical expression for the gamma function (see Eq. 13 of
-    2407.xxxxx).
+    2407.14460).
 
     Parameters:
     -----------
@@ -428,7 +434,7 @@ def gamma_pulsar_pair_analytical(
 def gamma_analytical(theta, phi, theta_k, phi_k):
     """
     Compute the analytical expression for the gamma function (see Eq. 13 of
-    2407.xxxxx).
+    2407.14460).
 
     Parameters:
     -----------
@@ -444,8 +450,9 @@ def gamma_analytical(theta, phi, theta_k, phi_k):
     Returns:
     --------
     gamma : numpy.ndarray or jax.numpy.ndarray
-        Array of gamma values computed for all pulsar pairs and for all pixels
-        The shape will be ulsar index, pulsar index, pixel index
+        3D array of gamma values computed for all pulsar pairs and for all
+        pixels. The shape will be (N, N, pp), where N is the number of pulsars
+        and pp is the number of pixels.
 
     """
 
@@ -462,23 +469,23 @@ def gamma_analytical(theta, phi, theta_k, phi_k):
 @jax.jit
 def gamma(p_I, hat_k):
     """
-    Compute the gamma function (see Eq. 13 of  2407.xxxxx).
+    Compute the gamma function (see Eq. 13 of  2407.14460).
 
     Parameters:
     -----------
     p_I : numpy.ndarray or jax.numpy.ndarray
-        2D Array of unit vectors representing the pulsar directions.
+        2D array of unit vectors representing the pulsar directions.
         Assumed to have shape (N, 3), N is the number of pulsars.
 
     hat_k : numpy.ndarray or jax.numpy.ndarray
         Array of unit vectors representing the pixel directions.
-        Assumed to have shape (P, 3), P is the number of pixels.
+        Assumed to have shape (pp, 3), pp is the number of pixels.
 
     Returns:
     --------
     gamma : numpy.ndarray or jax.numpy.ndarray
         3D array of gamma values computed for all pulsar pairs and pixels
-        The shape will be (N, N, P) where  N is the number of pulsars and P is
+        The shape will be (N, N, pp) where  N is the number of pulsars and pp is
         the number of pixels.
 
     """
@@ -519,103 +526,7 @@ def gamma(p_I, hat_k):
     return first_term + second_term
 
 
-def get_sort_indexes(l_max):
-    """
-    Given the maximum ell value, this function returns the indexes to sort the
-    spherical harmonics coefficients as returned by map2alm of healpy (see
-    https://healpy.readthedocs.io/en/latest/). The coefficients are sorted in
-    the following way:
-
-    - First all the negative m values for a given ell are sorted in decreasing
-        order.
-    - Then the m=0 values are sorted.
-    - Finally all the positive m values for a given ell are sorted in increasing
-        order.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    m_grid : numpy.ndarray
-        Array of m values.
-
-    sort_indexes : numpy.ndarray
-        Array of indexes to sort the spherical harmonics coefficients.
-
-    """
-
-    # Create arrays for l and m
-    l_values = np.arange(l_max + 1)
-    m_values = np.arange(l_max + 1)
-
-    # Create a grid of all possible (l, m) pairs
-    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing="xy")
-
-    # Flatten the grid
-    l_flat = l_grid.flatten()
-    m_flat = m_grid.flatten()
-
-    # Select only the m values that are allowed for a given ell
-    l_grid = l_flat[np.abs(m_flat) <= l_flat]
-    m_grid = m_flat[np.abs(m_flat) <= l_flat]
-
-    # Create a vector with all the m<0 and then all the m>=0
-    mm = np.append(-np.flip(m_grid[m_grid > 0]), m_grid)
-
-    # Create a vector with all the ls corresponding to mm
-    ll = np.append(np.flip(l_grid[m_grid > 0]), l_grid)
-
-    # Return the sorted indexes
-    return m_grid, np.lexsort((mm, ll))
-
-
-def spherial_harmonics_projection(quantity, l_max):
-    """
-    Compute the spherical harmonics projection of a given quantity. Quantity
-    should be an array in pixel space, and compatible with healpy (see
-    https://healpy.readthedocs.io/en/latest/). The spherical harmonics
-    coefficients are sorted as described in the get_sort_indexes function.
-
-    Parameters:
-    -----------
-    quantity : numpy.ndarray
-        Array of quantities to project on spherical harmonics.
-
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    real_alm : numpy.ndarray
-        Array of real spherical harmonics coefficients, with len (l_max + 1)**2
-
-    """
-
-    # Get the complex alm coefficients.
-    # These are sorted with the m values and are only for m>=0
-    alm = hp.map2alm(quantity, lmax=l_max)
-
-    # Create arrays the m_values and the indexes to sort
-    m_grid, sort_indexes = get_sort_indexes(l_max)
-
-    # Select only the m values that are allowed for a given ell
-    m_p = m_grid[m_grid > 0]
-
-    # Build the real alm selecting imaginary and real part
-    negative_m = np.flip(np.sqrt(2) * (-1) ** m_p * alm[m_grid > 0].imag)
-    positive_m = np.sqrt(2) * (-1) ** m_p * alm[m_grid > 0].real
-
-    # Concatenate the negative, zero and positive m values
-    real_alm = np.concatenate((negative_m, alm[m_grid == 0].real, positive_m))
-
-    # Sort with the indexes
-    return real_alm[sort_indexes]
-
-
-def spherial_harmonics_projection_pulsars(quantity, l_max):
+def projection_spherial_harmonics_basis(quantity, l_max):
     """
     Compute the spherical harmonics projection of a the correlation matrix
     given quantity.
@@ -630,7 +541,6 @@ def spherial_harmonics_projection_pulsars(quantity, l_max):
         (N, N, P), where N is the number of pulsars and P is the number of
         pixels, which should be compatible with healpy
         (see https://healpy.readthedocs.io/en/latest/).
-
     l_max : int
         Maximum ell value.
 
@@ -638,7 +548,8 @@ def spherial_harmonics_projection_pulsars(quantity, l_max):
     --------
     real_alm : numpy.ndarray
         3D array of real spherical harmonics coefficients.
-        It has shape ( (l_max + 1)**2, N, N), where N is the number of pulsars.
+        It has shape (lm, N, N), where N is the number of pulsars and
+        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
 
     """
 
@@ -650,14 +561,14 @@ def spherial_harmonics_projection_pulsars(quantity, l_max):
 
     # Get all the alms
     real_alm = np.apply_along_axis(
-        spherial_harmonics_projection, 1, qquantity, l_max
+        ut.spherical_harmonics_projection, 1, qquantity, l_max
     )
 
     # Reshape to get the same shape as before
     return np.reshape(real_alm, (shape[0], shape[0], real_alm.shape[-1])).T
 
 
-def get_correlations_lm_IJ(p_I, l_max, nside):
+def get_correlations_lm_IJ_spherical_harmonics_basis(p_I, l_max, gamma_pq):
     """
     Compute the correlations in spherical harmonics basis for a given pulsar
     catalog. The correlations are computed up to a maximum ell value l_max and
@@ -665,21 +576,106 @@ def get_correlations_lm_IJ(p_I, l_max, nside):
 
     Parameters:
     -----------
-    p_I : numpy.ndarray
-        2D array containing signal data, assumed to have shape (N, M, M)
-        Array of unit vectors representing the pulsar directions.
-
+    p_I : numpy.ndarray or jax.numpy.ndarray
+        2D array of unit vectors representing the pulsar directions.
+        Assumed to have shape (N, 3), N is the number of pulsars.
     l_max : int
         Maximum ell value.
-
-    nside : int
-        Resolution parameter for the HEALPix grid.
+    gamma_pq : numpy.ndarray or jax.numpy.ndarray
+        3D array of gamma values computed for all pulsar pairs and pixels.
+        The shape should be (N, N, pp), where N is the number of pulsars and
+        pp is the number of pixels
 
     Returns:
     --------
     correlations_lm : numpy.ndarray
         3D array of correlations computed in spherical harmonics basis.
-        It has shape ( (l_max + 1)**2, N, N), where N is the number of pulsars.
+        It has shape (lm, N, N), where N is the number of pulsars and
+        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
+
+    """
+
+    # Project gamma onto spherical harmonics
+    correlations_lm = projection_spherial_harmonics_basis(gamma_pq, l_max)
+
+    # Multiply by 1 + delta_{IJ} and return
+    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
+
+
+def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
+    """
+    Compute the correlations in sqrt basis for a given pulsar catalog. The
+    correlations are computed up to a maximum ell value l_max and for a given
+    nside.
+
+    Parameters:
+    -----------
+    p_I : numpy.ndarray or jax.numpy.ndarray
+        2D array of unit vectors representing the pulsar directions.
+        Assumed to have shape (N, 3), N is the number of pulsars.
+    l_max : int
+        Maximum ell value.
+    theta_k : numpy.ndarray or jax.numpy.ndarray
+        Array of polar angles (co-latitudes) for the pixel vectors.
+    phi_k : numpy.ndarray or jax.numpy.ndarray
+        Array of azimuthal angles (longitudes) for the pixel vectors.
+    gamma_pq : numpy.ndarray or jax.numpy.ndarray
+        3D array of gamma values computed for all pulsar pairs and pixels.
+        The shape should be (N, N, pp), where N is the number of pulsars and
+        pp is the number of pixels
+
+    Returns:
+    --------
+    correlations_lm : numpy.ndarray
+        4D array of correlations computed in sqrt basis.
+        It has shape (lm, lm, N, N), where N is the number of pulsars and
+        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
+
+    """
+
+    # Get the number of pixels
+    npix = hp.nside2npix(theta_k)
+
+    # spherical harmonis with shape (lm, pp)
+    spherical_harmonics = ut.get_spherical_harmonics(l_max, theta_k, phi_k)
+
+    # Quadratic spherical_harmonics basis with shape (lm, lm, pp)
+    quadratic = spherical_harmonics[:, None] * spherical_harmonics[None, :]
+
+    # Project gamma onto the sqrt basis
+    correlations_lm = (
+        np.einsum("ijp,nmp->ijnm", quadratic, gamma_pq) * (4 * jnp.pi) / npix
+    )
+
+    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
+
+
+def get_correlations_lm_IJ(
+    p_I, l_max, nside, lm_basis="spherical_harmonics_basis"
+):
+    """
+    Compute the response tensor for given angular separations and time tensors.
+
+    Parameters:
+    -----------
+    p_I : numpy.ndarray or jax.numpy.ndarray
+        2D array of unit vectors representing the pulsar directions.
+        Assumed to have shape (N, 3), N is the number of pulsars.
+    l_max : int
+        Maximum ell value.
+    nside : int
+        Resolution parameter for the HEALPix grid.
+    lm_basis : str
+        Basis to compute the correlations.
+        Can be either "spherical_harmonics_basis" or "sqrt_basis".
+
+    Returns:
+    --------
+    correlations_lm_IJ : numpy.ndarray
+        3D array of correlations computed in the given basis.
+        It has shape (lm, N, N), where lm is the number of coefficients for
+        the anisotropy decomposition (spherical harmonics or sqrt basis) and N
+        is the number of pulsars.
 
     """
 
@@ -692,29 +688,61 @@ def get_correlations_lm_IJ(p_I, l_max, nside):
     # Get the k vector (i.e., the sky direction) for all the pixels
     hat_k = unit_vector(theta_k, phi_k)
 
-    # Compute gamma in all the pixels
-    gamma_pq = 3 / 8 * gamma(p_I, hat_k)
+    # Compute gamma in all the pixels, the shape is (N, N, pp)
+    gamma_pq = 3.0 / 8.0 * gamma(p_I, hat_k)
 
-    # Project gamma onto spherical harmonics
-    correlations_lm = spherial_harmonics_projection_pulsars(gamma_pq, l_max)
+    # Compute the correlations on lm basis
+    if lm_basis.lower() == "spherical_harmonics_basis":
+        correlations_lm_IJ = get_correlations_lm_IJ_spherical_harmonics_basis(
+            p_I, l_max, gamma_pq
+        )
 
-    # Multiply by 1 + delta_{IJ} and return
-    return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
+    elif lm_basis.lower() == "sqrt_basis":
+        correlations_lm_IJ = get_correlations_lm_IJ_sqrt_basis(
+            p_I, l_max, theta_k, phi_k, gamma_pq
+        )
+
+    # return the correlations
+    return correlations_lm_IJ
 
 
-def get_response_IJ_lm(p_I, time_tensor_IJ, l_max, nside):
+def get_response_IJ_lm(
+    p_I, time_tensor_IJ, l_max, nside, lm_basis="spherical_harmonics_basis"
+):
     """
     Compute the response tensor for given angular separations and time tensors.
 
     Parameters:
     -----------
-    p_I : numpy.ndarray
-        2D array containing signal data, assumed to have shape (N, M, M)
-        Array of unit vectors representing the pulsar directions.
+    p_I : numpy.ndarray or jax.numpy.ndarray
+        2D array of unit vectors representing the pulsar directions.
+        Assumed to have shape (N, 3), N is the number of pulsars.
+    time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
+        3D array containing the attenuations due to the observation time for
+        all the pulsars and for all frequencies. Should have shape (F, N, N),
+        where F is the number of frequencies and N is the number of pulsars.
+    l_max : int
+        Maximum ell value.
+    nside : int
+        Resolution parameter for the HEALPix grid.
+    lm_basis : str
+        Basis to compute the correlations.
+        Can be either "spherical_harmonics_basis" or "sqrt_basis".
+
+    Returns:
+    --------
+    response_IJ : numpy.ndarray or jax.numpy.ndarray
+        4D array containing response tensor for all the pulsars pairs.
+        It has shape (lm, F, N, N), where lm is the number of coefficients for
+        the anisotropy decomposition (spherical harmonics or sqrt basis), F is
+        the number of frequencies, N is the number of pulsars.
+
     """
 
     # Compute the correlations on lm basis
-    correlations_lm_IJ = get_correlations_lm_IJ(p_I, l_max, nside)
+    correlations_lm_IJ = get_correlations_lm_IJ(
+        p_I, l_max, nside, lm_basis=lm_basis
+    )
 
     # combine the Hellings and Downs part and the time part
     return time_tensor_IJ[None, ...] * correlations_lm_IJ[:, None, ...]
@@ -729,12 +757,15 @@ def get_chi_tensor_IJ(zeta_IJ):
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations for all pulsar pairs.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
 
     Returns:
     --------
     chi_IJ : numpy.ndarray or jax.numpy.ndarray
-        chi_IJ tensor for all the pulsars pairs.
+        2D array representing the chi_IJ tensor for all the pulsars pairs.
+        It has shape (N, N), where N is the number of pulsars.
 
     """
 
@@ -750,15 +781,21 @@ def get_response_IJ(zeta_IJ, time_tensor_IJ):
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations for all pulsar pairs.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
-        Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies.
+        3D array representing the time tensor containing the attenuations due
+        to the observation time for all the pulsars and for all frequencies.
+        It should have shape (F, N, N), where F is the number of frequencies
+        and N is the number of pulsars.
 
     Returns:
     --------
     response_IJ : numpy.ndarray or jax.numpy.ndarray
-        Response tensor for all the pulsars pairs.
+        3D array containing the response tensor for all the pulsars pairs. It
+        has shape (F, N, N), where F is the number of frequencies and N is the
+        number of pulsars.
 
     """
 
@@ -769,57 +806,61 @@ def get_response_IJ(zeta_IJ, time_tensor_IJ):
     return time_tensor_IJ * chi_tensor_IJ[None, ...]
 
 
-def get_HD_Legendre_coefficients(order):
+def get_HD_Legendre_coefficients(HD_order):
     """
     Compute Legendre coefficients for Hellings and Downs correlations for
-    polynomials up to some order
+    polynomials up to some HD_order
 
     Parameters:
     -----------
-    order : int
+    HD_order : int
         Maximum order of Legendre coefficients to compute.
 
     Returns:
     --------
     coefficients : numpy.ndarray or jax.numpy.ndarray
-        Array of Legendre coefficients computed up to the given order.
+        Array of Legendre coefficients computed up to the given HD_order.
 
     """
 
     # Some l dependent normalization factor
-    l_coeffs = (2 * jnp.arange(order + 1) + 1) / 2
+    l_coeffs = (2 * jnp.arange(HD_order + 1) + 1) / 2
 
     return jnp.array(
         [
             # Project onto Legendre polynomials
             simpson(legendre(i)(x) * HD_value, x=x) * l_coeffs[i]
-            for i in range(order + 1)
+            for i in range(HD_order + 1)
         ]
     )
 
 
-def get_polynomials_IJ(zeta_IJ, order):
+def get_polynomials_IJ(zeta_IJ, HD_order):
     """
-    Compute Legendre polynomials for given angular separations and order.
+    Compute Legendre polynomials for given angular separations and HD_order.
 
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations between pairs of pulsars.
-    order : int
-        Maximum order of Legendre polynomials.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
+    HD_order : int
+        Maximum HD_order of Legendre polynomials.
 
     Returns:
     --------
     polynomials_IJ : numpy.ndarray or jax.numpy.ndarray
         Array of Legendre polynomials computed for the given angular separations
-        and order.
+        and HD_order.
 
     """
 
+    # Create an array to store the Legendre polynomials
     polynomials_IJ = []
 
-    for i in range(order + 1):
+    # Compute the Legendre polynomials for all the angular separations
+    for i in range(HD_order + 1):
         polynomials_IJ.append(legendre(i)(zeta_IJ))
 
     return jnp.array(polynomials_IJ)
@@ -834,52 +875,62 @@ def Legendre_projection(time_tensor_IJ, polynomials_IJ):
     -----------
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
         Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies. The shape is (
-        len(frequencies), len(pulsars), len(pulsars)
+        all the pulsars and for all frequencies. The shape is (F, N, N), where
+        F is the number of frequencies and N is the number of pulsars.
     polynomials_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of Legendre polynomials. The shape is (order + 1, len(pulsars),
-        len(pulsars)
+        Array of Legendre polynomials. The shape is (HD_order + 1, N, N), where
+        HD_order is the maximum order of Legendre polynomials and N is the
+        number of pulsars.
 
     Returns:
     --------
     projection : numpy.ndarray or jax.numpy.ndarray
-        Legendre projection
+        4D array with the Legendre projection of the Hellings and Downs
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is
+        the maximum order of Legendre polynomials, F is the number of
+        frequencies, and N is the number of pulsars.
 
     """
 
     return time_tensor_IJ[None, ...] * polynomials_IJ[:, None, ...]
 
 
-def HD_projection_Legendre(zeta_IJ, time_tensor_IJ, order):
+def HD_projection_Legendre(zeta_IJ, time_tensor_IJ, HD_order):
     """
     Projects Hellings and Downs correlations onto Legendre polynomials.
 
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations between pairs of pulsars.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
         Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies.
-    order : int
-        Maximum order of Legendre polynomials.
+        all the pulsars and for all frequencies. The shape is (F, N, N), where
+        F is the number of frequencies and N is the number of pulsars.
+    HD_order : int
+        Maximum HD_order of Legendre polynomials.
 
     Returns:
     --------
     Tuple containing:
     - HD_functions : numpy.ndarray or jax.numpy.ndarray
-        Hellings and Downs correlations projected onto Legendre polynomials.
+        4D array with the Legendre projection of the Hellings and Downs
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is
+        the maximum order of Legendre polynomials, F is the number of
+        frequencies, and N is the number of pulsars.
     - HD_coefficients : numpy.ndarray or jax.numpy.ndarray
         Legendre coefficients for Hellings and Downs correlations up to the
-        given order.
+        given HD_order.
 
     """
 
     # Gets the Legendre coefficients for HD
-    HD_coefficients = get_HD_Legendre_coefficients(order)
+    HD_coefficients = get_HD_Legendre_coefficients(HD_order)
 
     # Gets the values of the HD polynomials for all angular separations
-    polynomials_IJ = get_polynomials_IJ(zeta_IJ, order)
+    polynomials_IJ = get_polynomials_IJ(zeta_IJ, HD_order)
 
     # Projects the pulsar catalog onto Legendre polynomials
     HD_functions = Legendre_projection(time_tensor_IJ, polynomials_IJ)
@@ -895,18 +946,23 @@ def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations between pairs of pulsars.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
         Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies.
+        all the pulsars and for all frequencies. The shape is (F, N, N), where
+        F is the number of frequencies and N is the number of pulsars.
     masks : numpy.ndarray or jax.numpy.ndarray
         Array of masks representing binned intervals for Hellings and Downs
         correlations.
 
     Returns:
     --------
-    binned_projection :  numpy.ndarray or jax.numpy.ndarray
-        Binned projection of the Hellings and Downs correlations.
+    binned_projection : numpy.ndarray or jax.numpy.ndarray
+        4D array with the binned projection of the Hellings and Downs
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is number of bins, F is the number of frequencies, and N is the number of
+        pulsars.
 
     """
 
@@ -915,38 +971,42 @@ def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     ) * masks[:, None, ...]
 
 
-def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
+def HD_projection_binned(zeta_IJ, time_tensor_IJ, HD_order):
     """
     Projects Hellings and Downs correlations onto binned intervals.
-    NB!! For consistency with the Legendre version it uses order +1 bins!
+    NB!! For consistency with the Legendre version it uses HD_order +1 bins!
 
     Parameters:
     -----------
     zeta_IJ : numpy.ndarray or jax.numpy.ndarray
-        Array of angular separations between pairs of pulsars.
+        2D array of angular separations zeta_IJ. The angular separations should
+        be given in radians, and the array should have shape (N, N), where N
+        is the number of pulsars.
     time_tensor_IJ : numpy.ndarray or jax.numpy.ndarray
         Time tensor containing the attenuations due to the observation time for
-        all the pulsars and for all frequencies.
-    order : int
+        all the pulsars and for all frequencies. The shape is (F, N, N), where
+        F is the number of frequencies and N is the number of pulsars.
+    HD_order : int
         Number of bins used in the analysis.
 
     Returns:
     --------
     Tuple containing:
     - HD_functions : numpy.ndarray or jax.numpy.ndarray
-        Binned Hellings and Downs correlations.
+        4D array with the binned projection of the Hellings and Downs
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is
+        number of bins, F is the number of frequencies, and N is the number of
+        pulsars.
     - HD_coefficients : numpy.ndarray or jax.numpy.ndarray
         Coefficients of the binned Hellings and Downs correlations
 
     """
 
     # Ensure Hellings and Downs correlations values are within bounds
-    zeta_IJ = jnp.where(zeta_IJ > 1, 1, zeta_IJ)
-    zeta_IJ = jnp.where(zeta_IJ < -1, -1, zeta_IJ)  # type: ignore
-    xi_vals = jnp.arccos(zeta_IJ)
+    xi_vals = jnp.arccos(jnp.clip(zeta_IJ, -1.0, 1.0))
 
     # Compute bin edges for binning the Hellings and Downs correlations values
-    bin_edges = jnp.linspace(0 + 1e-2, jnp.pi + 1e-2, order + 2)
+    bin_edges = jnp.linspace(0.0, jnp.pi, HD_order + 2)
 
     # Compute mean values for each bin
     mean_x = 0.5 * (jnp.cos(bin_edges[:-1]) + np.cos(bin_edges[1:]))
@@ -955,7 +1015,7 @@ def HD_projection_binned(zeta_IJ, time_tensor_IJ, order):
     HD_coefficients = HD_correlations(mean_x)
 
     # Create masks for each bin
-    masks = np.zeros(shape=(order + 1, len(zeta_IJ), len(zeta_IJ)))
+    masks = np.zeros(shape=(HD_order + 1, len(zeta_IJ), len(zeta_IJ)))
 
     for i in range(len(masks)):
         masks[i][(xi_vals > bin_edges[i]) & (xi_vals < bin_edges[i + 1])] = 1.0
@@ -974,9 +1034,10 @@ def get_tensors(
     path_to_pulsar_catalog=ut.path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
     add_curn=False,
-    order=0,
-    method="legendre",
+    HD_order=0,
+    HD_basis="legendre",
     anisotropies=False,
+    lm_basis="spherical_harmonics_basis",
     l_max=0,
     nside=16,
     regenerate_catalog=False,
@@ -986,7 +1047,7 @@ def get_tensors(
     Generate all tensors (noise, response and Hellings and Downs) needed for
     gravitational wave data analysis. The noise tensors is returned in omega
     units. The Hellings and Downs correlations are projected onto Legendre
-    polynomials or binned intervals based on the chosen method.
+    polynomials or binned intervals based on the chosen HD_basis
 
     Parameters:
     -----------
@@ -1001,14 +1062,27 @@ def get_tensors(
     add_curn : bool, optional
         Whether to add common (spatially) uncorrelated red noise (CURN).
         Default is False.
-    order : int, optional
+    HD_order : int, optional
         Maximum order of Legendre polynomials/ number of bins for the Hellings
         and Downs correlations projection.
         Default is 0.
-    method : str, optional
-        Method for Hellings and Downs correlations projection.
+    HD_basis : str, optional
+        Basis for Hellings and Downs correlations projection.
         Options are "legendre" or "binned".
         Default is "legendre".
+    anisotropies : bool, optional
+        Whether to include anisotropies in the response tensor.
+        Default is False.
+    lm_basis : str, optional
+        Basis for the anisotropy decomposition.
+        Options are "spherical_harmonics_basis" or "sqrt_basis".
+        Default is "spherical_harmonics_basis".
+    l_max : int, optional
+        Maximum ell value for the anisotropy decomposition.
+        Default is 0.
+    nside : int, optional
+        Resolution parameter for the HEALPix grid.
+        Default is 16.
     regenerate_catalog : bool, optional
         Whether to regenerate the pulsars data file.
         Default is False.
@@ -1019,15 +1093,21 @@ def get_tensors(
     --------
     Tuple containing:
     - strain_omega : numpy.ndarray or jax.numpy.ndarray
-        Noise in omega units.
+        Noise converted to Omega units. The shape will be (F, N, N), where F
+        is the number of frequencies and N is the number of pulsars.
     - response_IJ : numpy.ndarray or jax.numpy.ndarray
-        Response tensor.
+        Array containing the response tensor for all the pulsars pairs.
+        If anisotropies is False, it has shape (F, N, N), where F is the number
+        of frequencies and N is the number of pulsars. If anisotropies is True,
+        it has shape (lm, F, N, N), where lm is the number of coefficients for
+        the anisotropy decomposition (spherical harmonics or sqrt basis).
     - HD_functions_IJ : numpy.ndarray or jax.numpy.ndarray
-        Hellings and Downs correlations functions projected onto Legendre
-        polynomials or binned intervals.
+        4D array with the Legendre or binned projection of the Hellings and
+        Downs correlations. The shape is (HD_order + 1, F, N, N), where HD_order is the maximum order of Legendre polynomials / bins, F is the
+        number of frequencies,and N is the number of pulsars.
     - HD_coefficients : numpy.ndarray or jax.numpy.ndarray
         Legendre coefficients for Hellings and Downs correlations values up to
-        the given order.
+        the given HD_order.
 
     """
 
@@ -1090,17 +1170,19 @@ def get_tensors(
         response_IJ = get_response_IJ(zeta_IJ, time_tensor_IJ)
 
     else:
-        response_IJ = get_response_IJ_lm(pi_vec, time_tensor_IJ, l_max, nside)
-
-    # and if needed the HD part
-    if order > 0 and method.lower() == "legendre":
-        HD_functions_IJ, HD_coefficients = HD_projection_Legendre(
-            zeta_IJ, time_tensor_IJ, order
+        response_IJ = get_response_IJ_lm(
+            pi_vec, time_tensor_IJ, l_max, nside, lm_basis=lm_basis
         )
 
-    elif order > 0 and method.lower() == "binned":
+    # and if needed the HD part
+    if HD_order > 0 and HD_basis.lower() == "legendre":
+        HD_functions_IJ, HD_coefficients = HD_projection_Legendre(
+            zeta_IJ, time_tensor_IJ, HD_order
+        )
+
+    elif HD_order > 0 and HD_basis.lower() == "binned":
         HD_functions_IJ, HD_coefficients = HD_projection_binned(
-            zeta_IJ, time_tensor_IJ, order
+            zeta_IJ, time_tensor_IJ, HD_order
         )
 
     else:

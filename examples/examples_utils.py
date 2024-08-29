@@ -29,3 +29,8 @@ EPTAlike = ut.load_yaml(
 mockSKA10 = ut.load_yaml(
     path_to_pulsar_parameters + "mockSKA10_pulsar_parameters.yaml"
 )
+
+# Default parameters for the pulsars
+EPTAlike_noiseless = ut.load_yaml(
+    path_to_pulsar_parameters + "EPTAlike_pulsar_parameters_noiseless.yaml"
+)
