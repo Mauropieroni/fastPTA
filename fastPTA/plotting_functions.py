@@ -8,6 +8,9 @@ import numpy as np
 from scipy.special import legendre
 
 
+from fastPTA import get_tensors as gt
+
+
 # Setting plotting parameters
 matplotlib.rcParams["text.usetex"] = True
 plt.rc("xtick", labelsize=20)
@@ -90,7 +93,14 @@ def plot_HD_binned(data_HD_coeffs, HD_coeffs, plot_suplabel):
         quantiles=[[0.16, 0.5, 0.84] for xx in range(len(HD_coeffs))],
     )
 
-    plt.plot(bin_val, HD_coeffs, color="dimgrey", label=r"$\rm Injection$")
+    plt.scatter(bin_val, HD_coeffs, color="dimgrey", label=r"$\rm Injection$")
+    plt.plot(
+        np.arccos(gt.x),
+        gt.HD_value,
+        color="red",
+        linestyle="--",
+        label="HD curve",
+    )
 
     plt.xlabel(r"$\zeta_{IJ} \equiv \arccos(\hat{p}_I \cdot \hat{p}_J)$")
     plt.xticks(

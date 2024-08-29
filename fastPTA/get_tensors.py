@@ -1,6 +1,4 @@
 # Global
-import scipy as sp
-import tqdm
 import numpy as np
 import healpy as hp
 import pandas as pd
@@ -9,7 +7,6 @@ import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
-from scipy.special import sph_harm
 from scipy.integrate import simpson
 
 # Local
@@ -529,54 +526,6 @@ def gamma(p_I, hat_k):
     return first_term + second_term
 
 
-def spherical_harmonics_projection(quantity, l_max):
-    """
-    Compute the spherical harmonics projection of a given quantity. Quantity
-    should be an array in pixel space, and compatible with healpy (see
-    https://healpy.readthedocs.io/en/latest/). The spherical harmonics
-    coefficients are sorted as described in the get_sort_indexes function in
-    utils.
-
-    Parameters:
-    -----------
-    quantity : numpy.ndarray
-        Array of quantities to project on spherical harmonics.
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    real_alm : numpy.ndarray
-        Array of real spherical harmonics coefficients, with len
-        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
-
-    """
-
-    # Get the complex alm coefficients.
-    # These are sorted with the m values and are only for m>=0
-    alm = hp.map2alm(quantity, lmax=l_max)
-
-    # Create arrays the m_values and the indexes to sort
-    inds = ut.get_sort_indexes(l_max)
-
-    # Unpack m_grid and sorted_indexes
-    m_grid = inds[1]
-    sorted_indexes = inds[-1]
-
-    # Select only the m values that are allowed for a given ell
-    m_p = m_grid[m_grid > 0]
-
-    # Build the real alm selecting imaginary and real part
-    negative_m = np.flip(np.sqrt(2) * (-1.0) ** m_p * alm[m_grid > 0.0].imag)
-    positive_m = np.sqrt(2) * (-1.0) ** m_p * alm[m_grid > 0.0].real
-
-    # Concatenate the negative, zero and positive m values
-    real_alm = np.concatenate((negative_m, alm[m_grid == 0.0].real, positive_m))
-
-    # Sort with the indexes
-    return real_alm[sorted_indexes]
-
-
 def projection_spherial_harmonics_basis(quantity, l_max):
     """
     Compute the spherical harmonics projection of a the correlation matrix
@@ -612,7 +561,7 @@ def projection_spherial_harmonics_basis(quantity, l_max):
 
     # Get all the alms
     real_alm = np.apply_along_axis(
-        spherical_harmonics_projection, 1, qquantity, l_max
+        ut.spherical_harmonics_projection, 1, qquantity, l_max
     )
 
     # Reshape to get the same shape as before

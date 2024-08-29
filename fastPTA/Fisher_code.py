@@ -304,13 +304,13 @@ def get_signal_dsignal_tensors_lm_sqrt_basis(
 
 lm_basis_list = [
     get_signal_dsignal_tensors_lm_spherical_harmonics_basis,
-    get_signal_dsignal_tensors_lm_sqrt_basis,
+    # get_signal_dsignal_tensors_lm_sqrt_basis,
 ]
 
 
 lm_basis_map = {
     "spherical_harmonics_basis": 0,
-    "sqrt_basis": 1,
+    # "sqrt_basis": 1,
 }
 
 

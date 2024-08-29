@@ -111,52 +111,6 @@ class TestGetTensors(unittest.TestCase):
             places=7,
         )
 
-    def test_spherical_harmonics_multipoles(self):
-        """
-        Test the spherical harmonics projection function
-
-        """
-
-        Y00 = np.array(sph_harm(0.0, 0.0, phi, theta).real)
-        Y1m1 = np.array(np.sqrt(2.0) * sph_harm(-1.0, 1.0, phi, theta).imag)
-        Y10 = np.array(sph_harm(0.0, 1.0, phi, theta).real)
-        Y1p1 = np.array(-np.sqrt(2.0) * sph_harm(1.0, 1.0, phi, theta).real)
-
-        Y2m2 = np.array(np.sqrt(2.0) * sph_harm(-2.0, 2.0, phi, theta).imag)
-        Y2m1 = np.array(np.sqrt(2.0) * sph_harm(-1.0, 2.0, phi, theta).imag)
-        Y20 = np.array(sph_harm(0.0, 2.0, phi, theta).real)
-        Y2p1 = np.array(-np.sqrt(2.0) * sph_harm(1.0, 2.0, phi, theta).real)
-        Y2p2 = np.array(np.sqrt(2.0) * sph_harm(2.0, 2.0, phi, theta).real)
-
-        Y3m3 = np.array(np.sqrt(2.0) * sph_harm(-3.0, 3.0, phi, theta).imag)
-        Y3p3 = np.array(-np.sqrt(2.0) * sph_harm(3.0, 3.0, phi, theta).real)
-
-        res_Y00 = gt.spherical_harmonics_projection(Y00, 1)
-        res_Y1m1 = gt.spherical_harmonics_projection(Y1m1, 1)
-        res_Y10 = gt.spherical_harmonics_projection(Y10, 1)
-        res_Y1p1 = gt.spherical_harmonics_projection(Y1p1, 1)
-
-        res_Y2m2 = gt.spherical_harmonics_projection(Y2m2, 2)
-        res_Y2m1 = gt.spherical_harmonics_projection(Y2m1, 2)
-        res_Y20 = gt.spherical_harmonics_projection(Y20, 2)
-        res_Y2p1 = gt.spherical_harmonics_projection(Y2p1, 2)
-        res_Y2p2 = gt.spherical_harmonics_projection(Y2p2, 2)
-
-        res_Y3m3 = gt.spherical_harmonics_projection(Y3m3, 3)
-        res_Y3p3 = gt.spherical_harmonics_projection(Y3p3, 3)
-
-        self.assertAlmostEqual(jnp.abs(res_Y00[0] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y1m1[1] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y10[2] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y1p1[3] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2m2[4] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2m1[5] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y20[6] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2p1[7] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2p2[8] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y3m3[9] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y3p3[15] - 1.0), 0.0, places=4)
-
     def test_spherical_harmonics_multipoles_2(self):
         """
         Test the spherical harmonics projection function for pulsars pulsar matrix
