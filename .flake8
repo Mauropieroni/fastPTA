@@ -2,4 +2,4 @@
 max-line-length = 80
 extend-select = B950
 exclude = 
-extend-ignore = E203,E501,E701,BLK100,W605,F401,E266
+extend-ignore = E203,E501,E701,BLK100,W605,F401,E266,F401,E266
