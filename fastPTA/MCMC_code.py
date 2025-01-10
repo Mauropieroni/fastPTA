@@ -10,10 +10,12 @@ import jax.numpy as jnp
 import fastPTA.utils as ut
 from fastPTA.signals import SMBBH_parameters, get_model
 from fastPTA.get_tensors import get_tensors
+from fastPTA.Compute_PBH_Abundance import f_PBH_NL_QCD
 
 jax.config.update("jax_enable_x64", True)
-jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
+# If you want to use your GPU change here
+jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
 # Setting some constants
 i_max_default = 100
@@ -317,7 +319,7 @@ def gaussian_prior(parameter, mean_val, std_val):
     )
 
 
-def log_prior(parameters, prior_parameters, which_prior="flat"):
+def log_prior(parameters, prior_parameters, signal_model, which_prior="flat"):
     """
     Calculate the logarithm of the prior probability density function. Only
     flat and gaussian priors are supported at the moment
@@ -343,7 +345,12 @@ def log_prior(parameters, prior_parameters, which_prior="flat"):
     """
 
     log_p = 0.0
-
+        
+    if signal_model.__name__ == 'power_law_SIGW': 
+        PBH_abundance = f_PBH_NL_QCD(10**parameters[2], 10**parameters[3], 10**parameters[4]*2*np.pi/(9.7156e-15))
+        if (PBH_abundance>1 or np.isnan(PBH_abundance)):
+            log_p += -np.inf 
+            
     for i in range(len(parameters)):
         if which_prior == "flat":
             log_p += flat_prior(parameters[i], *prior_parameters[:, i])
@@ -351,7 +358,6 @@ def log_prior(parameters, prior_parameters, which_prior="flat"):
             log_p += gaussian_prior(parameters[i], *prior_parameters[:, i])
 
     return log_p
-
 
 @jax.jit
 def log_likelihood(
@@ -440,7 +446,7 @@ def log_posterior(
 
     """
 
-    lp = log_prior(signal_parameters, prior_parameters)
+    lp = log_prior(signal_parameters, prior_parameters, signal_model)
 
     if not jnp.isfinite(lp):
         return -jnp.inf
@@ -452,119 +458,6 @@ def log_posterior(
     )
 
     return lp + log_lik
-
-
-@jax.jit
-def log_likelihood_lm(
-    frequency,
-    signal_lm,
-    signal_value,
-    response_IJ,
-    strain_omega,
-    data,
-):
-    """
-    Compute the logarithm of the likelihood assujming a Whittle likelihood.
-
-    Parameters:
-    -----------
-    frequency : numpy.ndarray
-        Array containing frequency bins.
-    signal_value : numpy.ndarray
-        Array containing the signal evaluated in all frequency bins.
-    response_IJ : numpy.ndarray
-        Array containing response function.
-    strain_omega : numpy.ndarray
-        Array containing strain noise.
-    data : numpy.ndarray
-        Array containing the observed data.
-
-    Returns:
-    --------
-    float
-        Logarithm of the likelihood.
-
-    """
-
-    signal_lm_f = signal_lm[:, None] * signal_value[None, :]
-
-    # Assemble the signal tensor
-    signal_tensor = jnp.sum(response_IJ * signal_lm_f[..., None, None], axis=0)
-
-    # Covariance of the data
-    covariance = signal_tensor + strain_omega
-
-    # Inverse of the covariance
-    c_inverse = ut.compute_inverse(covariance)
-
-    # Log determinant
-    sign, logdet = jnp.linalg.slogdet(covariance)
-
-    # data term
-    data_term = jnp.abs(jnp.einsum("ijk,ikj->i", c_inverse, data))
-
-    # return the likelihood
-    return -jnp.sum(logdet + data_term)
-
-
-def log_posterior_lm(
-    signal_parameters,
-    frequency,
-    signal_model,
-    response_IJ,
-    strain_omega,
-    data,
-    prior_parameters,
-    which_prior="flat",
-):
-    """
-    Compute the logarithm of the posterior probability summing log likelihood
-    and prior.
-
-    Parameters:
-    -----------
-    signal_parameters : numpy.ndarray
-        Array containing parameters of the signal model.
-    frequency : numpy.ndarray
-        Array containing frequency bins.
-    signal_model : callable
-        Function representing the signal model.
-    response_IJ : numpy.ndarray
-        Array containing response function.
-    strain_omega : numpy.ndarray
-        Array containing strain noise.
-    data : numpy.ndarray
-        Array containing the observed data.
-    prior_parameters : numpy.ndarray
-        Array containing prior parameters.
-    which_prior : str, optional
-        Type of prior distribution to use (default is "flat").
-
-    Returns:
-    --------
-    float
-        Logarithm of the posterior probability.
-
-    """
-
-    lp = log_prior(signal_parameters, prior_parameters)
-
-    if not jnp.isfinite(lp):
-        return -jnp.inf
-
-    signal_value = signal_model(frequency, signal_parameters[:2])
-
-    log_lik = log_likelihood_lm(
-        frequency,
-        signal_parameters[2:],
-        signal_value,
-        response_IJ,
-        strain_omega,
-        data,
-    )
-
-    return lp + log_lik
-
 
 def run_MCMC(
     priors,
@@ -665,24 +558,13 @@ def run_MCMC(
 
     """
 
-    if "anisotropies" in get_tensors_kwargs.keys():
-        anisotropies = get_tensors_kwargs["anisotropies"]
-    else:
-        anisotropies = False
-
-    # This is not used now
-    # if "lm_order" in get_tensors_kwargs.keys():
-    #     lm_order = get_tensors_kwargs["lm_order"]
-    # else:
-    #     lm_order = False
-
     # Get the data
     frequency, MCMC_data, response_IJ, strain_omega = get_MCMC_data(
         regenerate_MCMC_data,
         T_obs_yrs=T_obs_yrs,
         n_frequencies=n_frequencies,
         signal_label=signal_label,
-        signal_parameters=signal_parameters[:2],
+        signal_parameters=signal_parameters,
         realization=realization,
         save_MCMC_data=save_MCMC_data,
         path_to_MCMC_data=path_to_MCMC_data,
@@ -697,6 +579,16 @@ def run_MCMC(
         initial = np.random.uniform(
             priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
         )
+        i = 0
+        while i<nwalkers:
+            PBH_abundance = f_PBH_NL_QCD(10**initial[i,2], 10**initial[i,3], 10**initial[i,4]*2*np.pi/(9.7156e-15))
+            if PBH_abundance>1:
+                initial[i] = np.random.uniform(
+                    priors[0, :], priors[1, :], size=(1, len(priors.T))
+                )
+            else: 
+                print("Accepted:", i, initial[i])
+                i = i+1
     elif not initial and which_prior.lower() == "gaussian":
         initial = np.random.uniform(
             priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
@@ -721,11 +613,9 @@ def run_MCMC(
     # Kwargs for the posterior
     kwargs = {"which_prior": which_prior}
 
-    posterior_to_use = log_posterior_lm if anisotropies else log_posterior
-
     # Set the sampler
     sampler = emcee.EnsembleSampler(
-        nwalkers, ndims, posterior_to_use, args=args, kwargs=kwargs
+        nwalkers, ndims, log_posterior, args=args, kwargs=kwargs
     )
 
     start = time.perf_counter()
@@ -759,12 +649,12 @@ def run_MCMC(
         i += 1
 
     # Samples and pdfs
-    samples = np.array(sampler.get_chain(flat=True))
+    samples = sampler.get_chain(flat=True)
     pdfs = sampler.lnprobability
 
     print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))
 
     print("Storing as", path_to_MCMC_chains)
-    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)  # type: ignore
+    np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)
 
     return samples, pdfs
