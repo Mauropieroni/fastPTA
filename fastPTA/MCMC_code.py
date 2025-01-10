@@ -587,7 +587,6 @@ def run_MCMC(
                     priors[0, :], priors[1, :], size=(1, len(priors.T))
                 )
             else: 
-                print("Accepted:", i, initial[i])
                 i = i+1
     elif not initial and which_prior.lower() == "gaussian":
         initial = np.random.uniform(
