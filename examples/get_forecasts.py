@@ -245,11 +245,30 @@ def get_constraints(
             # priors = signal_parameters[None, :] + 5 * np.array(
             #     [-errors, errors]
             # )
-            priors = np.array([[signal_parameters[0] - 5 * errors[0], signal_parameters[0] + 5 * errors[0]],
-                               [signal_parameters[1] - 5 * errors[1], signal_parameters[1] + 5 * errors[1]],
-                               [max([-3.5, signal_parameters[2] - 5 * errors[2]]), min([0, signal_parameters[2] + 5 * errors[2]])],
-                               [max([-1.5, signal_parameters[3] - 5 * errors[3]]), min([0.9, signal_parameters[3] + 5 * errors[3]])],
-                               [max([-10, signal_parameters[4] - 5 * errors[4]]), min([-6, signal_parameters[4] + 5 * errors[4]])]]).T
+            priors = np.array(
+                [
+                    [
+                        signal_parameters[0] - 5 * errors[0],
+                        signal_parameters[0] + 5 * errors[0],
+                    ],
+                    [
+                        signal_parameters[1] - 5 * errors[1],
+                        signal_parameters[1] + 5 * errors[1],
+                    ],
+                    [
+                        max([-3.5, signal_parameters[2] - 5 * errors[2]]),
+                        min([0, signal_parameters[2] + 5 * errors[2]]),
+                    ],
+                    [
+                        max([-1.5, signal_parameters[3] - 5 * errors[3]]),
+                        min([0.9, signal_parameters[3] + 5 * errors[3]]),
+                    ],
+                    [
+                        max([-10, signal_parameters[4] - 5 * errors[4]]),
+                        min([-6, signal_parameters[4] + 5 * errors[4]]),
+                    ],
+                ]
+            ).T
             print(priors)
         MCMC_data, pdfs = run_MCMC(
             priors,
@@ -262,20 +281,26 @@ def get_constraints(
     fisher_data_prior = fisher_data.copy()
 
     for i in range(len(fisher_data)):
-        PBH_abundance = f_PBH_NL_QCD(10**fisher_data[i][2], 10**fisher_data[i][3], 10**fisher_data[i][4]*2*np.pi/(9.7156e-15))
-        if PBH_abundance>1:
+        PBH_abundance = f_PBH_NL_QCD(
+            10 ** fisher_data[i][2],
+            10 ** fisher_data[i][3],
+            10 ** fisher_data[i][4] * 2 * np.pi / (9.7156e-15),
+        )
+        if PBH_abundance > 1:
             fisher_data_prior[i] = np.nan
-        
-    fisher_data_prior = fisher_data_prior[~np.isnan(fisher_data_prior).any(axis=1)]
+
+    fisher_data_prior = fisher_data_prior[
+        ~np.isnan(fisher_data_prior).any(axis=1)
+    ]
 
     # This part should be moved out of this function
     datasets = [fisher_data, MCMC_data, fisher_data_prior]
     weights = [
         np.ones(len_fisher_data),
-        np.ones(MCMC_data.shape[0]), 
-        np.ones(len(fisher_data_prior)), # type: ignore
+        np.ones(MCMC_data.shape[0]),
+        np.ones(len(fisher_data_prior)),  # type: ignore
     ]
-    smooth = [1.0, 1.0, 1.0]  
+    smooth = [1.0, 1.0, 1.0]
 
     ranges = [
         (

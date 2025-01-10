@@ -2,4 +2,4 @@
 max-line-length = 80
 extend-select = B950
 exclude = tests/mod_Chiara_test_functions.py
-extend-ignore = E203,E501,E701,BLK100,W605,F401,E266
+extend-ignore = E203,E225,E231,E261,E302,E305,E501,E701,BLK100,W605,F401,E266

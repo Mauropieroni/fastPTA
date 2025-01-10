@@ -345,12 +345,16 @@ def log_prior(parameters, prior_parameters, signal_model, which_prior="flat"):
     """
 
     log_p = 0.0
-        
-    if signal_model.__name__ == 'power_law_SIGW': 
-        PBH_abundance = f_PBH_NL_QCD(10**parameters[2], 10**parameters[3], 10**parameters[4]*2*np.pi/(9.7156e-15))
-        if (PBH_abundance>1 or np.isnan(PBH_abundance)):
-            log_p += -np.inf 
-            
+
+    if signal_model.__name__ == "power_law_SIGW":
+        PBH_abundance = f_PBH_NL_QCD(
+            10 ** parameters[2],
+            10 ** parameters[3],
+            10 ** parameters[4] * 2 * np.pi / (9.7156e-15),
+        )
+        if PBH_abundance > 1 or np.isnan(PBH_abundance):
+            log_p += -np.inf
+
     for i in range(len(parameters)):
         if which_prior == "flat":
             log_p += flat_prior(parameters[i], *prior_parameters[:, i])
@@ -358,6 +362,7 @@ def log_prior(parameters, prior_parameters, signal_model, which_prior="flat"):
             log_p += gaussian_prior(parameters[i], *prior_parameters[:, i])
 
     return log_p
+
 
 @jax.jit
 def log_likelihood(
@@ -458,6 +463,7 @@ def log_posterior(
     )
 
     return lp + log_lik
+
 
 def run_MCMC(
     priors,
@@ -580,14 +586,18 @@ def run_MCMC(
             priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
         )
         i = 0
-        while i<nwalkers:
-            PBH_abundance = f_PBH_NL_QCD(10**initial[i,2], 10**initial[i,3], 10**initial[i,4]*2*np.pi/(9.7156e-15))
-            if PBH_abundance>1:
+        while i < nwalkers:
+            PBH_abundance = f_PBH_NL_QCD(
+                10 ** initial[i, 2],
+                10 ** initial[i, 3],
+                10 ** initial[i, 4] * 2 * np.pi / (9.7156e-15),
+            )
+            if PBH_abundance > 1:
                 initial[i] = np.random.uniform(
                     priors[0, :], priors[1, :], size=(1, len(priors.T))
                 )
-            else: 
-                i = i+1
+            else:
+                i = i + 1
     elif not initial and which_prior.lower() == "gaussian":
         initial = np.random.uniform(
             priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
