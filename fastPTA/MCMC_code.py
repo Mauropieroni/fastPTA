@@ -150,6 +150,7 @@ def generate_MCMC_data(
 
     # Save the data
     if save_MCMC_data:
+        print("- Storing the data as %s \n" % (path_to_MCMC_data))
         np.savez(
             path_to_MCMC_data,
             frequency=frequency,
@@ -243,9 +244,7 @@ def get_MCMC_data(
         print("\nRegenerating MCMC data")
 
         # Setting the frequency vector from the observation time
-        T_tot = T_obs_yrs * ut.yr
-        fmin = 1 / T_tot
-        frequency = fmin * (1 + np.arange(n_frequencies))
+        frequency = (1.0 + jnp.arange(n_frequencies)) / (T_obs_yrs * ut.yr)
 
         # Get the functions for the signal and its derivatives
         model = get_model(signal_label)
@@ -774,7 +773,7 @@ def run_MCMC(
 
     print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))
 
-    print("Storing as", path_to_MCMC_chains)
+    print("- Storing the chains as", path_to_MCMC_chains)
     np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)  # type: ignore
 
     return samples, pdfs
