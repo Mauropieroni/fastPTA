@@ -261,19 +261,19 @@ def get_constraints(
         ).T
         print(priors)
 
-        i = 0
-        while i < nwalkers:
-            PBH_abundance = f_PBH_NL_QCD(
-                10 ** initial[i, 2],
-                10 ** initial[i, 3],
-                10 ** initial[i, 4] * 2 * np.pi / (9.7156e-15),
-            )
-            if PBH_abundance > 1:
-                initial[i] = np.random.uniform(
-                    priors[0, :], priors[1, :], size=(1, len(priors.T))
-                )
-            else:
-                i = i + 1
+        # i = 0
+        # while i < nwalkers:
+        #     PBH_abundance = f_PBH_NL_QCD(
+        #         10 ** initial[i, 2],
+        #         10 ** initial[i, 3],
+        #         10 ** initial[i, 4] * 2 * np.pi / (9.7156e-15),
+        #     )
+        #     if PBH_abundance > 1:
+        #         initial[i] = np.random.uniform(
+        #             priors[0, :], priors[1, :], size=(1, len(priors.T))
+        #         )
+        #     else:
+        #         i = i + 1
 
     try:
         if rerun_MCMC:
@@ -439,13 +439,6 @@ if __name__ == "__main__":
             "add_curn": False,
             "regenerate_catalog": True,
         },
-        parameter_labels=[
-            r"$\alpha_{PL}$",
-            r"$n_T$",
-            r"$\mathrm{log}_{10}A_{\zeta}$",
-            r"$\mathrm{log}_{10} \Delta$",
-            r"$\mathrm{log}_{10} (f_*/\mathrm{Hz})$",
-        ],
     )
 
     plt.show(block=True)

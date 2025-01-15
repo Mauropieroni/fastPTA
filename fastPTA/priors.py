@@ -41,7 +41,7 @@ class Priors(object):
 
         for key, value in priors_dictionary.items():
 
-            if type(value) == dict:
+            if type(value) is dict:
                 for k, v in value.items():
                     priors[key] = {
                         "pdf": getattr(stats, k).pdf,
@@ -49,7 +49,7 @@ class Priors(object):
                         "pdf_kwargs": v,
                     }
 
-            elif type(value) == function_type:
+            elif type(value) is function_type:
                 priors[key] = {
                     "pdf": value,
                     "pdf_kwargs": {},

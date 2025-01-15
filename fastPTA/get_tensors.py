@@ -1,6 +1,5 @@
 # Global
-import scipy as sp
-import tqdm
+import sys
 import numpy as np
 import healpy as hp
 import pandas as pd
@@ -9,7 +8,14 @@ import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
-from scipy.special import sph_harm
+
+if sys.version_info.minor > 10:
+    from scipy.special import sph_harm_y
+else:
+    from scipy.special import sph_harm
+
+    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
+
 from scipy.integrate import simpson
 
 # Local
