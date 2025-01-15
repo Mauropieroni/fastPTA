@@ -1,5 +1,6 @@
 # Global
 import os
+import sys
 import yaml
 import numpy as np
 import healpy as hp
@@ -8,8 +9,13 @@ from wigners import clebsch_gordan
 
 import jax
 import jax.numpy as jnp
-from scipy.special import sph_harm
 
+if sys.version_info.minor > 10:
+    from scipy.special import sph_harm_y
+else:
+    from scipy.special import sph_harm
+
+    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -489,8 +495,8 @@ def get_real_spherical_harmonics(l_max, theta, phi):
     m_grid = inds[1]
 
     # Compute all the spherical harmonics
-    spherical_harmonics = sph_harm(
-        m_grid[:, None], l_grid[:, None], phi[None, :], theta[None, :]
+    spherical_harmonics = sph_harm_y(
+        l_grid[:, None], m_grid[:, None], theta[None, :], phi[None, :]
     )
 
     # Return sorted

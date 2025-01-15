@@ -1,9 +1,16 @@
 # Global
+import sys
 import unittest
 
 import numpy as np
 import healpy as hp
-from scipy.special import sph_harm
+
+if sys.version_info.minor > 10:
+    from scipy.special import sph_harm_y
+else:
+    from scipy.special import sph_harm
+
+    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
 
 import jax
 import jax.numpy as jnp
@@ -117,19 +124,19 @@ class TestGetTensors(unittest.TestCase):
 
         """
 
-        Y00 = np.array([[sph_harm(0.0, 0.0, phi, theta).real]])
-        Y1m1 = np.array([[np.sqrt(2.0) * sph_harm(-1.0, 1.0, phi, theta).imag]])
-        Y10 = np.array([[sph_harm(0.0, 1.0, phi, theta).real]])
-        Y1p1 = np.array([[-np.sqrt(2.0) * sph_harm(1.0, 1.0, phi, theta).real]])
+        Y00 = np.array([[sph_harm_y(0, 0, theta, phi).real]])
+        Y1m1 = np.array([[np.sqrt(2.0) * sph_harm_y(1, -1, theta, phi).imag]])
+        Y10 = np.array([[sph_harm_y(1, 0, theta, phi).real]])
+        Y1p1 = np.array([[-np.sqrt(2.0) * sph_harm_y(1, 1, theta, phi).real]])
 
-        Y2m2 = np.array([[np.sqrt(2.0) * sph_harm(-2.0, 2.0, phi, theta).imag]])
-        Y2m1 = np.array([[np.sqrt(2.0) * sph_harm(-1.0, 2.0, phi, theta).imag]])
-        Y20 = np.array([[sph_harm(0.0, 2.0, phi, theta).real]])
-        Y2p1 = np.array([[-np.sqrt(2.0) * sph_harm(1.0, 2.0, phi, theta).real]])
-        Y2p2 = np.array([[np.sqrt(2.0) * sph_harm(2.0, 2.0, phi, theta).real]])
+        Y2m2 = np.array([[np.sqrt(2.0) * sph_harm_y(2, -2, theta, phi).imag]])
+        Y2m1 = np.array([[np.sqrt(2.0) * sph_harm_y(2, -1, theta, phi).imag]])
+        Y20 = np.array([[sph_harm_y(2, 0, theta, phi).real]])
+        Y2p1 = np.array([[-np.sqrt(2.0) * sph_harm_y(2, 1, theta, phi).real]])
+        Y2p2 = np.array([[np.sqrt(2.0) * sph_harm_y(2, 2, theta, phi).real]])
 
-        Y3m3 = np.array([[np.sqrt(2.0) * sph_harm(-3.0, 3.0, phi, theta).imag]])
-        Y3p3 = np.array([[-np.sqrt(2.0) * sph_harm(3.0, 3.0, phi, theta).real]])
+        Y3m3 = np.array([[np.sqrt(2.0) * sph_harm_y(3, -3, theta, phi).imag]])
+        Y3p3 = np.array([[-np.sqrt(2.0) * sph_harm_y(3, 3, theta, phi).real]])
 
         res_Y00 = gt.projection_spherial_harmonics_basis(Y00, 1)
         res_Y1m1 = gt.projection_spherial_harmonics_basis(Y1m1, 1)

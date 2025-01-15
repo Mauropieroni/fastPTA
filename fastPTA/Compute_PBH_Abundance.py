@@ -1,7 +1,10 @@
 import numpy as np
+
 import jax
 import jax.numpy as jnp
 import matplotlib.pyplot as plt
+from jax.scipy.interpolate import RegularGridInterpolator
+
 
 # Local
 import fastPTA.utils as ut
@@ -23,35 +26,132 @@ T_range_up = jnp.geomspace(1e-3, 1e10, 10000)
 T_range_down = jnp.geomspace(1e10, 1e-3, 10000)
 
 # Importing data
-g_data = np.loadtxt(ut.path_to_defaults + "gstar(T).txt")
+g_data = np.loadtxt(ut.path_to_defaults + "gstar_T.txt")
+
 g_relativistic_dofs = g_data[:, [0, 1]] * jnp.array([1000, 1])
 g_entropy_dofs = g_data[:, [0, 3]] * jnp.array([1000, 1])
 
-# Interpolations
-@jax.jit
-def relativistic_dofs(temperature):
-    return jnp.interp(
-        temperature,
-        g_relativistic_dofs[:, 0],
-        g_relativistic_dofs[:, 1],
-        left=g_relativistic_dofs[0, 1],
-        right=g_relativistic_dofs[-1, 1],
-    )
+# Define interpolators from the data
+relativistic_dofs = RegularGridInterpolator(
+    [g_relativistic_dofs[:, 0]],
+    g_relativistic_dofs[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+entropy_dofs = RegularGridInterpolator(
+    [g_entropy_dofs[:, 0]],
+    g_entropy_dofs[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+# Import data
+tb_Kappa_v_T = np.loadtxt(ut.path_to_defaults + "Kappa_alpha3_fits.txt")
+tb_Gamma_v_T = np.loadtxt(ut.path_to_defaults + "gamma_alpha3_fits.txt")
+tb_Delta_cv_T = np.loadtxt(ut.path_to_defaults + "deltac_alpha3_fits.txt")
+tb_Phi_v_T = np.loadtxt(ut.path_to_defaults + "Phi_alpha3_fits.txt")
 
 
-@jax.jit
-def entropy_dofs(temperature):
-    return jnp.interp(
-        temperature,
-        g_entropy_dofs[:, 0],
-        g_entropy_dofs[:, 1],
-        left=g_entropy_dofs[0, 1],
-        right=g_entropy_dofs[-1, 1],
-    )
+# Interpolators from the data
+Kappa_QCD = RegularGridInterpolator(
+    [tb_Kappa_v_T[:, 0]],
+    tb_Kappa_v_T[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+Gamma_QCD = RegularGridInterpolator(
+    [tb_Gamma_v_T[:, 0]],
+    tb_Gamma_v_T[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+Delta_QCD = RegularGridInterpolator(
+    [tb_Delta_cv_T[:, 0]],
+    tb_Delta_cv_T[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+Phi_QCD = RegularGridInterpolator(
+    [tb_Phi_v_T[:, 0]],
+    tb_Phi_v_T[:, 1],
+    bounds_error=False,
+    fill_value=None,
+)
+
+# @jax.jit
+# def Kappa_QCD(temperature):
+#     return jnp.interp(
+#         temperature,
+#         tb_Kappa_v_T[:, 0],
+#         tb_Kappa_v_T[:, 1],
+#         left=tb_Kappa_v_T[0, 1],
+#         right=tb_Kappa_v_T[-1, 1],
+#     )
+
+
+# @jax.jit
+# def Gamma_QCD(temperature):
+#     return jnp.interp(
+#         temperature,
+#         tb_Gamma_v_T[:, 0],
+#         tb_Gamma_v_T[:, 1],
+#         left=tb_Gamma_v_T[0, 1],
+#         right=tb_Gamma_v_T[-1, 1],
+#     )
+
+
+# @jax.jit
+# def Delta_QCD(temperature):
+#     return jnp.interp(
+#         temperature,
+#         tb_Delta_cv_T[:, 0],
+#         tb_Delta_cv_T[:, 1],
+#         left=tb_Delta_cv_T[0, 1],
+#         right=tb_Delta_cv_T[-1, 1],
+#     )
+
+
+# @jax.jit
+# def Phi_QCD(temperature):
+#     return jnp.interp(
+#         temperature,
+#         tb_Phi_v_T[:, 0],
+#         tb_Phi_v_T[:, 1],
+#         left=tb_Phi_v_T[0, 1],
+#         right=tb_Phi_v_T[-1, 1],
+#     )
+
+
+# @jax.jit
+# def relativistic_dofs(temperature):
+#     return jnp.interp(
+#         temperature,
+#         g_relativistic_dofs[:, 0],
+#         g_relativistic_dofs[:, 1],
+#         left=g_relativistic_dofs[0, 1],
+#         right=g_relativistic_dofs[-1, 1],
+#     )
+
+
+# @jax.jit
+# def entropy_dofs(temperature):
+#     return jnp.interp(
+#         temperature,
+#         g_entropy_dofs[:, 0],
+#         g_entropy_dofs[:, 1],
+#         left=g_entropy_dofs[0, 1],
+#         right=g_entropy_dofs[-1, 1],
+#     )
+
+del g_data, g_relativistic_dofs, g_entropy_dofs
 
 # Values at specific points
-relativistic_dofs_0 = relativistic_dofs(1e-9)
-entropy_dofs_0 = entropy_dofs(1e-9)
+relativistic_dofs_0 = relativistic_dofs(jnp.array([1e-9]))
+entropy_dofs_0 = entropy_dofs(jnp.array([1e-9]))
 
 
 # Interpolators for the temperature
@@ -67,27 +167,36 @@ def k_of_T(temperature):
 
 @jax.jit
 def M_H_of_T(temperature):
-    return 1.5e5 / temperature**2.0 / jnp.sqrt(relativistic_dofs(temperature) / 10.75)
-
-@jax.jit
-def T_of_MH(MH):
-    return jnp.interp(
-        MH,
-        M_H_of_T(T_range_down),
-        T_range_down,
-        # left=T_range_down[0],
-        # right=T_range_down[-1],
+    return (
+        1.5e5
+        / temperature**2.0
+        / jnp.sqrt(relativistic_dofs(temperature) / 10.75)
     )
 
 
-@jax.jit
-def T_of_k(k):
-    return jnp.interp(
-        k,
-        k_of_T(T_range_up),
-        T_range_up,
-        #   left=T_range_up[0], right=T_range_up[-1]
-    )
+T_of_MH = RegularGridInterpolator([M_H_of_T(T_range_down)], T_range_down)
+T_of_k = RegularGridInterpolator([k_of_T(T_range_up)], T_range_up)
+
+
+# @jax.jit
+# def T_of_MH(MH):
+#     return jnp.interp(
+#         MH,
+#         M_H_of_T(T_range_down),
+#         T_range_down,
+#         # left=T_range_down[0],
+#         # right=T_range_down[-1],
+#     )
+
+
+# @jax.jit
+# def T_of_k(k):
+#     return jnp.interp(
+#         k,
+#         k_of_T(T_range_up),
+#         T_range_up,
+#         #   left=T_range_up[0], right=T_range_up[-1]
+#     )
 
 
 @jax.jit
@@ -101,67 +210,19 @@ def M_H_of_k(k_vec, kappa):
         * (1e6 / (k_vec / kappa)) ** 2.0
     )
 
-# Import data
-tb_Kappa_v_T = np.loadtxt(ut.path_to_defaults + "Kappa_alpha3_fits.txt")
-tb_Gamma_v_T = np.loadtxt(ut.path_to_defaults + "gamma_alpha3_fits.txt")
-tb_Delta_cv_T = np.loadtxt(ut.path_to_defaults + "deltac_alpha3_fits.txt")
-tb_Phi_v_T = np.loadtxt(ut.path_to_defaults + "Phi_alpha3_fits.txt")
-
-
-@jax.jit
-def Kappa_QCD(temperature):
-    return jnp.interp(
-        temperature,
-        tb_Kappa_v_T[:, 0],
-        tb_Kappa_v_T[:, 1],
-        left=tb_Kappa_v_T[0, 1],
-        right=tb_Kappa_v_T[-1, 1],
-    )
-
-
-@jax.jit
-def Gamma_QCD(temperature):
-    return jnp.interp(
-        temperature,
-        tb_Gamma_v_T[:, 0],
-        tb_Gamma_v_T[:, 1],
-        left=tb_Gamma_v_T[0, 1],
-        right=tb_Gamma_v_T[-1, 1],
-    )
-
-@jax.jit
-def Delta_QCD(temperature):
-    return jnp.interp(
-        temperature,
-        tb_Delta_cv_T[:, 0],
-        tb_Delta_cv_T[:, 1],
-        left=tb_Delta_cv_T[0, 1],
-        right=tb_Delta_cv_T[-1, 1],
-    )
-
-
-@jax.jit
-def Phi_QCD(temperature):
-    return jnp.interp(
-        temperature,
-        tb_Phi_v_T[:, 0],
-        tb_Phi_v_T[:, 1],
-        left=tb_Phi_v_T[0, 1],
-        right=tb_Phi_v_T[-1, 1],
-    )
-
 
 # Some Functions
 @jax.jit
-def Window(k_vec, curvature):
+def window(k_vec, curvature):
     x = k_vec * curvature
     return 3.0 * (jnp.sin(x) - x * jnp.cos(x)) / x**3.0
 
 
 @jax.jit
-def Transfer_function(k_vec, Rh):
+def transfer_function(k_vec, Rh):
     curvature = Rh / jnp.sqrt(3.0)
-    return Window(k_vec, curvature)
+    return window(k_vec, curvature)
+
 
 @jax.jit
 def PC(log_k, delta):
@@ -174,7 +235,7 @@ def PC(log_k, delta):
 
 # Lognormal spectrum
 @jax.jit
-def P_zeta_log(k_vec, amplitude, delta):
+def lognormal_spectrum(k_vec, amplitude, delta):
     return (
         amplitude
         / (jnp.sqrt(2.0 * jnp.pi) * delta)
@@ -188,10 +249,11 @@ def integrand_spectrum(k_vec, amplitude, delta, curvature_matter):
         1.0
         / k_vec
         * (curvature_matter * k_vec) ** 4.0
-        * Window(k_vec, curvature_matter) ** 2.0
-        * Transfer_function(k_vec, curvature_matter) ** 2.0
-        * P_zeta_log(k_vec, amplitude, delta)
+        * window(k_vec, curvature_matter) ** 2.0
+        * transfer_function(k_vec, curvature_matter) ** 2.0
+        * lognormal_spectrum(k_vec, amplitude, delta)
     )
+
 
 @jax.jit
 def compute_var_NL_QCD(k_vec, amplitude, delta, curvature_matter, horizon_mass):
@@ -216,6 +278,7 @@ def integrand_beta(CG, horizon_mass, sigma_C):
 
     return jnp.where((condition_1 >= 0.0) & (condition_2 >= 0.0), result, 0.0)
 
+
 @jax.jit
 def compute_beta_NL_C_QCD(
     k_vec, amplitude, delta, curvature_matter, horizon_mass, CG_vec
@@ -229,8 +292,11 @@ def compute_beta_NL_C_QCD(
 
     return jnp.trapezoid(beta_integrand, x=CG_vec, axis=0)
 
+
 @jax.jit
-def f_PBH_NL_QCD(amplitude, delta, ks, len_k=100, len_curvature=100, len_CG=100):
+def f_PBH_NL_QCD(
+    amplitude, delta, ks, len_k=100, len_curvature=100, len_CG=100
+):
     curvature_vec = jnp.logspace(-0.6, 1.2, len_curvature)
     M_H_vec = M_H_of_k(kappa / curvature_vec * ks, kappa)
 
@@ -246,7 +312,9 @@ def f_PBH_NL_QCD(amplitude, delta, ks, len_k=100, len_curvature=100, len_CG=100)
     )
 
     k_min = 10.0 ** (-3.0 * delta)
-    k_max = jnp.where(1 / k_min <= 1e3 / curvature_vec, 1 / k_min, 1e3 / curvature_vec)
+    k_max = jnp.where(
+        1 / k_min <= 1e3 / curvature_vec, 1 / k_min, 1e3 / curvature_vec
+    )
     k_vec = jnp.geomspace(k_min, k_max, len_k)
 
     CG_vec = jnp.linspace(0.0, 2 * Phi_QCD(M_H_vec), len_CG)
@@ -256,6 +324,7 @@ def f_PBH_NL_QCD(amplitude, delta, ks, len_k=100, len_curvature=100, len_CG=100)
     )
 
     return jnp.trapezoid(prefactor * integrand_M, x=M_H_vec)
+
 
 @jax.jit
 def find_A_NL_QCD(log10fPBH, Delta, ks):

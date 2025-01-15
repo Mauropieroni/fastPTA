@@ -1,4 +1,5 @@
 # Global
+import tqdm
 import numpy as np
 import matplotlib.pyplot as plt
 
@@ -222,13 +223,57 @@ def get_constraints(
         signal_parameters, covariance, size=len_fisher_data
     )
     errors = np.sqrt(np.diag(covariance))
-    print("Fisher errors", errors)
+    print("\nFisher errors", errors)
 
     get_tensors_kwargs["regenerate_catalog"] = False
 
     # MCMC_results = np.load(path_to_MCMC_chains)
     # MCMC_data = MCMC_results["samples"]
     # pdfs = MCMC_results["pdfs"]
+
+    if not np.any(priors):
+        # priors = signal_parameters[None, :] + 5 * np.array(
+        #     [-errors, errors]
+        # )
+        priors = np.array(
+            [
+                [
+                    signal_parameters[0] - 5 * errors[0],
+                    signal_parameters[0] + 5 * errors[0],
+                ],
+                [
+                    signal_parameters[1] - 5 * errors[1],
+                    signal_parameters[1] + 5 * errors[1],
+                ],
+                [
+                    max([-3.5, signal_parameters[2] - 5 * errors[2]]),
+                    min([0, signal_parameters[2] + 5 * errors[2]]),
+                ],
+                [
+                    max([-1.5, signal_parameters[3] - 5 * errors[3]]),
+                    min([0.9, signal_parameters[3] + 5 * errors[3]]),
+                ],
+                [
+                    max([-10, signal_parameters[4] - 5 * errors[4]]),
+                    min([-6, signal_parameters[4] + 5 * errors[4]]),
+                ],
+            ]
+        ).T
+        print(priors)
+
+        i = 0
+        while i < nwalkers:
+            PBH_abundance = f_PBH_NL_QCD(
+                10 ** initial[i, 2],
+                10 ** initial[i, 3],
+                10 ** initial[i, 4] * 2 * np.pi / (9.7156e-15),
+            )
+            if PBH_abundance > 1:
+                initial[i] = np.random.uniform(
+                    priors[0, :], priors[1, :], size=(1, len(priors.T))
+                )
+            else:
+                i = i + 1
 
     try:
         if rerun_MCMC:
@@ -239,37 +284,7 @@ def get_constraints(
 
     except FileNotFoundError:
 
-        print("Entered")
-
-        if not np.any(priors):
-            # priors = signal_parameters[None, :] + 5 * np.array(
-            #     [-errors, errors]
-            # )
-            priors = np.array(
-                [
-                    [
-                        signal_parameters[0] - 5 * errors[0],
-                        signal_parameters[0] + 5 * errors[0],
-                    ],
-                    [
-                        signal_parameters[1] - 5 * errors[1],
-                        signal_parameters[1] + 5 * errors[1],
-                    ],
-                    [
-                        max([-3.5, signal_parameters[2] - 5 * errors[2]]),
-                        min([0, signal_parameters[2] + 5 * errors[2]]),
-                    ],
-                    [
-                        max([-1.5, signal_parameters[3] - 5 * errors[3]]),
-                        min([0.9, signal_parameters[3] + 5 * errors[3]]),
-                    ],
-                    [
-                        max([-10, signal_parameters[4] - 5 * errors[4]]),
-                        min([-6, signal_parameters[4] + 5 * errors[4]]),
-                    ],
-                ]
-            ).T
-            print(priors)
+        print("Entering MCMC")
         MCMC_data, pdfs = run_MCMC(
             priors,
             **fisher_kwargs,
@@ -280,11 +295,17 @@ def get_constraints(
     # Generate a FIM without the points with fpbh>1
     fisher_data_prior = fisher_data.copy()
 
-    for i in range(len(fisher_data)):
+    for i in range(len(priors.T)):
+        fisher_data_prior = fisher_data_prior[
+            (fisher_data_prior[:, i] > priors[0, i])
+            & (fisher_data_prior[:, i] < priors[1, i])
+        ]
+
+    for i in tqdm.tqdm(range(len(fisher_data_prior))):
         PBH_abundance = f_PBH_NL_QCD(
-            10 ** fisher_data[i][2],
-            10 ** fisher_data[i][3],
-            10 ** fisher_data[i][4] * 2 * np.pi / (9.7156e-15),
+            10 ** fisher_data_prior[i][2],
+            10 ** fisher_data_prior[i][3],
+            10 ** fisher_data_prior[i][4] * 2 * np.pi / (9.7156e-15),
         )
         if PBH_abundance > 1:
             fisher_data_prior[i] = np.nan
@@ -320,7 +341,9 @@ def get_constraints(
         labels=parameter_labels,
         range=ranges,
         truth_color="black",
+        bbox_to_anchor=(0.0, 4.25, 1.0, 1.0),
     )
+    plt.suptitle("Chains", fontsize=20)
 
     datasets = [d - np.mean(d, axis=0) for d in datasets]
     ranges = [(-5 * errors[i], +5 * errors[i]) for i in range(len(errors))]
@@ -337,7 +360,10 @@ def get_constraints(
         labels=parameter_labels,
         range=ranges,
         truth_color="black",
+        bbox_to_anchor=(0.0, 4.25, 1.0, 1.0),
     )
+    plt.suptitle("Shifted chains", fontsize=20)
+
     print("-- Done --\n")
 
 
@@ -391,15 +417,16 @@ if __name__ == "__main__":
         np.concatenate([SMBBH_parameters, CGW_SIGW_parameters]),
         T_obs_yrs=10.33,
         n_frequencies=30,
-        rerun_MCMC=True,
+        rerun_MCMC=False,  # True,
         path_to_MCMC_data="generated_data/MCMC_data_Pl+SIGW_200p.npz",
         path_to_MCMC_chains="generated_chains/MCMC_chains_Pl+SIGW_200p.npz",
         MCMC_kwargs={
             "realization": False,
+            "regenerate_MCMC_data": True,
             "i_max": 20,
             "R_convergence": 1e-1,
             "R_criterion": "max",
-            "burnin_steps": 300,
+            "burnin_steps": 1000,
             "MCMC_iteration_steps": 500,
         },
         generate_catalog_kwargs={
@@ -413,11 +440,11 @@ if __name__ == "__main__":
             "regenerate_catalog": True,
         },
         parameter_labels=[
-            "$\\alpha_{PL}$",
-            "$n_T$",
-            "$\mathrm{log}_{10}A_{\zeta}$",
-            "$\mathrm{log}_{10} \\Delta$",
-            "$\mathrm{log}_{10} (f_*/\mathrm{Hz})$",
+            r"$\alpha_{PL}$",
+            r"$n_T$",
+            r"$\mathrm{log}_{10}A_{\zeta}$",
+            r"$\mathrm{log}_{10} \Delta$",
+            r"$\mathrm{log}_{10} (f_*/\mathrm{Hz})$",
         ],
     )
 

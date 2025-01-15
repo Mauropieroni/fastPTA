@@ -1,9 +1,16 @@
 # Global
+import sys
 import unittest
 
 import numpy as np
 import healpy as hp
-from scipy.special import sph_harm
+
+if sys.version_info.minor > 10:
+    from scipy.special import sph_harm_y
+else:
+    from scipy.special import sph_harm
+
+    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
 
 # Local
 import utils as tu
@@ -93,7 +100,7 @@ class TestGetTensors(unittest.TestCase):
         c = 0
         for ell in range(l_max + 1):
             for m in range(-ell, ell + 1):
-                sp = sph_harm(np.abs(m), ell, phi, theta)
+                sp = sph_harm_y(ell, np.abs(m), theta, phi)
 
                 if m == 0:
                     sp = sp.real
@@ -125,7 +132,7 @@ class TestGetTensors(unittest.TestCase):
         mm = inds[3][inds[-1]]
 
         for ind in range(len(ll)):
-            YY = np.array(sph_harm(np.abs(mm[ind]), ll[ind], phi, theta))
+            YY = np.array(sph_harm_y(ll[ind], np.abs(mm[ind]), theta, phi))
 
             if mm[ind] < 0:
                 # The m < 0 is the complex conjugate of the m > 0 so need a -1

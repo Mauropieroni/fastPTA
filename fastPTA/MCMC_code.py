@@ -8,9 +8,8 @@ import jax.numpy as jnp
 
 # Local
 import fastPTA.utils as ut
-from fastPTA.signals import SMBBH_parameters, get_model
+from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
-from fastPTA.Compute_PBH_Abundance import f_PBH_NL_QCD
 
 jax.config.update("jax_enable_x64", True)
 
@@ -23,6 +22,7 @@ R_convergence_default = 1e-1
 R_criterion_default = "mean_squared"
 burnin_steps_default = 300
 MCMC_iteration_steps_default = 500
+power_law_model = get_signal_model("power_law")
 
 
 def generate_gaussian(mean, sigma):
@@ -157,7 +157,7 @@ def get_MCMC_data(
     regenerate_MCMC_data,
     T_obs_yrs=10.33,
     n_frequencies=30,
-    signal_label="power_law",
+    signal_model=power_law_model,
     signal_parameters=SMBBH_parameters,
     realization=True,
     save_MCMC_data=True,
@@ -185,9 +185,9 @@ def get_MCMC_data(
     n_frequencies : int, optional
         Number of frequency bins
         Default is 30.
-    signal_label : str, optional
-        Label indicating the type of signal model to use
-        Default is "power_law".
+    signal_model : signal_model object, optional
+        Object containing the signal model and its derivatives
+        Default is a power_law model
     signal_parameters : dict, optional
         Dictionary containing parameters for the signal model
         Default is SMBBH_parameters.
@@ -235,16 +235,12 @@ def get_MCMC_data(
         print("\nRegenerating MCMC data")
 
         # Setting the frequency vector from the observation time
-        T_tot = T_obs_yrs * ut.yr
-        fmin = 1 / T_tot
-        frequency = fmin * (1 + np.arange(n_frequencies))
-
-        # Get the functions for the signal and its derivatives
-        model = get_model(signal_label)
-        signal_model = model["signal_model"]
+        frequency = (1.0 + jnp.arange(n_frequencies)) / (T_obs_yrs * ut.yr)
 
         # Computing (sqrt of the) signal
-        signal_std = np.sqrt(signal_model(frequency, signal_parameters))
+        signal_std = np.sqrt(
+            signal_model.template(frequency, signal_parameters)
+        )
 
         # Gets all the ingredients to compute the fisher
         strain_omega, response_IJ, HD_functions_IJ, HD_coeffs = get_tensors(
@@ -267,106 +263,8 @@ def get_MCMC_data(
     return frequency, MCMC_data, response_IJ, strain_omega
 
 
-def flat_prior(parameter, min_val, max_val):
-    """
-    Calculate the logarithm of a flat prior probability density function.
-
-    Parameters:
-    -----------
-    parameter : float or jax.numpy.ndarray
-        Parameter value(s) for which the prior probability is calculated.
-    min_val : float
-        Minimum allowed value for the parameter.
-    max_val : float
-        Maximum allowed value for the parameter.
-
-    Returns:
-    --------
-    float or jax.numpy.ndarray
-        Logarithm of the prior probability density function.
-
-    """
-
-    if not (parameter >= min_val and parameter <= max_val):
-        return -jnp.inf
-    else:
-        return 0.0
-
-
-def gaussian_prior(parameter, mean_val, std_val):
-    """
-    Calculate the logarithm of a Gaussian prior probability density function.
-
-    Parameters:
-    -----------
-    parameter : float or jax.numpy.ndarray
-        Parameter value(s) for which the prior probability is calculated.
-    mean_val : float
-        Mean value of the Gaussian distribution.
-    std_val : float
-        Standard deviation of the Gaussian distribution.
-
-    Returns:
-    --------
-    float or jax.numpy.ndarray
-        Logarithm of the prior probability density function.
-
-    """
-
-    return -0.5 * jnp.sum(
-        jnp.log(2 * jnp.pi * std_val**2)
-        + ((parameter - mean_val) / std_val) ** 2
-    )
-
-
-def log_prior(parameters, prior_parameters, signal_model, which_prior="flat"):
-    """
-    Calculate the logarithm of the prior probability density function. Only
-    flat and gaussian priors are supported at the moment
-
-    Parameters:
-    -----------
-    parameters : jax.numpy.ndarray
-        Array of parameter values for which the prior probability is calculated.
-    prior_parameters : numpy.ndarray
-        Array containing prior parameters, where each row represents the
-        parameters for a single prior.
-        For flat prior: [min_val, max_val]
-        For Gaussian prior: [mean_val, std_val]
-    which_prior : str, optional
-        Type of prior distribution to use
-        Default is "flat"
-
-    Returns:
-    --------
-    float
-        Logarithm of the prior probability density function.
-
-    """
-
-    log_p = 0.0
-
-    if signal_model.__name__ == "power_law_SIGW":
-        PBH_abundance = f_PBH_NL_QCD(
-            10 ** parameters[2],
-            10 ** parameters[3],
-            10 ** parameters[4] * 2 * np.pi / (9.7156e-15),
-        )
-        if PBH_abundance > 1 or np.isnan(PBH_abundance):
-            log_p += -np.inf
-
-    for i in range(len(parameters)):
-        if which_prior == "flat":
-            log_p += flat_prior(parameters[i], *prior_parameters[:, i])
-        elif which_prior == "gaussian":
-            log_p += gaussian_prior(parameters[i], *prior_parameters[:, i])
-
-    return log_p
-
-
 @jax.jit
 def log_likelihood(
-    frequency,
     signal_value,
     response_IJ,
     strain_omega,
@@ -377,8 +275,6 @@ def log_likelihood(
 
     Parameters:
     -----------
-    frequency : numpy.ndarray
-        Array containing frequency bins.
     signal_value : numpy.ndarray
         Array containing the signal evaluated in all frequency bins.
     response_IJ : numpy.ndarray
@@ -402,7 +298,7 @@ def log_likelihood(
     c_inverse = ut.compute_inverse(covariance)
 
     # Log determinant
-    sign, logdet = jnp.linalg.slogdet(covariance)
+    _, logdet = jnp.linalg.slogdet(covariance)
 
     # data term
     data_term = jnp.abs(jnp.einsum("ijk,ikj->i", c_inverse, data))
@@ -418,8 +314,7 @@ def log_posterior(
     response_IJ,
     strain_omega,
     data,
-    prior_parameters,
-    which_prior="flat",
+    priors,
 ):
     """
     Compute the logarithm of the posterior probability summing log likelihood
@@ -431,18 +326,17 @@ def log_posterior(
         Array containing parameters of the signal model.
     frequency : numpy.ndarray
         Array containing frequency bins.
-    signal_model : callable
-        Function representing the signal model.
+    signal_model : signal_model object, optional
+        Object containing the signal model and its derivatives
+        Default is a power_law model
     response_IJ : numpy.ndarray
         Array containing response function.
     strain_omega : numpy.ndarray
         Array containing strain noise.
     data : numpy.ndarray
         Array containing the observed data.
-    prior_parameters : numpy.ndarray
-        Array containing prior parameters.
-    which_prior : str, optional
-        Type of prior distribution to use (default is "flat").
+    priors : prior object
+        Object containing the prior probability density functions.
 
     Returns:
     --------
@@ -451,16 +345,16 @@ def log_posterior(
 
     """
 
-    lp = log_prior(signal_parameters, prior_parameters, signal_model)
+    lp = priors.evaluate_log_priors(
+        dict(zip(signal_model.parameter_names, signal_parameters))
+    )
 
     if not jnp.isfinite(lp):
         return -jnp.inf
 
-    signal_value = signal_model(frequency, signal_parameters)
+    signal_value = signal_model.template(frequency, signal_parameters)
 
-    log_lik = log_likelihood(
-        frequency, signal_value, response_IJ, strain_omega, data
-    )
+    log_lik = log_likelihood(signal_value, response_IJ, strain_omega, data)
 
     return lp + log_lik
 
@@ -469,10 +363,9 @@ def run_MCMC(
     priors,
     T_obs_yrs=10.33,
     n_frequencies=30,
-    signal_label="power_law",
+    signal_model=power_law_model,
     signal_parameters=SMBBH_parameters,
     initial=[],
-    which_prior="flat",
     regenerate_MCMC_data=False,
     realization=True,
     save_MCMC_data=True,
@@ -505,18 +398,15 @@ def run_MCMC(
     n_frequencies : int, optional
         Number of frequency bins
         Default is 30
-    signal_label : str, optional
-        Label indicating the type of signal model to use
-        Default is "power_law"
+    signal_model : signal_model object, optional
+        Object containing the signal model and its derivatives
+        Default is a power_law model
     signal_parameters : numpy.ndarray, optional
         Array containing signal model parameters
         Default is SMBBH_parameters
     initial : list or numpy.ndarray, optional
         Initial parameter values for the MCMC walkers
         Default is empty
-    which_prior : str, optional
-        Type of prior distribution to use
-        Default is "flat"
     regenerate_MCMC_data : bool, optional
         Flag indicating whether to regenerate MCMC data
         Default is False
@@ -569,7 +459,7 @@ def run_MCMC(
         regenerate_MCMC_data,
         T_obs_yrs=T_obs_yrs,
         n_frequencies=n_frequencies,
-        signal_label=signal_label,
+        signal_model=signal_model,
         signal_parameters=signal_parameters,
         realization=realization,
         save_MCMC_data=save_MCMC_data,
@@ -578,54 +468,29 @@ def run_MCMC(
         generate_catalog_kwargs=generate_catalog_kwargs,
     )
 
-    nwalkers = max(2 * len(priors.T), 5)
+    ndims = len(priors.parameter_names)
 
     # Generate the initial points if not provided
-    if not initial and which_prior.lower() == "flat":
-        initial = np.random.uniform(
-            priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
-        )
-        i = 0
-        while i < nwalkers:
-            PBH_abundance = f_PBH_NL_QCD(
-                10 ** initial[i, 2],
-                10 ** initial[i, 3],
-                10 ** initial[i, 4] * 2 * np.pi / (9.7156e-15),
-            )
-            if PBH_abundance > 1:
-                initial[i] = np.random.uniform(
-                    priors[0, :], priors[1, :], size=(1, len(priors.T))
-                )
-            else:
-                i = i + 1
-    elif not initial and which_prior.lower() == "gaussian":
-        initial = np.random.uniform(
-            priors[0, :], priors[1, :], size=(nwalkers, len(priors.T))
-        )
-    elif initial:
-        pass
-    else:
-        raise ValueError("Cannot use that prior")
+    if not initial:
+        nwalkers = max(2 * ndims, 5)
+        initial = np.empty((nwalkers, ndims))
 
-    nwalkers, ndims = initial.shape
+        for i in range(ndims):
+            pp = priors.priors[priors.parameter_names[i]]
+            initial[:, i] = pp["rvs"](**pp["pdf_kwargs"], size=nwalkers)
 
     # Args for the posterior
     args = [
         jnp.array(frequency),
-        get_model(signal_label)["signal_model"],
+        signal_model,
         jnp.array(response_IJ),
         jnp.array(strain_omega),
         jnp.array(MCMC_data),
         priors,
     ]
 
-    # Kwargs for the posterior
-    kwargs = {"which_prior": which_prior}
-
     # Set the sampler
-    sampler = emcee.EnsembleSampler(
-        nwalkers, ndims, log_posterior, args=args, kwargs=kwargs
-    )
+    sampler = emcee.EnsembleSampler(nwalkers, ndims, log_posterior, args=args)
 
     start = time.perf_counter()
 
