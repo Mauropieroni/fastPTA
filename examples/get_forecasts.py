@@ -333,11 +333,15 @@ def get_constraints(
 
     plot_corner(
         datasets,
-        colors=[pf.my_colormap["red"], pf.my_colormap["green"], pf.my_colormap["blue"]],  # type: ignore
+        colors=[
+            pf.my_colormap["red"],
+            pf.my_colormap["green"],
+            pf.my_colormap["blue"],
+        ],
         truths=signal_parameters,
-        chain_labels=["Fisher", "MCMC", "Fisher with priors"],  # type: ignore
-        weights=weights,  # type: ignore
-        smooth=smooth,  # type: ignore
+        chain_labels=["Fisher", "MCMC", "Fisher with priors"],
+        weights=weights,
+        smooth=smooth,
         labels=parameter_labels,
         range=ranges,
         truth_color="black",
@@ -352,11 +356,15 @@ def get_constraints(
 
     plot_corner(
         datasets,
-        colors=[pf.my_colormap["red"], pf.my_colormap["green"], pf.my_colormap["blue"]],  # type: ignore
+        colors=[
+            pf.my_colormap["red"],
+            pf.my_colormap["green"],
+            pf.my_colormap["blue"],
+        ],
         truths=np.zeros(len(signal_parameters)),
-        chain_labels=["Fisher", "MCMC", "Fisher with priors"],  # type: ignore
-        weights=weights,  # type: ignore
-        smooth=smooth,  # type: ignore
+        chain_labels=["Fisher", "MCMC", "Fisher with priors"],
+        weights=weights,
+        smooth=smooth,
         labels=parameter_labels,
         range=ranges,
         truth_color="black",
