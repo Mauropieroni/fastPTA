@@ -15,7 +15,9 @@ if sys.version_info.minor > 10:
 else:
     from scipy.special import sph_harm
 
-    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
+    def sph_harm_y(ell, m, theta, phi):
+        return sph_harm(m, ell, phi, theta)
+
 
 jax.config.update("jax_enable_x64", True)
 
@@ -442,7 +444,8 @@ def real_to_complex_conversion(real_spherical_harmonics):
     ordered_real_spherical_harmonics = np.zeros_like(real_spherical_harmonics)
     ordered_real_spherical_harmonics[sort_indexes] = real_spherical_harmonics
 
-    # Split the ordered real coefficients into negative, zero, and positive m values
+    # Split the ordered real coefficients into negative, zero, and positive
+    # m values
     zero_m = ordered_real_spherical_harmonics[mm == 0]
     positive_m = ordered_real_spherical_harmonics[mm > 0]
     negative_m = ordered_real_spherical_harmonics[mm < 0]
@@ -505,7 +508,8 @@ def get_real_spherical_harmonics(l_max, theta, phi):
 
 def get_CL_from_real_clm(clm_real):
     """
-    Compute the angular power spectrum from the spherical harmonics coefficients.
+    Compute the angular power spectrum from the spherical harmonics
+    coefficients.
 
     Parameters:
     -----------

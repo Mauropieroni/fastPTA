@@ -1,5 +1,4 @@
 # Global
-import sys
 import numpy as np
 import healpy as hp
 import pandas as pd
@@ -8,14 +7,6 @@ import jax
 import jax.numpy as jnp
 
 from scipy.special import legendre
-
-if sys.version_info.minor > 10:
-    from scipy.special import sph_harm_y
-else:
-    from scipy.special import sph_harm
-
-    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
-
 from scipy.integrate import simpson
 
 # Local
@@ -1018,7 +1009,8 @@ def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     --------
     binned_projection : numpy.ndarray or jax.numpy.ndarray
         4D array with the binned projection of the Hellings and Downs
-        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is number of bins, F is the number of frequencies, and N is the number of
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is
+        number of bins, F is the number of frequencies, and N is the number of
         pulsars.
 
     """
@@ -1160,7 +1152,8 @@ def get_tensors(
         the anisotropy decomposition (spherical harmonics or sqrt basis).
     - HD_functions_IJ : numpy.ndarray or jax.numpy.ndarray
         4D array with the Legendre or binned projection of the Hellings and
-        Downs correlations. The shape is (HD_order + 1, F, N, N), where HD_order is the maximum order of Legendre polynomials / bins, F is the
+        Downs correlations. The shape is (HD_order + 1, F, N, N), where
+        HD_order is the maximum order of Legendre polynomials / bins, F is the
         number of frequencies,and N is the number of pulsars.
     - HD_coefficients : numpy.ndarray or jax.numpy.ndarray
         Legendre coefficients for Hellings and Downs correlations values up to

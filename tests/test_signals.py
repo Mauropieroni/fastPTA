@@ -62,12 +62,14 @@ if __name__ == "__main__":
     unittest.main(verbosity=2)
 
 
-### Power law test
+# --- Power law test
 # Check analytical and numerical derivative
 # To use grad() we need a function of the parameters
 
+
 # def function_powerlaw(log_amplitude, tilt, pivot):
 #     return 10**log_amplitude * (frequency_point / pivot) ** tilt
+
 
 # X = np.arange(1, 10, 0.01)
 # Y = []
@@ -77,26 +79,40 @@ if __name__ == "__main__":
 # for i in range(len(X)):
 #     Y.append(dpower_law(0, frequency_point, [X[i], SMBBH_tilt], ut.f_yr))
 #     Ynum.append(grad(function_powerlaw, argnums=0)(X[i], SMBBH_tilt, ut.f_yr))
-#     Z.append(dpower_law(1, frequency_point, [SMBBH_log_amplitude, X[i]], ut.f_yr))
-#     Znum.append(grad(function_powerlaw, argnums=1)(SMBBH_log_amplitude, X[i], ut.f_yr))
-# plt.loglog(X, Y, label='$LogAmplitude - analytic$')
-# plt.loglog(X, Ynum, color='yellow', linestyle='dashed', label='$LogAmplitude - numeric$')
-# plt.loglog(X, Z, label='$Tilt - analytic$')
-# plt.loglog(X,Znum, color='cyan', linestyle='dashed', label='$Tilt - numeric$')
-# plt.legend(loc='center left', bbox_to_anchor=(.1, .8), prop={'size': 10})
+#     Z.append(
+#         dpower_law(1, frequency_point, [SMBBH_log_amplitude, X[i]], ut.f_yr)
+#     )
+#     Znum.append(
+#         grad(function_powerlaw, argnums=1)(SMBBH_log_amplitude, X[i], ut.f_yr)
+#     )
+# plt.loglog(X, Y, label="$LogAmplitude - analytic$")
+# plt.loglog(
+#     X,
+#     Ynum,
+#     color="yellow",
+#     linestyle="dashed",
+#     label="$LogAmplitude - numeric$",
+# )
+# plt.loglog(X, Z, label="$Tilt - analytic$")
+# plt.loglog(X, Znum, color="cyan", linestyle="dashed",
+# label="$Tilt - numeric$")
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.8), prop={"size": 10})
 # plt.show()
 
 
-### Lognormal test
+# --- Lognormal test
 
 
 # Check analytical and numerical derivative
 # To use grad() we need a function of the parameters
 
+
 # def function_lognormal(log_amplitude, log_width, log_pivot):
 #     return 10**log_amplitude * jnp.exp(
-#         -0.5 * (jnp.log(frequency_point / (10**log_pivot)) / 10**log_width) ** 2
+#         -0.5 * (jnp.log(frequency_point / (10**log_pivot)) / 10**log_width
+# ) ** 2
 #     )
+
 
 # X = np.arange(1, 10, 0.01)
 # Y = []
@@ -106,21 +122,47 @@ if __name__ == "__main__":
 # W = []
 # Wnum = []
 # for i in range(len(X)):
-#     Y.append(dlognormal(0, frequency_point, [X[i], LN_log_width, LN_log_pivot]))
-#     Ynum.append(grad(function_lognormal, argnums=0)(X[i], LN_log_width, LN_log_pivot))
-#     Z.append(dlognormal(1, frequency_point, [LN_log_amplitude, X[i], LN_log_pivot]))
-#     Znum.append(grad(function_lognormal, argnums=1)(LN_log_amplitude, X[i], LN_log_pivot))
-#     W.append(dlognormal(2, frequency_point, [LN_log_amplitude, LN_log_width, -X[i]]))
-#     Wnum.append(grad(function_lognormal, argnums=2)(LN_log_amplitude, LN_log_width, -X[i]))
-# plt.loglog(X,Y, label="$LogAmplitude - Analytic$")
-# plt.loglog(X,Ynum, color='yellow', linestyle='dashed', label="$LogAmplitude - Numeric$")
-# plt.loglog(X,Z, label="$LogWidth - Analytic$")
-# plt.loglog(X, Znum, color='cyan', linestyle='dashed', label="$LogWidth - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+#     Y.append(
+# dlognormal(0, frequency_point, [X[i], LN_log_width, LN_log_pivot]))
+#     Ynum.append(
+#         grad(function_lognormal, argnums=0)(X[i], LN_log_width, LN_log_pivot)
+#     )
+#     Z.append(
+#         dlognormal(1, frequency_point, [LN_log_amplitude, X[i], LN_log_pivot])
+#     )
+#     Znum.append(
+#         grad(function_lognormal, argnums=1)(
+#             LN_log_amplitude, X[i], LN_log_pivot
+#         )
+#     )
+#     W.append(
+#         dlognormal(
+# 2, frequency_point, [LN_log_amplitude, LN_log_width, -X[i]])
+#     )
+#     Wnum.append(
+#         grad(function_lognormal, argnums=2)(
+#             LN_log_amplitude, LN_log_width, -X[i]
+#         )
+#     )
+# plt.loglog(X, Y, label="$LogAmplitude - Analytic$")
+# plt.loglog(
+#     X,
+#     Ynum,
+#     color="yellow",
+#     linestyle="dashed",
+#     label="$LogAmplitude - Numeric$",
+# )
+# plt.loglog(X, Z, label="$LogWidth - Analytic$")
+# plt.loglog(
+#     X, Znum, color="cyan", linestyle="dashed", label="$LogWidth - Numeric$"
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
 # plt.plot(-X, W, label="$LogPivot - Analytic$")
-# plt.plot(-X, Wnum, color='yellow', linestyle='dashed', label="$LogPivot - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.5, 0.2), prop={'size': 10})
+# plt.plot(
+#     -X, Wnum, color="yellow", linestyle="dashed", label="$LogPivot - Numeric$"
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.5, 0.2), prop={"size": 10})
 # plt.show()
 
 
@@ -156,31 +198,80 @@ if __name__ == "__main__":
 # K = []
 # Knum = []
 # for i in range(len(X)):
-#     Y.append(dbroken_power_law(0, frequency_point, [X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2]))
-#     Ynum.append(grad(function_bpl, argnums=0)(X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2))
-#     Z.append(dbroken_power_law(1, frequency_point, [BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2]))
-#     Znum.append(grad(function_bpl, argnums=1)(BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2))
-#     W.append(dbroken_power_law(2, frequency_point, [BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2]))
-#     Wnum.append(grad(function_bpl, argnums=2)(BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2))
-#     K.append(dbroken_power_law(3, frequency_point, [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]]))
-#     Knum.append(grad(function_bpl, argnums=3)(BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]))
-# plt.plot(X,Y, label="$LogAmplitude - Analytic$")
-# plt.plot(X,Ynum, color='yellow', linestyle='dashed', label="$LogAmplitude - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+#     Y.append(
+#         dbroken_power_law(
+#             0, frequency_point, [X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2]
+#         )
+#     )
+#     Ynum.append(
+#         grad(function_bpl, argnums=0)(
+#             X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2
+#         )
+#     )
+#     Z.append(
+#         dbroken_power_law(
+#             1,
+#             frequency_point,
+#             [BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2],
+#         )
+#     )
+#     Znum.append(
+#         grad(function_bpl, argnums=1)(
+#             BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2
+#         )
+#     )
+#     W.append(
+#         dbroken_power_law(
+#             2,
+#             frequency_point,
+#             [BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2],
+#         )
+#     )
+#     Wnum.append(
+#         grad(function_bpl, argnums=2)(
+#             BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2
+#         )
+#     )
+#     K.append(
+#         dbroken_power_law(
+#             3,
+#             frequency_point,
+#             [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]],
+#         )
+#     )
+#     Knum.append(
+#         grad(function_bpl, argnums=3)(
+#             BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]
+#         )
+#     )
+# plt.plot(X, Y, label="$LogAmplitude - Analytic$")
+# plt.plot(
+#     X,
+#     Ynum,
+#     color="yellow",
+#     linestyle="dashed",
+#     label="$LogAmplitude - Numeric$",
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
-# plt.plot(X,Z, label="$LogWidth - Analytic$")
-# plt.plot(X, Znum, color='cyan', linestyle='dashed', label="$LogWidth - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+# plt.plot(X, Z, label="$LogWidth - Analytic$")
+# plt.plot(
+#     X, Znum, color="cyan", linestyle="dashed", label="$LogWidth - Numeric$"
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
-# plt.plot(X,W, label="$Tilt_1 - Analytic$")
-# plt.plot(X, Wnum, color='yellow', linestyle='dashed', label="$Tilt_1 - Numeric$")
-# plt.plot(X,K, label="$Tilt_2 - Analytic$")
-# plt.plot(X, Knum, color='blue', linestyle='dashed', label="$Tilt_2 - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+# plt.plot(X, W, label="$Tilt_1 - Analytic$")
+# plt.plot(
+#     X, Wnum, color="yellow", linestyle="dashed", label="$Tilt_1 - Numeric$"
+# )
+# plt.plot(X, K, label="$Tilt_2 - Analytic$")
+# plt.plot(X, Knum, color="blue", linestyle="dashed",
+# label="$Tilt_2 - Numeric$")
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
 
 
-### SMBH + BPL
+# --- SMBH + BPL
 
 
 # Check analytical and numerical derivative
@@ -211,30 +302,79 @@ if __name__ == "__main__":
 # K = []
 # Knum = []
 # for i in range(len(X)):
-#     Y.append(dbroken_power_law(0, frequency_point, [X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2]))
-#     Ynum.append(grad(function_bpl, argnums=0)(X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2))
-#     Z.append(dbroken_power_law(1, frequency_point, [BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2]))
-#     Znum.append(grad(function_bpl, argnums=1)(BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2))
-#     W.append(dbroken_power_law(2, frequency_point, [BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2]))
-#     Wnum.append(grad(function_bpl, argnums=2)(BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2))
-#     K.append(dbroken_power_law(3, frequency_point, [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]]))
-#     Knum.append(grad(function_bpl, argnums=3)(BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]))
-# plt.plot(X,Y, label="$LogAmplitude - Analytic$")
-# plt.plot(X,Ynum, color='yellow', linestyle='dashed', label="$LogAmplitude - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+#     Y.append(
+#         dbroken_power_law(
+#             0, frequency_point, [X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2]
+#         )
+#     )
+#     Ynum.append(
+#         grad(function_bpl, argnums=0)(
+#             X[i], BPL_log_width, BPL_tilt_1, BPL_tilt_2
+#         )
+#     )
+#     Z.append(
+#         dbroken_power_law(
+#             1,
+#             frequency_point,
+#             [BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2],
+#         )
+#     )
+#     Znum.append(
+#         grad(function_bpl, argnums=1)(
+#             BPL_log_amplitude, X[i], BPL_tilt_1, BPL_tilt_2
+#         )
+#     )
+#     W.append(
+#         dbroken_power_law(
+#             2,
+#             frequency_point,
+#             [BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2],
+#         )
+#     )
+#     Wnum.append(
+#         grad(function_bpl, argnums=2)(
+#             BPL_log_amplitude, BPL_log_width, X[i], BPL_tilt_2
+#         )
+#     )
+#     K.append(
+#         dbroken_power_law(
+#             3,
+#             frequency_point,
+#             [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]],
+#         )
+#     )
+#     Knum.append(
+#         grad(function_bpl, argnums=3)(
+#             BPL_log_amplitude, BPL_log_width, BPL_tilt_1, X[i]
+#         )
+#     )
+# plt.plot(X, Y, label="$LogAmplitude - Analytic$")
+# plt.plot(
+#     X,
+#     Ynum,
+#     color="yellow",
+#     linestyle="dashed",
+#     label="$LogAmplitude - Numeric$",
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
-# plt.plot(X,Z, label="$LogWidth - Analytic$")
-# plt.plot(X, Znum, color='cyan', linestyle='dashed', label="$LogWidth - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+# plt.plot(X, Z, label="$LogWidth - Analytic$")
+# plt.plot(
+#     X, Znum, color="cyan", linestyle="dashed", label="$LogWidth - Numeric$"
+# )
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
-# plt.plot(X,W, label="$Tilt_1 - Analytic$")
-# plt.plot(X, Wnum, color='yellow', linestyle='dashed', label="$Tilt_1 - Numeric$")
-# plt.plot(X,K, label="$Tilt_2 - Analytic$")
-# plt.plot(X, Knum, color='blue', linestyle='dashed', label="$Tilt_2 - Numeric$")
-# plt.legend(loc='center left', bbox_to_anchor=(.1, 0.2), prop={'size': 10})
+# plt.plot(X, W, label="$Tilt_1 - Analytic$")
+# plt.plot(
+#     X, Wnum, color="yellow", linestyle="dashed", label="$Tilt_1 - Numeric$"
+# )
+# plt.plot(X, K, label="$Tilt_2 - Analytic$")
+# plt.plot(X, Knum, color="blue", linestyle="dashed",
+# label="$Tilt_2 - Numeric$")
+# plt.legend(loc="center left", bbox_to_anchor=(0.1, 0.2), prop={"size": 10})
 # plt.show()
 
-### PL + SIGW
+# --- PL + SIGW
 
 # Check analytical and numerical derivative
 # Already done for the two separate functions
@@ -269,22 +409,47 @@ if __name__ == "__main__":
 # plt.rcParams["text.usetex"] = True
 # plt.rcParams["font.family"] = "serif"
 # plt.rcParams["font.size"] = "18"
-# plt.fill_between(frequency, quant025SIGW, quant975SIGW, color="orange", alpha=0.4)
-# plt.fill_between(frequency, quant16SIGW, quant84SIGW, color="darkorange", alpha=0.4)
-# plt.loglog(frequency, SIGW(frequency, [-1.5, np.log10(0.5), -7.8]), color = 'chocolate',  alpha=0.8)
-# plt.fill_between(frequency, quant025plSIGW, quant975plSIGW, color="mediumpurple", alpha=0.7)
-# plt.fill_between(frequency, quant16plSIGW, quant84plSIGW, color="rebeccapurple", alpha=0.7)
-# plt.loglog(frequency, power_law_SIGW(frequency, [-7.1995, 2, -1.5, np.log10(0.5), -7.8]), color = 'indigo', alpha=0.8)
-# plt.fill_between(frequency, quant025pl, quant975pl, color="limegreen", alpha=0.4)
-# plt.fill_between(frequency, quant16pl, quant84pl, color="forestgreen", alpha=0.4)
-# plt.loglog(frequency, power_law(frequency, [-7.1995, 2]), color = 'darkgreen',  alpha=0.8)
+# plt.fill_between(
+#     frequency, quant025SIGW, quant975SIGW, color="orange", alpha=0.4
+# )
+# plt.fill_between(
+#     frequency, quant16SIGW, quant84SIGW, color="darkorange", alpha=0.4
+# )
+# plt.loglog(
+#     frequency,
+#     SIGW(frequency, [-1.5, np.log10(0.5), -7.8]),
+#     color="chocolate",
+#     alpha=0.8,
+# )
+# plt.fill_between(
+#     frequency, quant025plSIGW, quant975plSIGW, color="mediumpurple", alpha=0.7
+# )
+# plt.fill_between(
+#     frequency, quant16plSIGW, quant84plSIGW, color="rebeccapurple", alpha=0.7
+# )
+# plt.loglog(
+#     frequency,
+#     power_law_SIGW(frequency, [-7.1995, 2, -1.5, np.log10(0.5), -7.8]),
+#     color="indigo",
+#     alpha=0.8,
+# )
+# plt.fill_between(
+#     frequency, quant025pl, quant975pl, color="limegreen", alpha=0.4
+# )
+# plt.fill_between(
+#     frequency, quant16pl, quant84pl, color="forestgreen", alpha=0.4
+# )
+# plt.loglog(
+#     frequency, power_law(frequency, [-7.1995, 2]), color="darkgreen",
+# alpha=0.8
+# )
 # plt.xlabel(r"$f \mathrm{[Hz]}$")
 # plt.ylabel(r"$h^2 \Omega_{GW}$")
-# plt.ylim((1e-19,1e-5))
+# plt.ylim((1e-19, 1e-5))
 # plt.show()
 
 
-### Tanh test
+# --- Tanh test
 
 # def dtanh(index, frequency, parameters, pivot=ut.f_yr):
 #     """
@@ -293,7 +458,8 @@ if __name__ == "__main__":
 #     Parameters:
 #     -----------
 #     index : int
-#         Index of the parameter with respect to which the derivative is computed.
+#         Index of the parameter with respect to which the derivative is
+# computed.
 #     frequency : numpy.ndarray or jax.numpy.ndarray
 #         Array containing frequency bins.
 #     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -306,7 +472,7 @@ if __name__ == "__main__":
 #         respect to the specified parameter.
 #     """
 
-#     ### unpack parameters
+#     # --- unpack parameters
 #     log_amplitude, tilt = parameters
 
 #     model = tanh(frequency, parameters, pivot=ut.f_yr)
@@ -347,7 +513,8 @@ if __name__ == "__main__":
 #     Z.append(dtanh(1, frequency_point, [Tanh_log_amplitude, X[i]], ut.f_yr))
 #     Znum.append(grad(function_tanh, argnums=1)(Tanh_log_amplitude, X[i]))
 # plt.loglog(X, Y, label='$LogAmplitude - analytic$')
-# plt.loglog(X, Ynum, color='yellow', linestyle='dashed', label='$LogAmplitude - numeric$')
+# plt.loglog(X, Ynum, color='yellow', linestyle='dashed',
+# label='$LogAmplitude - numeric$')
 # plt.loglog(X, Z, label='$Tilt - analytic$')
 # plt.loglog(X,Znum, color='cyan', linestyle='dashed', label='$Tilt - numeric$')
 # plt.legend(loc='center left', bbox_to_anchor=(.05, .85), prop={'size': 10})

@@ -480,7 +480,8 @@ def tanh(frequency, parameters, pivot=ut.f_yr):
 #     Parameters:
 #     -----------
 #     index : int
-#         Index of the parameter with respect to which the derivative is computed.
+#         Index of the parameter with respect to which the derivative is
+# computed.
 #     frequency : numpy.ndarray or jax.numpy.ndarray
 #         Array containing frequency bins.
 #     parameters : numpy.ndarray or jax.numpy.ndarray
@@ -594,7 +595,8 @@ def SIGW(frequency, parameters):
 #     Parameters:
 #     -----------
 #     index : int
-#         Index of the parameter with respect to which the derivative is computed.
+#         Index of the parameter with respect to which the derivative is
+# computed.
 #     frequency : numpy.ndarray or jax.numpy.ndarray
 #         Array containing frequency bins.
 #     parameters : numpy.ndarray or jax.numpy.ndarray

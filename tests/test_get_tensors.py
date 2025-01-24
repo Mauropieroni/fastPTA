@@ -1,16 +1,8 @@
 # Global
-import sys
 import unittest
 
 import numpy as np
 import healpy as hp
-
-if sys.version_info.minor > 10:
-    from scipy.special import sph_harm_y
-else:
-    from scipy.special import sph_harm
-
-    sph_harm_y = lambda l, m, theta, phi: sph_harm(m, l, phi, theta)
 
 import jax
 import jax.numpy as jnp
@@ -36,7 +28,8 @@ def get_tensors_and_shapes(
     path_to_pulsar_catalog, n_pulsars, HD_basis, HD_order
 ):
     """
-    A utility function that returns the results of the get_tensors function and the expected shapes of the results.
+    A utility function that returns the results of the get_tensors function and
+    the expected shapes of the results.
 
     """
 
@@ -67,7 +60,8 @@ def get_tensors_data(
     path_to_pulsar_catalog, HD_basis, HD_order, data_path, anisotropies=False
 ):
     """
-    A utility function that returns the results of the get_tensors function and the expected results.
+    A utility function that returns the results of the get_tensors function and
+    the expected results.
 
     """
 
@@ -120,23 +114,38 @@ class TestGetTensors(unittest.TestCase):
 
     def test_spherical_harmonics_multipoles_2(self):
         """
-        Test the spherical harmonics projection function for pulsars pulsar matrix
+        Test the spherical harmonics projection function for pulsars pulsar
+        matrix
 
         """
 
-        Y00 = np.array([[sph_harm_y(0, 0, theta, phi).real]])
-        Y1m1 = np.array([[np.sqrt(2.0) * sph_harm_y(1, -1, theta, phi).imag]])
-        Y10 = np.array([[sph_harm_y(1, 0, theta, phi).real]])
-        Y1p1 = np.array([[-np.sqrt(2.0) * sph_harm_y(1, 1, theta, phi).real]])
+        Y00 = np.array([[ut.sph_harm_y(0, 0, theta, phi).real]])
+        Y1m1 = np.array(
+            [[np.sqrt(2.0) * ut.sph_harm_y(1, -1, theta, phi).imag]]
+        )
+        Y10 = np.array([[ut.sph_harm_y(1, 0, theta, phi).real]])
+        Y1p1 = np.array(
+            [[-np.sqrt(2.0) * ut.sph_harm_y(1, 1, theta, phi).real]]
+        )
 
-        Y2m2 = np.array([[np.sqrt(2.0) * sph_harm_y(2, -2, theta, phi).imag]])
-        Y2m1 = np.array([[np.sqrt(2.0) * sph_harm_y(2, -1, theta, phi).imag]])
-        Y20 = np.array([[sph_harm_y(2, 0, theta, phi).real]])
-        Y2p1 = np.array([[-np.sqrt(2.0) * sph_harm_y(2, 1, theta, phi).real]])
-        Y2p2 = np.array([[np.sqrt(2.0) * sph_harm_y(2, 2, theta, phi).real]])
+        Y2m2 = np.array(
+            [[np.sqrt(2.0) * ut.sph_harm_y(2, -2, theta, phi).imag]]
+        )
+        Y2m1 = np.array(
+            [[np.sqrt(2.0) * ut.sph_harm_y(2, -1, theta, phi).imag]]
+        )
+        Y20 = np.array([[ut.sph_harm_y(2, 0, theta, phi).real]])
+        Y2p1 = np.array(
+            [[-np.sqrt(2.0) * ut.sph_harm_y(2, 1, theta, phi).real]]
+        )
+        Y2p2 = np.array([[np.sqrt(2.0) * ut.sph_harm_y(2, 2, theta, phi).real]])
 
-        Y3m3 = np.array([[np.sqrt(2.0) * sph_harm_y(3, -3, theta, phi).imag]])
-        Y3p3 = np.array([[-np.sqrt(2.0) * sph_harm_y(3, 3, theta, phi).real]])
+        Y3m3 = np.array(
+            [[np.sqrt(2.0) * ut.sph_harm_y(3, -3, theta, phi).imag]]
+        )
+        Y3p3 = np.array(
+            [[-np.sqrt(2.0) * ut.sph_harm_y(3, 3, theta, phi).real]]
+        )
 
         res_Y00 = gt.projection_spherial_harmonics_basis(Y00, 1)
         res_Y1m1 = gt.projection_spherial_harmonics_basis(Y1m1, 1)
@@ -256,7 +265,8 @@ class TestGetTensors(unittest.TestCase):
 
     def test_Legendre_projection(self):
         """
-        Test the results of the Legendre projection of the get_tensors function (going to large HD_order the projection gives chi_IJ)
+        Test the results of the Legendre projection of the get_tensors function
+        (going to large HD_order the projection gives chi_IJ)
 
         """
 
@@ -326,7 +336,8 @@ class TestGetTensors(unittest.TestCase):
 
     def test_get_tensors_anisotropies(self):
         """
-        Test the results of the get_tensors function with anisotropies, check that the monopole is correct
+        Test the results of the get_tensors function with anisotropies, check
+        that the monopole is correct
 
         """
 

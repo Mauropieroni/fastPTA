@@ -15,6 +15,7 @@ class Priors(object):
         self,
         priors_dictionary,
         get_PBH_abundance=None,
+        check_PBH_abundance=True,
     ):
         """
         Initialize the class.
@@ -31,6 +32,7 @@ class Priors(object):
         self.parameter_names = list(priors_dictionary.keys())
         self.priors = self.set_priors(priors_dictionary)
         self.get_PBH_abundance = get_PBH_abundance
+        self.get_PBH_abundance = check_PBH_abundance
 
     def set_priors(self, priors_dictionary):
         """
@@ -52,6 +54,7 @@ class Priors(object):
             elif type(value) is function_type:
                 priors[key] = {
                     "pdf": value,
+                    "rvs": None,
                     "pdf_kwargs": {},
                 }
 
@@ -75,7 +78,7 @@ class Priors(object):
 
         log_prior = 0.0
 
-        if self.get_PBH_abundance is function_type:
+        if self.get_PBH_abundance is function_type and self.check_PBH_abundance:
             PBH_abundance = self.get_PBH_abundance(list(parameters.values()))
 
             if PBH_abundance > 1 or jnp.isnan(PBH_abundance):

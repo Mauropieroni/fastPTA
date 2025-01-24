@@ -1,12 +1,10 @@
 # Global
 import unittest
 
-import numpy as np
 import jax.numpy as jnp
 from scipy import stats
 
 # Local
-import utils as tu
 from fastPTA.priors import Priors
 
 
@@ -37,7 +35,8 @@ class TestSignals(unittest.TestCase):
 
         """
 
-        func = lambda x: x**2
+        def func(x):
+            return x**2
 
         my_dict = {
             "p1": {"uniform": {"loc": 5.0, "scale": 3.0}},

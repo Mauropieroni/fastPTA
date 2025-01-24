@@ -471,13 +471,16 @@ def run_MCMC(
     ndims = len(priors.parameter_names)
 
     # Generate the initial points if not provided
-    if not initial:
+    if not np.all(initial):
         nwalkers = max(2 * ndims, 5)
         initial = np.empty((nwalkers, ndims))
 
         for i in range(ndims):
             pp = priors.priors[priors.parameter_names[i]]
             initial[:, i] = pp["rvs"](**pp["pdf_kwargs"], size=nwalkers)
+
+    else:
+        nwalkers = initial.shape[0]
 
     # Args for the posterior
     args = [

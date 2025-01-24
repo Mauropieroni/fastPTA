@@ -2,7 +2,6 @@ import numpy as np
 
 import jax
 import jax.numpy as jnp
-import matplotlib.pyplot as plt
 from jax.scipy.interpolate import RegularGridInterpolator
 
 
@@ -31,6 +30,14 @@ g_data = np.loadtxt(ut.path_to_defaults + "gstar_T.txt")
 g_relativistic_dofs = g_data[:, [0, 1]] * jnp.array([1000, 1])
 g_entropy_dofs = g_data[:, [0, 3]] * jnp.array([1000, 1])
 
+
+# Import data
+tb_Kappa_v_T = np.loadtxt(ut.path_to_defaults + "Kappa_alpha3_fits.txt")
+tb_Gamma_v_T = np.loadtxt(ut.path_to_defaults + "gamma_alpha3_fits.txt")
+tb_Delta_cv_T = np.loadtxt(ut.path_to_defaults + "deltac_alpha3_fits.txt")
+tb_Phi_v_T = np.loadtxt(ut.path_to_defaults + "Phi_alpha3_fits.txt")
+
+
 # Define interpolators from the data
 relativistic_dofs = RegularGridInterpolator(
     [g_relativistic_dofs[:, 0]],
@@ -45,13 +52,6 @@ entropy_dofs = RegularGridInterpolator(
     bounds_error=False,
     fill_value=None,
 )
-
-# Import data
-tb_Kappa_v_T = np.loadtxt(ut.path_to_defaults + "Kappa_alpha3_fits.txt")
-tb_Gamma_v_T = np.loadtxt(ut.path_to_defaults + "gamma_alpha3_fits.txt")
-tb_Delta_cv_T = np.loadtxt(ut.path_to_defaults + "deltac_alpha3_fits.txt")
-tb_Phi_v_T = np.loadtxt(ut.path_to_defaults + "Phi_alpha3_fits.txt")
-
 
 # Interpolators from the data
 Kappa_QCD = RegularGridInterpolator(
@@ -81,6 +81,17 @@ Phi_QCD = RegularGridInterpolator(
     bounds_error=False,
     fill_value=None,
 )
+
+del (
+    g_data,
+    g_relativistic_dofs,
+    g_entropy_dofs,
+    tb_Kappa_v_T,
+    tb_Gamma_v_T,
+    tb_Delta_cv_T,
+    tb_Phi_v_T,
+)
+
 
 # @jax.jit
 # def Kappa_QCD(temperature):
@@ -147,7 +158,6 @@ Phi_QCD = RegularGridInterpolator(
 #         right=g_entropy_dofs[-1, 1],
 #     )
 
-del g_data, g_relativistic_dofs, g_entropy_dofs
 
 # Values at specific points
 relativistic_dofs_0 = relativistic_dofs(jnp.array([1e-9]))

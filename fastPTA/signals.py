@@ -160,11 +160,10 @@ def get_signal_model(signal_label):
 
     if signal_label == "flat":
 
-        dflat = (
-            lambda frequency, parameters, *args, **kwargs: s_ut.get_gradient(
+        def dflat(frequency, parameters, *args, **kwargs):
+            return s_ut.get_gradient(
                 1, s_ut.d1flat, frequency, parameters, *args, **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label,
@@ -176,11 +175,10 @@ def get_signal_model(signal_label):
 
     elif signal_label == "power_law":
 
-        dpower_law = (
-            lambda frequency, parameters, *args, **kwargs: s_ut.get_gradient(
+        def dpower_law(frequency, parameters, *args, **kwargs):
+            return s_ut.get_gradient(
                 2, s_ut.d1power_law, frequency, parameters, *args, **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label,
@@ -192,9 +190,10 @@ def get_signal_model(signal_label):
 
     elif signal_label == "lognormal":
 
-        dlognormal = lambda frequency, parameters, **kwargs: s_ut.get_gradient(
-            3, s_ut.d1lognormal, frequency, parameters, **kwargs
-        )
+        def dlognormal(frequency, parameters, **kwargs):
+            return s_ut.get_gradient(
+                3, s_ut.d1lognormal, frequency, parameters, **kwargs
+            )
 
         signal_model = Signal_model(
             signal_label, s_ut.lognormal, dtemplate=dlognormal
@@ -202,11 +201,10 @@ def get_signal_model(signal_label):
 
     elif signal_label == "power_law_flat":
 
-        dSMBH_and_flat = (
-            lambda frequency, parameters, **kwargs: s_ut.get_gradient(
+        def dSMBH_and_flat(frequency, parameters, **kwargs):
+            return s_ut.get_gradient(
                 3, s_ut.d1SMBH_and_flat, frequency, parameters, **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label, s_ut.SMBH_and_flat, dtemplate=dSMBH_and_flat
@@ -214,11 +212,10 @@ def get_signal_model(signal_label):
 
     elif signal_label == "power_law_lognormal":
 
-        dSMBH_and_lognormal = (
-            lambda frequency, parameters, **kwargs: s_ut.get_gradient(
+        def dSMBH_and_lognormal(frequency, parameters, **kwargs):
+            return s_ut.get_gradient(
                 5, s_ut.d1SMBH_and_lognormal, frequency, parameters, **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label,
@@ -228,11 +225,10 @@ def get_signal_model(signal_label):
 
     elif signal_label == "bpl":
 
-        dbroken_power_law = (
-            lambda frequency, parameters, **kwargs: s_ut.get_gradient(
+        def dbroken_power_law(frequency, parameters, **kwargs):
+            return s_ut.get_gradient(
                 4, s_ut.d1broken_power_law, frequency, parameters, **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label,
@@ -242,15 +238,14 @@ def get_signal_model(signal_label):
 
     elif signal_label == "power_law_broken_power_law":
 
-        dSMBH_and_broken_power_law = (
-            lambda frequency, parameters, **kwargs: s_ut.get_gradient(
+        def dSMBH_and_broken_power_law(frequency, parameters, **kwargs):
+            return s_ut.get_gradient(
                 6,
                 s_ut.d1SMBH_and_broken_power_law,
                 frequency,
                 parameters,
                 **kwargs
             )
-        )
 
         signal_model = Signal_model(
             signal_label,
@@ -277,11 +272,14 @@ def get_signal_model(signal_label):
             ],
         )
 
-        signal_model.get_PBH_abundance = lambda parameters: f_PBH_NL_QCD(
-            10 ** parameters[0],
-            10 ** parameters[1],
-            10 ** parameters[2] * 2.0 * jnp.pi / (9.7156e-15),
-        )
+        def f_PBH_wrapper(parameters):
+            return f_PBH_NL_QCD(
+                10 ** parameters[0],
+                10 ** parameters[1],
+                10 ** parameters[2] * 2.0 * jnp.pi / (9.7156e-15),
+            )
+
+        signal_model.get_PBH_abundance = f_PBH_wrapper
 
     elif signal_label == "power_law_SIGW":
         signal_model = Signal_model(
@@ -303,11 +301,14 @@ def get_signal_model(signal_label):
             ],
         )
 
-        signal_model.get_PBH_abundance = lambda parameters: f_PBH_NL_QCD(
-            10 ** parameters[2],
-            10 ** parameters[3],
-            10 ** parameters[4] * 2.0 * jnp.pi / (9.7156e-15),
-        )
+        def f_PBH_wrapper(parameters):
+            return f_PBH_NL_QCD(
+                10 ** parameters[2],
+                10 ** parameters[3],
+                10 ** parameters[4] * 2.0 * jnp.pi / (9.7156e-15),
+            )
+
+        signal_model.get_PBH_abundance = f_PBH_wrapper
 
     else:
         raise ValueError("Cannot use", signal_label)
