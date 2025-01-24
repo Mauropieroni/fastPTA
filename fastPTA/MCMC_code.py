@@ -365,7 +365,7 @@ def run_MCMC(
     n_frequencies=30,
     signal_model=power_law_model,
     signal_parameters=SMBBH_parameters,
-    initial=[],
+    initial=jnp.array([False]),
     regenerate_MCMC_data=False,
     realization=True,
     save_MCMC_data=True,
@@ -480,7 +480,7 @@ def run_MCMC(
             initial[:, i] = pp["rvs"](**pp["pdf_kwargs"], size=nwalkers)
 
     else:
-        nwalkers = initial.shape[0]
+        nwalkers = len(initial)
 
     # Args for the posterior
     args = [
