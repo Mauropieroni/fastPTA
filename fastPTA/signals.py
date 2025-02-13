@@ -44,7 +44,7 @@ Tanh_tilt = 8.0
 CGW_Tanh_parameters = jnp.array([Tanh_log_amplitude, Tanh_tilt])
 
 # Some values for a SIGW spectrum
-SIGW_log_amplitude = -2
+SIGW_log_amplitude = -5
 SIGW_log_width = np.log10(0.5)
 SIGW_log_pivot = -8.45
 CGW_SIGW_parameters = jnp.array(
@@ -860,6 +860,105 @@ def dSIGW(index, frequency, parameters):
 
     return dlog_model
 
+def SIGW_Delta(frequency, parameters):
+    """
+    Generate a spectrum for SIGW.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the lognormal spectrum.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed lognormal spectrum.
+    """
+
+    # unpack parameters
+    log_amplitude, log_pivot = parameters
+
+    x = frequency / (10**log_pivot)
+    width = 0.5
+    k = x * jnp.exp((3 / 2) * width**2)
+
+    return (
+        cg(frequency)
+        * (10**log_amplitude) ** 2
+        * (
+            (
+                (4 / (5 * jnp.sqrt(np.pi)))
+                * x**3
+                * (1 / width)
+                * jnp.exp((9 * width**2) / 4)
+            )
+            * (
+                (jnp.log(k) ** 2 + (1 / 2) * width**2)
+                * jax.scipy.special.erfc(
+                    (1 / width) * (jnp.log(k) + (1 / 2) * jnp.log(3 / 2))
+                )
+                - (width / (jnp.sqrt(np.pi)))
+                * jnp.exp(
+                    -((jnp.log(k) + (1 / 2) * jnp.log(3 / 2)) ** 2) / (width**2)
+                )
+                * (jnp.log(k) - (1 / 2) * jnp.log(3 / 2))
+            )
+            + (0.0659 / (width**2))
+            * x**2
+            * jnp.exp(width**2)
+            * jnp.exp(
+                -((jnp.log(x) + width**2 - (1 / 2) * jnp.log(4 / 3)) ** 2)
+                / (width**2)
+            )
+            + (1 / 3)
+            * jnp.sqrt(2 / np.pi)
+            * x ** (-4)
+            * (1 / width)
+            * jnp.exp(8 * width**2)
+            * jnp.exp(-(jnp.log(x) ** 2) / (2 * width**2))
+            * jax.scipy.special.erfc(
+                (4 * width**2 - jnp.log(x / 4)) / (jnp.sqrt(2) * width)
+            )
+        )
+    )
+
+def dSIGW_Delta(index, frequency, parameters):
+    """
+    Derivative of the tanh spectrum.
+
+    Parameters:
+    -----------
+    index : int
+        Index of the parameter with respect to which the derivative is computed.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the tanh spectrum.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the tanh spectrum with
+        respect to the specified parameter.
+    """
+
+    # unpack parameters
+    log_amplitude, log_pivot = parameters
+
+    def function_SIGW_Delta(log_amplitude, log_pivot):
+        return SIGW_Delta(frequency, (log_amplitude, log_pivot))
+
+    if index < 3:
+        dlog_model = jacfwd(function_SIGW_Delta, argnums=index)(
+            log_amplitude, log_pivot
+        )
+
+    else:
+        raise ValueError("Cannot use that for this signal")
+
+    return dlog_model
 
 def power_law_SIGW(frequency, parameters):
     """
@@ -913,50 +1012,53 @@ def dpower_law_SIGW(index, frequency, parameters):
 # Check analytical and numerical derivative
 # Already done for the two separate functions
 
-# filedata = np.load('MCMC_data_pl_SIGW_SKA200.npz')
-# filechains = np.load('MCMC_chains_pl_SIGW_SKA200.npz')
-# frequency = np.logspace(-9, -7, num = 200)
-# print(len(frequency))
+def power_law_SIGW_Delta(frequency, parameters):
+    """
+    Generate a spectrum combining the SIGW and flat models.
 
-# dataplSIGW = np.zeros(shape=(200, 5000))
-# datapl = np.zeros(shape=(200, 5000))
-# dataSIGW = np.zeros(shape=(200, 5000))
-# for j in range(5000):
-#     y = random.randint(0, len(filechains['samples'])-1)
-#     dataplSIGW[:,j] = power_law_SIGW(frequency, filechains['samples'][y][:])
-#     datapl[:,j] = power_law(frequency, filechains['samples'][y][:2])
-#     dataSIGW[:,j] = SIGW(frequency, filechains['samples'][y][2:])
-# quant025plSIGW = np.quantile(dataplSIGW, 0.025, axis=1)
-# quant16plSIGW = np.quantile(dataplSIGW, 0.16, axis=1)
-# quant84plSIGW = np.quantile(dataplSIGW, 0.84, axis=1)
-# quant975plSIGW = np.quantile(dataplSIGW, 0.975, axis=1)
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH and lognormal spectra.
 
-# quant025pl = np.quantile(datapl, 0.025, axis=1)
-# quant16pl = np.quantile(datapl, 0.16, axis=1)
-# quant84pl = np.quantile(datapl, 0.84, axis=1)
-# quant975pl = np.quantile(datapl, 0.975, axis=1)
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed SMBH and lognormal spectra.
+    """
 
-# quant025SIGW = np.quantile(dataSIGW, 0.025, axis=1)
-# quant16SIGW = np.quantile(dataSIGW, 0.16, axis=1)
-# quant84SIGW = np.quantile(dataSIGW, 0.84, axis=1)
-# quant975SIGW = np.quantile(dataSIGW, 0.975, axis=1)
-# plt.rcParams["text.usetex"] = True
-# plt.rcParams["font.family"] = "serif"
-# plt.rcParams["font.size"] = "18"
-# plt.fill_between(frequency, quant025SIGW, quant975SIGW, color="orange", alpha=0.4)
-# plt.fill_between(frequency, quant16SIGW, quant84SIGW, color="darkorange", alpha=0.4)
-# plt.loglog(frequency, SIGW(frequency, [-1.5, np.log10(0.5), -7.8]), color = 'chocolate',  alpha=0.8)
-# plt.fill_between(frequency, quant025plSIGW, quant975plSIGW, color="mediumpurple", alpha=0.7)
-# plt.fill_between(frequency, quant16plSIGW, quant84plSIGW, color="rebeccapurple", alpha=0.7)
-# plt.loglog(frequency, power_law_SIGW(frequency, [-7.1995, 2, -1.5, np.log10(0.5), -7.8]), color = 'indigo', alpha=0.8)
-# plt.fill_between(frequency, quant025pl, quant975pl, color="limegreen", alpha=0.4)
-# plt.fill_between(frequency, quant16pl, quant84pl, color="forestgreen", alpha=0.4)
-# plt.loglog(frequency, power_law(frequency, [-7.1995, 2]), color = 'darkgreen',  alpha=0.8)
-# plt.xlabel(r"$f \mathrm{[Hz]}$")
-# plt.ylabel(r"$h^2 \Omega_{GW}$")
-# plt.ylim((1e-19,1e-5))
-# plt.show()
+    return power_law(frequency, parameters[:2]) + SIGW_Delta(
+        frequency, parameters[2:]
+    )
 
+
+def dpower_law_SIGW_Delta(index, frequency, parameters):
+    """
+    Derivative of the SIGW + flat spectrum.
+
+    Parameters:
+    -----------
+    index : int
+        Index of the parameter to differentiate.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH + flat spectra.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the SMBH + flat
+        spectra with respect to the specified parameter.
+    """
+
+    if index < 2:
+        return dpower_law(index, frequency, parameters[:2])
+
+    else:
+        return dSIGW_Delta(index - 2, frequency, parameters[2:])
 
 def get_model(signal_label):
     """
@@ -1041,6 +1143,12 @@ def get_model(signal_label):
         signal = {
             "signal_model": power_law_SIGW,
             "dsignal_model": dpower_law_SIGW,
+        }
+
+    elif signal_label == "power_law_SIGW_Delta":
+        signal = {
+            "signal_model": power_law_SIGW_Delta,
+            "dsignal_model": dpower_law_SIGW_Delta,
         }
 
     else:
