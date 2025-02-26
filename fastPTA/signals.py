@@ -2,6 +2,7 @@
 import jax
 from jax import jacfwd
 import jax.numpy as jnp
+from numpy import s_
 
 # Local
 from fastPTA.utils import which_device
@@ -23,16 +24,16 @@ SMBBH_tilt = 2
 # Current SMBBH SGWB parameters
 SMBBH_parameters = jnp.array([SMBBH_log_amplitude, SMBBH_tilt])
 
-# A value for a flat spectrum
+# A value for a flat model
 CGW_flat_parameters = jnp.array([-7.0])
 
-# Some values for a LN spectrum
+# Some values for a LN model
 LN_log_amplitude = -6.45167492
 LN_log_width = -0.91240383
 LN_log_pivot = -7.50455732
 CGW_LN_parameters = jnp.array([LN_log_amplitude, LN_log_width, LN_log_pivot])
 
-# Some values for a BPL spectrum
+# Some values for a BPL model
 BPL_log_amplitude = -5.8
 BPL_log_width = -8.0
 BPL_tilt_1 = 3
@@ -41,13 +42,13 @@ CGW_BPL_parameters = jnp.array(
     [BPL_log_amplitude, BPL_log_width, BPL_tilt_1, BPL_tilt_2]
 )
 
-# Some values for a Tanh spectrum
+# Some values for a Tanh model
 Tanh_log_amplitude = -8.0
 Tanh_tilt = 8.0
 CGW_Tanh_parameters = jnp.array([Tanh_log_amplitude, Tanh_tilt])
 
-# Some values for a SIGW spectrum
-SIGW_log_amplitude = -2
+# Some values for a SIGW model
+SIGW_log_amplitude = -5
 SIGW_log_width = jnp.log10(0.5)
 SIGW_log_pivot = -8.45
 CGW_SIGW_parameters = jnp.array(
@@ -101,57 +102,74 @@ class Signal_model(object):
         self.d1 = self.dtemplate_forward if dtemplate is None else dtemplate
         self.d2 = self.d2template_forward if d2template is None else d2template
 
+    def dtemplate_forward(self, frequency, parameters, *args, **kwargs):
+        """
+        Compute the derivative of the signal model using automatic
+        differentiation.
+
+        Parameters:
+        -----------
+        frequency : numpy.ndarray or jax.numpy.ndarray
+            Array containing frequency bins.
+        parameters : numpy.ndarray or jax.numpy.ndarray
+            Array containing parameters for the signal model.
+        args : tuple
+            Additional arguments to pass to the signal model.
+        kwargs : dict
+            Additional keyword arguments to pass to the signal model.
+
+        Returns:
+        --------
+        numpy.ndarray or jax.numpy.ndarray
+            Array containing the derivatives of the signal model.
+            The shape of the output will be frequency, number of parameters.
+
+        """
+        return jacfwd(self.template, argnums=1)(
+            frequency, parameters, *args, **kwargs
+        )
+
+    def d2template_forward(self, frequency, parameters, *args, **kwargs):
+        """
+        Compute the second derivative of the signal model using automatic
+        differentiation.
+
+        Parameters:
+        -----------
+        frequency : numpy.ndarray or jax.numpy.ndarray
+            Array containing frequency bins.
+        parameters : numpy.ndarray or jax.numpy.ndarray
+            Array containing parameters for the signal model.
+        args : tuple
+            Additional arguments to pass to the signal model.
+        kwargs : dict
+            Additional keyword arguments to pass to the signal model.
+
+        Returns:
+        --------
+        numpy.ndarray or jax.numpy.ndarray
+            Array containing the second derivatives of the signal model.
+            The shape of the output will be frequency, number of parameters.
+
+        """
+
+        return jacfwd(self.d1, argnums=1)(
+            frequency, parameters, *args, **kwargs
+        )
+
     @property
     def Nparams(self):
         """
         Number of parameters for the signal model.
 
+
+        Returns:
+        --------
+        int
+            Number of parameters for the signal model.
         """
+
         return len(self.parameter_names.keys())
-
-    def dtemplate_forward(self, frequency, parameters, **kwargs):
-        """
-        Compute the derivative of the signal model using auto diff.
-
-        Parameters:
-        -----------
-        frequency : numpy.ndarray or jax.numpy.ndarray
-            Array containing frequency bins.
-        parameters : numpy.ndarray or jax.numpy.ndarray
-            Array containing parameters for the signal model.
-        kwargs : dict
-            Additional keyword arguments to pass to the signal model.
-
-        Returns:
-        --------
-        numpy.ndarray or jax.numpy.ndarray
-            Array containing the derivative of the signal model with
-            respect to the specified parameter.
-        """
-
-        return jacfwd(self.template, argnums=1)(frequency, parameters, **kwargs)
-
-    def d2template_forward(self, frequency, parameters, **kwargs):
-        """
-        Compute the derivative of the signal model using auto diff.
-
-        Parameters:
-        -----------
-        frequency : numpy.ndarray or jax.numpy.ndarray
-            Array containing frequency bins.
-        parameters : numpy.ndarray or jax.numpy.ndarray
-            Array containing parameters for the signal model.
-        kwargs : dict
-            Additional keyword arguments to pass to the signal model.
-
-        Returns:
-        --------
-        numpy.ndarray or jax.numpy.ndarray
-            Array containing the derivative of the signal model with
-            respect to the specified parameter.
-        """
-
-        return jacfwd(self.d1, argnums=1)(frequency, parameters, **kwargs)
 
 
 def get_signal_model(signal_label):
@@ -180,11 +198,11 @@ def get_signal_model(signal_label):
         - "bpl":
             Broken power law signal model.
         - "power_law_flat":
-            Signal model combining SMBH and flat spectrum.
+            Signal model combining SMBH and flat model.
         - "power_law_lognormal":
-            Signal model combining SMBH and log-normal spectrum.
+            Signal model combining SMBH and log-normal model.
         - "power_law_broken_power_law":
-            Signal model combining SMBH and broken power law spectrum.
+            Signal model combining SMBH and broken power law model.
         - "SIGW":
             Signal model for scalar induce GW
         - "power_law_SIGW";
@@ -194,26 +212,26 @@ def get_signal_model(signal_label):
 
     if signal_label == "flat":
 
-        # wrapper for the analytic derivatives of the flat spectrum
+        # wrapper for the analytic derivatives of the flat model
         def dflat(frequency, parameters, *args, **kwargs):
             """
-            Function to compute the derivatives of the flat spectrum.
+            Function to compute the derivatives of the flat model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the flat spectrum.
+                Array containing parameters for the flat model.
             args : tuple
-                Additional arguments to pass to the flat spectrum.
+                Additional arguments to pass to the flat model.
             kwargs : dict
-                Additional keyword arguments to pass to the flat spectrum.
+                Additional keyword arguments to pass to the flat model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
-                Array containing the derivatives of the flat spectrum.
+                Array containing the derivatives of the flat model.
                 The shape of the output will be frequency, number of parameters.
 
             """
@@ -221,37 +239,66 @@ def get_signal_model(signal_label):
                 1, s_ut.d1flat, frequency, parameters, *args, **kwargs
             )
 
-        # Initialize the signal model
-        signal_model = Signal_model(
-            signal_label,
-            s_ut.flat,
-            dtemplate=dflat,
-            parameter_names=["log_amplitude"],
-            parameter_labels=[r"$\alpha$"],
-        )
-
-    elif signal_label == "power_law":
-
-        # wrapper for the analytic derivatives of the power law spectrum
-        def dpower_law(frequency, parameters, *args, **kwargs):
+        # wrapper for the second derivative of the flat model
+        def d2flat(frequency, parameters, *args, **kwargs):
             """
-            Function to compute the derivatives of the power law spectrum.
+            Function to compute the second derivatives of the flat model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the power law spectrum.
+                Array containing parameters for the flat model.
             args : tuple
-                Additional arguments to pass to the power law spectrum.
+                Additional arguments to pass to the flat
+                model.
             kwargs : dict
-                Additional keyword arguments to pass to the power law spectrum.
+                Additional keyword arguments to pass to the flat
+                model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
-                Array containing the derivatives of the power law spectrum.
+                Array containing the second derivatives of the flat model.
+                The shape of the output will be frequency, npars, npars.
+            """
+            return s_ut.get_hessian(
+                1, s_ut.d2flat, frequency, parameters, *args, **kwargs
+            )
+
+        # Initialize the signal model
+        signal_model = Signal_model(
+            signal_label,
+            s_ut.flat,
+            dtemplate=dflat,
+            d2template=d2flat,
+            parameter_names=["log_amplitude"],
+            parameter_labels=[r"$\alpha$"],
+        )
+
+    elif signal_label == "power_law":
+
+        # wrapper for the analytic derivatives of the power law model
+        def dpower_law(frequency, parameters, *args, **kwargs):
+            """
+            Function to compute the first derivatives of the power law model.
+
+            Parameters:
+            -----------
+            frequency : numpy.ndarray or jax.numpy.ndarray
+                Array containing frequency bins.
+            parameters : numpy.ndarray or jax.numpy.ndarray
+                Array containing parameters for the power law model.
+            args : tuple
+                Additional arguments to pass to the power law model.
+            kwargs : dict
+                Additional keyword arguments to pass to the power law model.
+
+            Returns:
+            --------
+            numpy.ndarray or jax.numpy.ndarray
+                Array containing the derivatives of the power law model.
                 The shape of the output will be frequency, number of parameters.
 
             """
@@ -259,35 +306,63 @@ def get_signal_model(signal_label):
                 2, s_ut.d1power_law, frequency, parameters, *args, **kwargs
             )
 
-        # Initialize the signal model
-        signal_model = Signal_model(
-            signal_label,
-            s_ut.power_law,
-            dtemplate=dpower_law,
-            parameter_names=["log_amplitude", "tilt"],
-            parameter_labels=[r"$\alpha_{\rm PL}$", r"$n_{\rm T}$"],
-        )
-
-    elif signal_label == "lognormal":
-
-        # wrapper for the analytic derivatives of the log-normal spectrum
-        def dlognormal(frequency, parameters, **kwargs):
+        # wrapper for the analytic derivatives of the power law model
+        def d2power_law(frequency, parameters, *args, **kwargs):
             """
-            Function to compute the derivatives of the log-normal spectrum.
+            Function to compute the second derivatives of the power law model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the log-normal spectrum.
+                Array containing parameters for the power law model.
+            args : tuple
+                Additional arguments to pass to the power law model.
             kwargs : dict
-                Additional keyword arguments to pass to the log-normal spectrum.
+                Additional keyword arguments to pass to the power law model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
-                Array containing the derivatives of the log-normal spectrum.
+                Array containing the second derivatives of the power law model.
+                The shape of the output will be frequency, npars, npars.
+
+            """
+            return s_ut.get_hessian(
+                2, s_ut.d2power_law, frequency, parameters, *args, **kwargs
+            )
+
+        # Initialize the signal model
+        signal_model = Signal_model(
+            signal_label,
+            s_ut.power_law,
+            dtemplate=dpower_law,
+            d2template=d2power_law,
+            parameter_names=["log_amplitude", "tilt"],
+            parameter_labels=[r"$\alpha_{\rm PL}$", r"$n_{\rm T}$"],
+        )
+
+    elif signal_label == "lognormal":
+
+        # wrapper for the analytic derivatives of the log-normal model
+        def dlognormal(frequency, parameters, **kwargs):
+            """
+            Function to compute the derivatives of the log-normal model.
+
+            Parameters:
+            -----------
+            frequency : numpy.ndarray or jax.numpy.ndarray
+                Array containing frequency bins.
+            parameters : numpy.ndarray or jax.numpy.ndarray
+                Array containing parameters for the log-normal model.
+            kwargs : dict
+                Additional keyword arguments to pass to the log-normal model.
+
+            Returns:
+            --------
+            numpy.ndarray or jax.numpy.ndarray
+                Array containing the derivatives of the log-normal model.
                 The shape of the output will be frequency, number of parameters.
             """
 
@@ -302,27 +377,27 @@ def get_signal_model(signal_label):
 
     elif signal_label == "bpl":
 
-        # wrapper for the analytic derivatives of the broken power law spectrum
+        # wrapper for the analytic derivatives of the broken power law model
         def dbroken_power_law(frequency, parameters, **kwargs):
             """
             Function to compute the derivatives of the broken power law
-            spectrum.
+            model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the broken power law spectrum.
+                Array containing parameters for the broken power law model.
             kwargs : dict
                 Additional keyword arguments to pass to the broken power law
-                spectrum.
+                model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
                 Array containing the derivatives of the broken power law
-                spectrum.
+                model.
                 The shape of the output will be frequency, number of parameters.
             """
 
@@ -340,26 +415,26 @@ def get_signal_model(signal_label):
     elif signal_label == "power_law_flat":
 
         # wrapper for the analytic derivatives of the sum of a SMBH and flat
-        # spectrum
+        # model
         def dSMBH_and_flat(frequency, parameters, **kwargs):
             """
             Function to compute the derivatives of the sum of a SMBH and flat
-            spectrum.
+            model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the SMBH + flat spectrum.
+                Array containing parameters for the SMBH + flat model.
             kwargs : dict
                 Additional keyword arguments to pass to the SMBH + flat
-                spectrum.
+                model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
-                Array containing the derivatives of the SMBH + flat spectrum.
+                Array containing the derivatives of the SMBH + flat model.
                 The shape of the output will be frequency, number of parameters.
             """
             return s_ut.get_gradient(
@@ -374,27 +449,27 @@ def get_signal_model(signal_label):
     elif signal_label == "power_law_lognormal":
 
         # wrapper for the analytic derivatives of the sum of a SMBH and
-        # lognormal spectrum
+        # lognormal model
         def dSMBH_and_lognormal(frequency, parameters, **kwargs):
             """
             Function to compute the derivatives of the sum of a SMBH and
-            lognormal spectrum.
+            lognormal model.
 
             Parameters:
             -----------
             frequency : numpy.ndarray or jax.numpy.ndarray
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing parameters for the SMBH + lognormal spectrum.
+                Array containing parameters for the SMBH + lognormal model.
             kwargs : dict
                 Additional keyword arguments to pass to the SMBH
-                + lognormal spectrum.
+                + lognormal model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
                 Array containing the derivatives of the SMBH + lognormal
-                spectrum.
+                model.
                 The shape of the output will be frequency, number of parameters.
             """
             return s_ut.get_gradient(
@@ -411,11 +486,11 @@ def get_signal_model(signal_label):
     elif signal_label == "power_law_broken_power_law":
 
         # wrapper for the analytic derivatives of the sum of a SMBH and broken
-        # power law spectrum
+        # power law model
         def dSMBH_and_broken_power_law(frequency, parameters, **kwargs):
             """
             Function to compute the derivatives of the sum of a SMBH and
-            broken power law spectrum.
+            broken power law model.
 
             Parameters:
             -----------
@@ -423,16 +498,16 @@ def get_signal_model(signal_label):
                 Array containing frequency bins.
             parameters : numpy.ndarray or jax.numpy.ndarray
                 Array containing parameters for the SMBH + broken power law
-                spectrum.
+                model.
             kwargs : dict
                 Additional keyword arguments to pass to the SMBH + broken power
-                law spectrum.
+                law model.
 
             Returns:
             --------
             numpy.ndarray or jax.numpy.ndarray
                 Array containing the derivatives of the SMBH + broken power law
-                spectrum.
+                model.
                 The shape of the output will be frequency, number of parameters.
             """
             return s_ut.get_gradient(
@@ -452,7 +527,7 @@ def get_signal_model(signal_label):
 
     elif signal_label == "SIGW":
 
-        # wrapper for the analytic derivatives of the SIGW spectrum
+        # wrapper for the analytic derivatives of the SIGW model
         signal_model = Signal_model(
             signal_label,
             s_ut.SIGW_broad_approximated,
@@ -476,7 +551,7 @@ def get_signal_model(signal_label):
             Parameters:
             -----------
             parameters : numpy.ndarray or jax.numpy.ndarray
-                Array containing the parameters for the SIGW spectrum.
+                Array containing the parameters for the SIGW model.
 
             Returns:
             --------
@@ -495,7 +570,7 @@ def get_signal_model(signal_label):
     elif signal_label == "power_law_SIGW":
 
         # wrapper for the analytic derivatives of the sum of a power law and
-        # SIGW spectrum
+        # SIGW model
         signal_model = Signal_model(
             signal_label,
             s_ut.power_law_SIGW_broad_approximated,
@@ -524,7 +599,7 @@ def get_signal_model(signal_label):
             -----------
             parameters : numpy.ndarray or jax.numpy.ndarray
                 Array containing the parameters for the power law + SIGW
-                spectrum.
+                model.
 
             Returns:
             --------

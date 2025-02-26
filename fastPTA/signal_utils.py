@@ -51,25 +51,70 @@ def SIGWB_prefactor(frequency):
 
 def get_gradient(npars, function, frequency, parameters, *args, **kwargs):
     """
-    Derivative of the power law spectrum.
+    Get the vector of first derivatives of some signal model.
 
     Parameters:
     -----------
+    npars : int
+        Number of parameters in the signal model.
+    function : callable
+        Function to compute the first derivative of the signal model.
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the power law spectrum.
+        Array containing parameters for the signal model.
+    args : tuple
+        Additional arguments to pass to the function.
+    kwargs : dictionary
+        Additional keyword arguments to pass to the function.
 
     Returns:
     --------
     numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed derivative of the power law spectrum.
+        Array containing the computed derivatives of the signal model.
         The shape of the array is (len(frequency), npars).
     """
 
     return jnp.array(
         [
             function(i, frequency, parameters, *args, **kwargs)
+            for i in range(npars)
+        ]
+    ).T
+
+
+def get_hessian(npars, function, frequency, parameters, *args, **kwargs):
+    """
+    Second derivative derivatives of some signal model.
+
+    Parameters:
+    -----------
+    npars : int
+        Number of parameters in the signal model.
+    function : callable
+        Function to compute the second derivative of the signal model.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the signal model.
+    args : tuple
+        Additional arguments to pass to the function.
+    kwargs : dictionary
+        Additional keyword arguments to pass to the function.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the second derivative of the spectrum.
+        The shape of the array is (len(frequency), npars, npars).
+    """
+
+    return jnp.array(
+        [
+            [
+                function(i, j, frequency, parameters, *args, **kwargs)
+                for j in range(npars)
+            ]
             for i in range(npars)
         ]
     ).T
@@ -134,6 +179,46 @@ def d1flat(index, frequency, parameters):
 
     # return the derivative multiplying the log derivative by the model
     return model * dlog_model
+
+
+def d2flat(index_1, index_2, frequency, parameters):
+    """
+    Second derivative of the flat spectrum.
+
+    The only parameter of this template is the log of the amplitude. If index
+    is > 0 it will raise an error.
+
+    Parameters:
+    -----------
+    index_1 : int
+        First index of the parameter to differentiate.
+    index_2 : int
+        Second index of the parameter to differentiate.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the flat spectrum.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the flat spectrum with
+            respect to the specified parameter.
+    """
+
+    # compute the model
+    model = flat(frequency, parameters)
+
+    if index_1 == index_2 == 0:
+        # second derivative of the log model w.r.t the log amplitude
+        d2log_model = jnp.log(10) ** 2
+
+    else:
+        # raise an error if the index is not valid
+        raise ValueError("Cannot use that for this signal")
+
+    # return the second derivative multiplying the log derivative by the model
+    return model * d2log_model
 
 
 def power_law(frequency, parameters, pivot=ut.f_yr):
@@ -203,6 +288,54 @@ def d1power_law(index, frequency, parameters, pivot=ut.f_yr):
 
     # return the derivative multiplying the log derivative by the model
     return model * dlog_model
+
+
+def d2power_law(index_1, index_2, frequency, parameters, pivot=ut.f_yr):
+    """
+    Second derivative of the power law spectrum.
+
+    The parameters of this template are the log of the amplitude and the tilt
+    of the power law. If index_1 or index_2 is > 1 it will raise an error.
+
+    Parameters:
+    -----------
+    index_1 : int
+        First index of the parameter to differentiate.
+    index_2 : int
+        Second index of the parameter to differentiate.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the power law spectrum.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the second derivative of the power law spectrum with
+        respect to the specified parameters.
+    """
+
+    # compute the model
+    model = power_law(frequency, parameters, pivot=pivot)
+
+    if index_1 == index_2 == 0:
+        # second derivative of the log of the model w.r.t the log amplitude
+        d2log_model = jnp.log(10) ** 2
+
+    elif index_1 == index_2 == 1:
+        # second derivative of the log of the model w.r.t the tilt
+        d2log_model = jnp.log(frequency / pivot) ** 2
+
+    elif index_1 + index_2 == 1:
+        # mixed second derivative
+        d2log_model = jnp.log(10) * jnp.log(frequency / pivot)
+
+    else:
+        # raise an error if the index is not valid
+        raise ValueError("Cannot use that for this signal")
+
+    # return the derivative multiplying the log derivative by the model
+    return model * d2log_model
 
 
 def lognormal(frequency, parameters):
