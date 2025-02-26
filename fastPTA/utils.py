@@ -1,5 +1,6 @@
 # Global
 import os
+import sys
 import yaml
 import numpy as np
 import healpy as hp
@@ -8,25 +9,36 @@ from wigners import clebsch_gordan
 
 import jax
 import jax.numpy as jnp
-from scipy.special import sph_harm
 
+if sys.version_info.minor > 10:
+    from scipy.special import sph_harm_y
+else:
+    from scipy.special import sph_harm
 
-jax.config.update("jax_enable_x64", True)
+    def sph_harm_y(ell, m, theta, phi):
+        return sph_harm(m, ell, phi, theta)
 
 
 # If you want to use your GPU change here
 which_device = "cpu"
 jax.config.update("jax_default_device", jax.devices(which_device)[0])
 
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
+
 
 # H0/h = 100 km/s/Mpc expressed in meters
 Hubble_over_h = 3.24e-18
+
 # Hour
 hour = 3600
+
 # Day
 day = 24 * hour
+
 # Year in seconds
 yr = 365.25 * day
+
 # Frequency associated with 1yr
 f_yr = 1 / yr
 
@@ -116,10 +128,8 @@ def hc_from_CP(CP, frequency, T_obs_s):
     -----------
     CP : numpy.ndarray or jax.numpy.ndarray
         Amplitude of the Common Process (in seconds^3)
-
     frequency : numpy.ndarray or jax.numpy.ndarray
         Frequency (in Hz) at which the characteristic strain is measured.
-
     T_obs_s : float
         Observation time (in seconds)
 
@@ -436,7 +446,8 @@ def real_to_complex_conversion(real_spherical_harmonics):
     ordered_real_spherical_harmonics = np.zeros_like(real_spherical_harmonics)
     ordered_real_spherical_harmonics[sort_indexes] = real_spherical_harmonics
 
-    # Split the ordered real coefficients into negative, zero, and positive m values
+    # Split the ordered real coefficients into negative, zero, and positive
+    # m values
     zero_m = ordered_real_spherical_harmonics[mm == 0]
     positive_m = ordered_real_spherical_harmonics[mm > 0]
     negative_m = ordered_real_spherical_harmonics[mm < 0]
@@ -489,8 +500,8 @@ def get_real_spherical_harmonics(l_max, theta, phi):
     m_grid = inds[1]
 
     # Compute all the spherical harmonics
-    spherical_harmonics = sph_harm(
-        m_grid[:, None], l_grid[:, None], phi[None, :], theta[None, :]
+    spherical_harmonics = sph_harm_y(
+        l_grid[:, None], m_grid[:, None], theta[None, :], phi[None, :]
     )
 
     # Return sorted
@@ -499,7 +510,8 @@ def get_real_spherical_harmonics(l_max, theta, phi):
 
 def get_CL_from_real_clm(clm_real):
     """
-    Compute the angular power spectrum from the spherical harmonics coefficients.
+    Compute the angular power spectrum from the spherical harmonics
+    coefficients.
 
     Parameters:
     -----------
@@ -635,9 +647,9 @@ def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
     -----------
     gLM_grid : numpy.ndarray
         Array of sqrt basis coefficients.
-    l_max_lin : int
-        Maximum ell value for the linear basis.
-    real_basis_input : bool
+    l_max_lin : int, optional
+        Maximum ell value for the linear basis. Default is -1.
+    real_basis_input : bool, optional
         If True, the input is in the real basis. Default is False.
 
     Returns:

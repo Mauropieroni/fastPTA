@@ -20,9 +20,9 @@ plt.rcParams.update(
 )
 
 # Some other useful things
-cmap_HD = matplotlib.colormaps["coolwarm"]  # type: ignore
-cmap1_grid = matplotlib.colormaps["hot"]  # type: ignore
-cmap2_grid = matplotlib.colormaps["PiYG"]  # type: ignore
+cmap_HD = matplotlib.colormaps["coolwarm"]
+cmap1_grid = matplotlib.colormaps["hot"]
+cmap2_grid = matplotlib.colormaps["PiYG"]
 
 my_colormap = {
     "red": "#EE6677",
@@ -128,6 +128,7 @@ def plot_corner(
     bins=25,
     title_kwargs={"fontsize": 20, "pad": 12},
     hist_kwargs={"density": True, "linewidth": 2},
+    bbox_to_anchor=(0.0, 1.0, 1.0, 1.0),
     **kwargs,
 ):
 
@@ -201,8 +202,6 @@ def plot_corner(
                 )
             )
 
-        plt.legend(
-            handles=custom_lines, bbox_to_anchor=(0.0, 1.0, 1.0, 1.0), loc=0
-        )
+        plt.legend(handles=custom_lines, bbox_to_anchor=bbox_to_anchor, loc=0)
     else:
         plt.legend(loc=0)
