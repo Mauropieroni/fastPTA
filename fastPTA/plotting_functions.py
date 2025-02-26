@@ -17,9 +17,9 @@ plt.rcParams.update(
 )
 
 # Some other useful things
-cmap_HD = matplotlib.colormaps["coolwarm"]  # type: ignore
-cmap1_grid = matplotlib.colormaps["hot"]  # type: ignore
-cmap2_grid = matplotlib.colormaps["PiYG"]  # type: ignore
+cmap_HD = matplotlib.colormaps["coolwarm"]
+cmap1_grid = matplotlib.colormaps["hot"]
+cmap2_grid = matplotlib.colormaps["PiYG"]
 
 my_colormap = {
     "red": "#EE6677",

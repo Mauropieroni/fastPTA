@@ -7,9 +7,13 @@ import fastPTA.utils as ut
 from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
 
-# Set some global parameters for jax
-jax.config.update("jax_enable_x64", True)
+
+# Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
+
 
 # Default value for signal_lm
 default_signal_lm = jnp.array([1.0 / jnp.sqrt(4 * jnp.pi)])

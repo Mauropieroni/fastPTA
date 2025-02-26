@@ -8,27 +8,79 @@ from jax.scipy.interpolate import RegularGridInterpolator
 # Local
 import fastPTA.utils as ut
 
-# If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
+# Set the device
+jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
 jax.config.update("jax_enable_x64", True)
 
 
-cgx = np.loadtxt(ut.path_to_defaults + "fvals.txt")
-cgy = np.loadtxt(ut.path_to_defaults + "cgvals.txt")
+SIGWB_prefactor_data = np.loadtxt(
+    ut.path_to_defaults + "SIGWB_prefactor_data.txt"
+)
+
+# This is building an interpolator for the SIGWB prefactor
+SIGWB_prefactor_interpolator = RegularGridInterpolator(
+    [SIGWB_prefactor_data[:, 0]], SIGWB_prefactor_data[:, 1]
+)
 
 
-cg_interpolator = RegularGridInterpolator([cgx], cgy)
-del cgx, cgy
+del SIGWB_prefactor_data
 
 
-def cg(frequency):
-    return 10 ** cg_interpolator(jnp.log10(frequency))
+def SIGWB_prefactor(frequency):
+    """
+    Returns the prefactor appearing in Eqs. 9 - 10 of xxxxx as a function of
+    frequency using the interpolated values from the data file.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the prefactor for the SIGWB spectrum.
+    """
+
+    # The data are in log scale so we log the frequency and then exp the result
+    return 10 ** SIGWB_prefactor_interpolator(jnp.log10(frequency))
+
+
+def get_gradient(npars, function, frequency, parameters, *args, **kwargs):
+    """
+    Derivative of the power law spectrum.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the power law spectrum.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the power law spectrum.
+        The shape of the array is (len(frequency), npars).
+    """
+
+    return jnp.array(
+        [
+            function(i, frequency, parameters, *args, **kwargs)
+            for i in range(npars)
+        ]
+    ).T
 
 
 def flat(frequency, parameters):
     """
-    Generate a flat spectrum.
+    Returns a flat spectrum.
+
+    The only parameter of this template is the log of the amplitude, so if the
+    vector of parameters is longer, it will use only the first parameter.
 
     Parameters:
     -----------
@@ -43,12 +95,15 @@ def flat(frequency, parameters):
         Array containing the computed flat spectrum.
     """
 
-    return 10 ** parameters[0] * frequency**0
+    return 10.0 ** parameters[0] * frequency**0
 
 
 def d1flat(index, frequency, parameters):
     """
     Derivative of the flat spectrum.
+
+    The only parameter of this template is the log of the amplitude. If index
+    is > 0 it will raise an error.
 
     Parameters:
     -----------
@@ -66,16 +121,27 @@ def d1flat(index, frequency, parameters):
             respect to the specified parameter.
     """
 
+    # compute the model
+    model = flat(frequency, parameters)
+
     if index == 0:
-        return flat(frequency, parameters) * jnp.log(10)
+        # derivative of the log model w.r.t the log amplitude
+        dlog_model = jnp.log(10)
 
     else:
+        # raise an error if the index is not valid
         raise ValueError("Cannot use that for this signal")
+
+    # return the derivative multiplying the log derivative by the model
+    return model * dlog_model
 
 
 def power_law(frequency, parameters, pivot=ut.f_yr):
     """
-    Generate a power law spectrum.
+    Returns a power law spectrum.
+
+    The parameters of this template are the log of the amplitude and the tilt
+    of the power law.
 
     Parameters:
     -----------
@@ -93,12 +159,16 @@ def power_law(frequency, parameters, pivot=ut.f_yr):
     # unpack parameters
     log_amplitude, tilt = parameters
 
+    # return the power law spectrum
     return 10**log_amplitude * (frequency / pivot) ** tilt
 
 
 def d1power_law(index, frequency, parameters, pivot=ut.f_yr):
     """
     Derivative of the power law spectrum.
+
+    The parameters of this template are the log of the amplitude and the tilt
+    of the power law. If index is > 1 it will raise an error.
 
     Parameters:
     -----------
@@ -113,26 +183,34 @@ def d1power_law(index, frequency, parameters, pivot=ut.f_yr):
     --------
     numpy.ndarray or jax.numpy.ndarray
         Array containing the computed derivative of the power law spectrum with
-            respect to the specified parameter.
+        respect to the specified parameter.
     """
 
+    # compute the model
     model = power_law(frequency, parameters, pivot=pivot)
 
     if index == 0:
+        # derivative of the log of the model w.r.t the log amplitude
         dlog_model = jnp.log(10)
 
     elif index == 1:
+        # derivative of the log of the model w.r.t the tilt
         dlog_model = jnp.log(frequency / pivot)
 
     else:
+        # raise an error if the index is not valid
         raise ValueError("Cannot use that for this signal")
 
+    # return the derivative multiplying the log derivative by the model
     return model * dlog_model
 
 
 def lognormal(frequency, parameters):
     """
-    Generate a lognormal spectrum.
+    Returns a lognormal spectrum.
+
+    The parameters of this template are the log of the amplitude, the log of the
+    width, and the log of the pivot frequency (in Hz) of the lognormal spectrum.
 
     Parameters:
     -----------
@@ -150,14 +228,20 @@ def lognormal(frequency, parameters):
     # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
-    return 10**log_amplitude * jnp.exp(
-        -0.5 * (jnp.log(frequency / (10**log_pivot)) / 10**log_width) ** 2
-    )
+    # compute the exponent
+    to_exp = -0.5 * (jnp.log(frequency / 10**log_pivot) / 10**log_width) ** 2
+
+    # return the lognormal spectrum
+    return 10**log_amplitude * jnp.exp(to_exp)
 
 
 def d1lognormal(index, frequency, parameters):
     """
     Derivative of the lognormal spectrum.
+
+    The parameters of this template are the log of the amplitude, the log of the
+    width, and the log of the pivot frequency (in Hz) of the lognormal spectrum.
+    If index is > 2 it will raise an error.
 
     Parameters:
     -----------
@@ -172,138 +256,46 @@ def d1lognormal(index, frequency, parameters):
     --------
     numpy.ndarray or jax.numpy.ndarray
         Array containing the computed derivative of the lognormal spectrum with
-            respect to the specified parameter.
+        respect to the specified parameter.
     """
 
     # unpack parameters
-    log_amplitude, log_width, log_pivot = parameters
+    _, log_width, log_pivot = parameters
 
+    # compute the model
     model = lognormal(frequency, parameters)
 
     if index == 0:
+        # derivative of the log of the model w.r.t the log amplitude
         dlog_model = jnp.log(10)
 
     elif index == 1:
-        dlog_model = (
-            jnp.log(10)
-            / 10 ** (2 * log_width)
-            * (jnp.log(frequency / 10**log_pivot)) ** 2
-        )
+        # derivative of the log of the model w.r.t the log width
+        numerator = jnp.log(10) * jnp.log(frequency / 10**log_pivot) ** 2
+        denominator = 10 ** (2 * log_width)
+        dlog_model = numerator / denominator
 
     elif index == 2:
-        dlog_model = (
-            jnp.log(10)
-            / 10 ** (2 * log_width)
-            * (jnp.log(frequency / 10**log_pivot))
-        )
+        # derivative of the log of the model w.r.t the log pivot frequency
+        numerator = jnp.log(10) * jnp.log(frequency / 10**log_pivot)
+        denominator = 10 ** (2 * log_width)
+        dlog_model = numerator / denominator
 
     else:
+        # raise an error if the index is not valid
         raise ValueError("Cannot use that for this signal")
 
+    # return the derivative multiplying the log derivative by the model
     return model * dlog_model
-
-
-def SMBH_and_flat(frequency, parameters):
-    """
-    Generate a spectrum combining the SMBH and flat models.
-
-    Parameters:
-    -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the SMBH and lognormal spectra.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed SMBH and lognormal spectra.
-    """
-
-    return power_law(frequency, parameters[:2]) + flat(
-        frequency, parameters[2:]
-    )
-
-
-def d1SMBH_and_flat(index, frequency, parameters):
-    """
-    Derivative of the SMBH + flat spectrum.
-
-    Parameters:
-    -----------
-    index : int
-        Index of the parameter with respect to which the derivative is computed.
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the SMBH + flat spectra.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed derivative of the SMBH + flat
-        spectra with respect to the specified parameter.
-    """
-
-    if index < 2:
-        return d1power_law(index, frequency, parameters[:2])
-
-    else:
-        return d1flat(index - 2, frequency, parameters[2:])
-
-
-def SMBH_and_lognormal(frequency, parameters):
-    """
-    Generate a spectrum combining the SMBH and lognormal models.
-
-    Parameters:
-    -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the SMBH and lognormal spectra.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed SMBH and lognormal spectra.
-    """
-
-    return power_law(frequency, parameters[:2]) + lognormal(
-        frequency, parameters[2:]
-    )
-
-
-def d1SMBH_and_lognormal(index, frequency, parameters):
-    """
-    Derivative of the SMBH + lognormal spectrum.
-
-    Parameters:
-    -----------
-    index : int
-        Index of the parameter to differentiate.
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the SMBH + lognormal spectra.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed derivative of the SMBH + lognormal
-        spectra with respect to the specified parameter.
-    """
-
-    if index < 2:
-        return d1power_law(index, frequency, parameters[:2])
-
-    else:
-        return d1lognormal(index - 2, frequency, parameters[2:])
 
 
 def broken_power_law(frequency, parameters, smoothing=1.5):
     """
-    Generate a broken power law spectrum.
+    Returns a broken power law spectrum (BPL).
+
+    The parameters of this template are the log of the amplitude, the log of the
+    pivot frequency (in Hz), the tilt of the power law at low frequencies, and
+    the tilt of the power law at high frequencies.
 
     Parameters:
     -----------
@@ -320,26 +312,29 @@ def broken_power_law(frequency, parameters, smoothing=1.5):
     """
 
     # unpack parameters
-    alpha, gamma, a, b = parameters
+    log_amplitude, log_pivot, a, b = parameters
 
-    x = frequency / 10**gamma
+    # rescale the frequency to the pivot frequency
+    x = frequency / 10**log_pivot
 
-    return (
-        10**alpha
-        * (jnp.abs(a) + jnp.abs(b)) ** smoothing
-        / (
-            (
-                jnp.abs(b) * x ** (-a / smoothing)
-                + jnp.abs(a) * x ** (b / smoothing)
-            )
-            ** smoothing
-        )
-    )
+    # compute the numerator and denominator
+    numerator = (jnp.abs(a) + jnp.abs(b)) ** smoothing
+    denominator = (
+        jnp.abs(b) * x ** (-a / smoothing) + jnp.abs(a) * x ** (b / smoothing)
+    ) ** smoothing
+
+    # return the BPL spectrum
+    return 10**log_amplitude * numerator / denominator
 
 
 def d1broken_power_law(index, frequency, parameters, smoothing=1.5):
     """
     Derivative of the BPL spectrum.
+
+    The parameters of this template are the log of the amplitude, the log of the
+    pivot frequency (in Hz), the tilt of the power law at low frequencies, and
+    the tilt of the power law at high frequencies. If index is > 3 it will raise
+    an error.
 
     Parameters:
     -----------
@@ -358,17 +353,21 @@ def d1broken_power_law(index, frequency, parameters, smoothing=1.5):
     """
 
     # unpack parameters
-    alpha, gamma, a, b = parameters
+    log_amplitude, log_pivot, a, b = parameters
 
+    # compute the model
     model = broken_power_law(frequency, parameters)
 
     if index != 0:
-        x = frequency / 10**gamma
+        # rescale the frequency to the pivot frequency
+        x = frequency / 10**log_pivot
 
     if index == 0:
+        # derivative of the log of the model w.r.t the log amplitude
         dlog_model = jnp.log(10)
 
     elif index == 1:
+        # derivative of the log of the model w.r.t the log pivot frequency
         dlog_model = (
             jnp.log(10)
             * a
@@ -378,6 +377,7 @@ def d1broken_power_law(index, frequency, parameters, smoothing=1.5):
         )
 
     elif index == 2:
+        # derivative of the log of the model w.r.t the tilt at low frequencies
         dlog_model = (
             -((b * smoothing) / (a + b))
             + (b * (smoothing + a * jnp.log(x)))
@@ -385,6 +385,7 @@ def d1broken_power_law(index, frequency, parameters, smoothing=1.5):
         ) / a
 
     elif index == 3:
+        # derivative of the log of the model w.r.t the tilt at high frequencies
         dlog_model = (
             -a
             * (
@@ -396,36 +397,182 @@ def d1broken_power_law(index, frequency, parameters, smoothing=1.5):
         )
 
     else:
+        # raise an error if the index is not valid
         raise ValueError("Cannot use that for this signal")
 
+    # return the derivative multiplying the log derivative by the model
     return model * dlog_model
 
 
-def SMBH_and_broken_power_law(frequency, parameters):
+def SMBH_and_flat(frequency, parameters):
     """
-    Generate a spectrum combining the SMBH and BPL models.
+    Returns a spectrum combining the SMBH and flat models.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude of the flat spectrum.
 
     Parameters:
     -----------
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the lognormal spectrum.
+        Array containing parameters for the SMBH and flat spectra.
 
     Returns:
     --------
     numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed lognormal spectrum.
+        Array containing the computed SMBH and flat spectra.
     """
 
-    return power_law(frequency, parameters[:2]) + broken_power_law(
-        frequency, parameters[2:]
-    )
+    # compute the SMBH and flat spectra
+    power_law_spectrum = power_law(frequency, parameters[:2])
+    flat_spectrum = flat(frequency, parameters[2:])
+
+    # return the combined spectrum
+    return power_law_spectrum + flat_spectrum
+
+
+def d1SMBH_and_flat(index, frequency, parameters):
+    """
+    Derivative of the SMBH + flat spectrum.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude of the flat spectrum.
+    If index is > 2 it will raise an error.
+
+    Parameters:
+    -----------
+    index : int
+        Index of the parameter w.r.t which the derivative is computed.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH + flat spectra.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the SMBH + flat spectra
+        w.r.t the specified parameter.
+    """
+
+    if index < 2:
+        # compute the derivative of the SMBH spectrum
+        dmodel = d1power_law(index, frequency, parameters[:2])
+
+    else:
+        # compute the derivative of the flat spectrum
+        dmodel = d1flat(index - 2, frequency, parameters[2:])
+
+    return dmodel
+
+
+def SMBH_and_lognormal(frequency, parameters):
+    """
+    Returns a spectrum combining the SMBH and lognormal models.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude, the log of the width,
+    and the log of the pivot frequency (in Hz) of the lognormal spectrum. If
+    index is > 2 it will raise an error.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH and lognormal spectra.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed SMBH and lognormal spectra.
+    """
+
+    # compute the SMBH and lognormal spectra
+    power_law_spectrum = power_law(frequency, parameters[:2])
+    lognormal_spectrum = lognormal(frequency, parameters[2:])
+
+    # return the combined spectrum
+    return power_law_spectrum + lognormal_spectrum
+
+
+def d1SMBH_and_lognormal(index, frequency, parameters):
+    """
+    Derivative of the SMBH + lognormal spectrum.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude, the log of the width,
+    and the log of the pivot frequency (in Hz) of the lognormal spectrum. If
+    index is > 4 it will raise an error.
+
+    Parameters:
+    -----------
+    index : int
+        Index of the parameter to differentiate.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH + lognormal spectra.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the computed derivative of the SMBH + lognormal
+        spectra w.r.t the specified parameter.
+    """
+
+    if index < 2:
+        # compute the derivative of the SMBH spectrum
+        dmodel = d1power_law(index, frequency, parameters[:2])
+
+    else:
+        # compute the derivative of the lognormal spectrum
+        dmodel = d1lognormal(index - 2, frequency, parameters[2:])
+
+    # return the derivative
+    return dmodel
+
+
+def SMBH_and_broken_power_law(frequency, parameters):
+    """
+    Returns a spectrum combining the SMBH and BPL models.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude, the log of the pivot
+    frequency (in Hz), the tilt of the power law at low frequencies, and the
+    tilt of the power law at high frequencies.
+
+    Parameters:
+    -----------
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    parameters : numpy.ndarray or jax.numpy.ndarray
+        Array containing parameters for the SMBH and lognormal spectra.
+
+    Returns:
+    --------
+    numpy.ndarray or jax.numpy.ndarray
+        Array containing the sum of the computed SMBH and BPL spectra.
+    """
+
+    # compute the SMBH and BPL spectra
+    power_law_spectrum = power_law(frequency, parameters[:2])
+    broken_power_law_spectrum = broken_power_law(frequency, parameters[2:])
+
+    # return the combined spectrum
+    return power_law_spectrum + broken_power_law_spectrum
 
 
 def d1SMBH_and_broken_power_law(index, frequency, parameters):
     """
     Derivative of the SMBH + BPL spectrum.
+
+    The parameters of this template are the log of the amplitude, and tilt of
+    the power law for SMBHs plus the log of the amplitude, the log of the pivot
+    frequency (in Hz), the tilt of the power law at low frequencies, and the
+    tilt of the power law at high frequencies. If index is > 6 it will raise an
+    error.
 
     Parameters:
     -----------
@@ -440,114 +587,56 @@ def d1SMBH_and_broken_power_law(index, frequency, parameters):
     --------
     numpy.ndarray or jax.numpy.ndarray
         Array containing the computed derivative of the SMBH + BPL
-        spectra with respect to the specified parameter.
+        spectra w.r.t the specified parameter.
     """
 
     if index < 2:
-        return d1power_law(index, frequency, parameters[:2])
+        # compute the derivative of the SMBH spectrum
+        dmodel = d1power_law(index, frequency, parameters[:2])
 
     else:
-        return d1broken_power_law(index - 2, frequency, parameters[2:])
+        # compute the derivative of the BPL spectrum
+        dmodel = d1broken_power_law(index - 2, frequency, parameters[2:])
+
+    # return the derivative
+    return dmodel
 
 
-def tanh(frequency, parameters, pivot=ut.f_yr):
+def SIGW_broad_approximated(frequency, parameters):
     """
-    Generate a tanh spectrum.
+    Returns the analytical approximation of the SIGW for a broad a lognormal
+    scalar spectrum (originally proposed in 2005.12306) see eq. 9 of xxxxx.
+
+    The parameters of this template are the log of the amplitude, the log of the
+    width, and the log of the pivot frequency (in Hz) of the lognormal scalar
+    spectrum.
 
     Parameters:
     -----------
     frequency : numpy.ndarray or jax.numpy.ndarray
         Array containing frequency bins.
     parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the tanh spectrum.
+        Array containing parameters for the lognormal scalar spectrum.
 
     Returns:
     --------
     numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed tanh spectrum.
-    """
-
-    # unpack parameters
-    log_amplitude, tilt = parameters
-
-    return 10**log_amplitude * (1 + jnp.tanh(frequency / pivot)) ** tilt
-
-
-# def d1tanh(index, frequency, parameters, pivot=ut.f_yr):
-#     """
-#     Derivative of the tanh spectrum.
-
-#     Parameters:
-#     -----------
-#     index : int
-#         Index of the parameter with respect to which the derivative is
-# computed.
-#     frequency : numpy.ndarray or jax.numpy.ndarray
-#         Array containing frequency bins.
-#     parameters : numpy.ndarray or jax.numpy.ndarray
-#         Array containing parameters for the tanh spectrum.
-
-#     Returns:
-#     --------
-#     numpy.ndarray or jax.numpy.ndarray
-#         Array containing the computed derivative of the tanh spectrum with
-#         respect to the specified parameter.
-#     """
-
-#     # unpack parameters
-#     log_amplitude, tilt = parameters
-
-#     dlog_model = []
-
-#     def function_tanh(frequency, log_amplitude, tilt):
-#         return (10**log_amplitude) * (1 + jnp.tanh(frequency / pivot)) ** tilt
-
-#     if index == 0:
-#         for i in range(len(frequency)):
-#             dlog_model.append(
-#                 grad(function_tanh, argnums=1)(
-#                     frequency[i], log_amplitude, tilt
-#                 )
-#             )
-
-#     elif index == 1:
-#         for i in range(len(frequency)):
-#             dlog_model.append(
-#                 grad(function_tanh, argnums=2)(
-#                     frequency[i], log_amplitude, tilt
-#                 )
-#             )
-
-#     else:
-#         raise ValueError("Cannot use that for this signal")
-
-#     return dlog_model
-
-
-def SIGW(frequency, parameters):
-    """
-    Generate a spectrum for SIGW.
-
-    Parameters:
-    -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the lognormal spectrum.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed lognormal spectrum.
+        Array containing the analytical approximation for the SIGW.
     """
 
     # unpack parameters
     log_amplitude, log_width, log_pivot = parameters
 
+    # rescale the frequency to the pivot frequency
     x = frequency / (10**log_pivot)
+
+    # get the width
     width = 10**log_width
+
+    # compute the k parameter
     k = x * jnp.exp((3 / 2) * width**2)
 
+    # compute the three terms
     term1 = (
         (4 / (5 * jnp.sqrt(np.pi)))
         * x**3
@@ -584,51 +673,23 @@ def SIGW(frequency, parameters):
         )
     )
 
-    return cg(frequency) * (10**log_amplitude) ** 2 * (term1 + term2 + term3)
+    # return the SIGW spectrum
+    return (
+        SIGWB_prefactor(frequency)
+        * (10**log_amplitude) ** 2
+        * (term1 + term2 + term3)
+    )
 
 
-# # The following one is if you want ot compute the derivative numerically
-# def d1SIGW(index, frequency, parameters):
-#     """
-#     Derivative of the tanh spectrum.
-
-#     Parameters:
-#     -----------
-#     index : int
-#         Index of the parameter with respect to which the derivative is
-# computed.
-#     frequency : numpy.ndarray or jax.numpy.ndarray
-#         Array containing frequency bins.
-#     parameters : numpy.ndarray or jax.numpy.ndarray
-#         Array containing parameters for the tanh spectrum.
-
-#     Returns:
-#     --------
-#     numpy.ndarray or jax.numpy.ndarray
-#         Array containing the computed derivative of the tanh spectrum with
-#         respect to the specified parameter.
-#     """
-
-#     # unpack parameters
-#     log_amplitude, log_width, log_pivot = parameters
-
-#     def function_SIGW(log_amplitude, log_width, log_pivot):
-#         return SIGW(frequency, (log_amplitude, log_width, log_pivot))
-
-#     if index < 3:
-#         dlog_model = jacfwd(function_SIGW, argnums=index)(
-#             log_amplitude, log_width, log_pivot
-#         )
-
-#     else:
-#         raise ValueError("Cannot use that for this signal")
-
-#     return dlog_model
-
-
-def power_law_SIGW(frequency, parameters):
+def power_law_SIGW_broad_approximated(frequency, parameters):
     """
-    Generate a spectrum combining the SIGW and flat models.
+    Returns a spectrum combining the power law and the analytical approximation
+    of the SIGW for a broad a lognormal scalar spectrum (originally proposed in
+    2005.12306) see eq. 9 of xxxxx.
+
+    The parameters of this template are the log of the amplitude, the log of the
+    width, and the log of the pivot frequency (in Hz) of the lognormal scalar
+    spectrum.
 
     Parameters:
     -----------
@@ -643,59 +704,9 @@ def power_law_SIGW(frequency, parameters):
         Array containing the computed SMBH and lognormal spectra.
     """
 
-    return power_law(frequency, parameters[:2]) + SIGW(
-        frequency, parameters[2:]
-    )
+    # compute the power law and SIGW spectra
+    power_law_spectrum = power_law(frequency, parameters[:2])
+    SIGW_spectrum = SIGW_broad_approximated(frequency, parameters[2:])
 
-
-# def d1power_law_SIGW(index, frequency, parameters):
-#     """
-#     Derivative of the SIGW + flat spectrum.
-
-#     Parameters:
-#     -----------
-#     index : int
-#         Index of the parameter to differentiate.
-#     frequency : numpy.ndarray or jax.numpy.ndarray
-#         Array containing frequency bins.
-#     parameters : numpy.ndarray or jax.numpy.ndarray
-#         Array containing parameters for the SMBH + flat spectra.
-
-#     Returns:
-#     --------
-#     numpy.ndarray or jax.numpy.ndarray
-#         Array containing the computed derivative of the SMBH + flat
-#         spectra with respect to the specified parameter.
-#     """
-
-#     if index < 2:
-#         return dpower_law(index, frequency, parameters[:2])
-
-#     else:
-#         return dSIGW(index - 2, frequency, parameters[2:])
-
-
-def get_gradient(npars, function, frequency, parameters, *args, **kwargs):
-    """
-    Derivative of the power law spectrum.
-
-    Parameters:
-    -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
-        Array containing frequency bins.
-    parameters : numpy.ndarray or jax.numpy.ndarray
-        Array containing parameters for the power law spectrum.
-
-    Returns:
-    --------
-    numpy.ndarray or jax.numpy.ndarray
-        Array containing the computed derivative of the power law spectrum.
-        The shape of the array is (len(frequency), npars).
-    """
-
-    return jnp.array(
-        [
-            function(i, frequency, parameters, *args, **kwargs)
-            for i in range(npars)
-        ]
-    ).T
+    # return the combined spectrum
+    return power_law_spectrum + SIGW_spectrum

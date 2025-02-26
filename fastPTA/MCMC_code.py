@@ -11,10 +11,13 @@ import fastPTA.utils as ut
 from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
 
+
+# Set the device
+jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
 jax.config.update("jax_enable_x64", True)
 
-# If you want to use your GPU change here
-jax.config.update("jax_default_device", jax.devices("cpu")[0])
 
 # Setting some constants
 i_max_default = 100
@@ -120,15 +123,25 @@ def generate_MCMC_data(
         # Generate gaussian data with the right std for the noise
         noise_data = generate_gaussian(0, noise_std)
 
-        # Combine to get nn
-        noise_part = noise_data[:, :, None] * np.conj(noise_data[:, None, :])
+        # Combine to get nn take the real part only since the likelihood is
+        # real and is multiplied by a 2 to keep track of that
+        noise_part = np.real(
+            noise_data[:, :, None] * np.conj(noise_data[:, None, :])
+        )
+
+        # Since we work with variables of f only (already integrated over theta
+        # and phi), each signal component should be generated independently
+        signal_std = signal_std[:, None, None] * np.ones_like(
+            np.real(noise_part)
+        )
 
         # Generate gaussian data with the right std for the signal
         signal_data = generate_gaussian(0, signal_std)
 
         # The response projects the signal in the different pulsar combinations
-        signal_part = (
-            response_IJ * (signal_data * np.conj(signal_data))[:, None, None]
+        # as for the noise, take the real part only
+        signal_part = response_IJ * np.real(
+            signal_data * np.conjugate(signal_data)
         )
 
     else:
@@ -265,24 +278,24 @@ def get_MCMC_data(
 
 @jax.jit
 def log_likelihood(
+    data,
     signal_value,
     response_IJ,
     strain_omega,
-    data,
 ):
     """
     Compute the logarithm of the likelihood assujming a Whittle likelihood.
 
     Parameters:
     -----------
-    signal_value : numpy.ndarray
-        Array containing the signal evaluated in all frequency bins.
-    response_IJ : numpy.ndarray
-        Array containing response function.
-    strain_omega : numpy.ndarray
-        Array containing strain noise.
-    data : numpy.ndarray
+    data : numpy.ndarray or jax.numpy.ndarray
         Array containing the observed data.
+    signal_value : numpy.ndarray or jax.numpy.ndarray
+        Array containing the signal evaluated in all frequency bins.
+    response_IJ : numpy.ndarray or jax.numpy.ndarray
+        Array containing response function.
+    strain_omega : numpy.ndarray or jax.numpy.ndarray
+        Array containing strain noise.
 
     Returns:
     --------
@@ -291,8 +304,10 @@ def log_likelihood(
 
     """
 
-    # Covariance of the data
-    covariance = response_IJ * signal_value[:, None, None] + strain_omega
+    # Covariance of the data as signal * response + noise
+    covariance = (
+        jnp.einsum("ijk,i->ijk", response_IJ, signal_value) + strain_omega
+    )
 
     # Inverse of the covariance
     c_inverse = ut.compute_inverse(covariance)
@@ -309,11 +324,11 @@ def log_likelihood(
 
 def log_posterior(
     signal_parameters,
+    data,
     frequency,
     signal_model,
     response_IJ,
     strain_omega,
-    data,
     priors,
 ):
     """
@@ -322,19 +337,18 @@ def log_posterior(
 
     Parameters:
     -----------
-    signal_parameters : numpy.ndarray
+    signal_parameters : numpy.ndarray or jax.numpy.ndarray
         Array containing parameters of the signal model.
-    frequency : numpy.ndarray
-        Array containing frequency bins.
-    signal_model : signal_model object, optional
-        Object containing the signal model and its derivatives
-        Default is a power_law model
-    response_IJ : numpy.ndarray
-        Array containing response function.
-    strain_omega : numpy.ndarray
-        Array containing strain noise.
-    data : numpy.ndarray
+    data : numpy.ndarray or jax.numpy.ndarray
         Array containing the observed data.
+    frequency : numpy.ndarray or jax.numpy.ndarray
+        Array containing frequency bins.
+    signal_model : signal_model object
+        Object containing the signal model and its derivatives
+    response_IJ : numpy.ndarray or jax.numpy.ndarray
+        Array containing response function.
+    strain_omega : numpy.ndarray or jax.numpy.ndarray
+        Array containing strain noise.
     priors : prior object
         Object containing the prior probability density functions.
 
@@ -345,18 +359,129 @@ def log_posterior(
 
     """
 
+    # Evaluate the log prior
     lp = priors.evaluate_log_priors(
         dict(zip(signal_model.parameter_names, signal_parameters))
     )
 
+    # If the prior is not finite, return -inf
     if not jnp.isfinite(lp):
         return -jnp.inf
 
+    # Evaluate the signal model
     signal_value = signal_model.template(frequency, signal_parameters)
 
-    log_lik = log_likelihood(signal_value, response_IJ, strain_omega, data)
+    # Evaluate the log likelihood
+    log_lik = log_likelihood(data, signal_value, response_IJ, strain_omega)
 
+    # Return log prior + log likelihood
     return lp + log_lik
+
+
+def get_MCMC_samples(
+    log_posterior,
+    initial,
+    log_posterior_args,
+    i_max=i_max_default,
+    R_convergence=R_convergence_default,
+    R_criterion=R_criterion_default,
+    burnin_steps=burnin_steps_default,
+    MCMC_iteration_steps=MCMC_iteration_steps_default,
+    print_progress=True,
+):
+    """
+    Run Markov Chain Monte Carlo (MCMC) to estimate the posterior distribution
+    of the parameters given the observed data. After a burn-in phase, the
+    Gelman-Rubin statistic is used as a convergence diagnostic. Several MCMC
+    iterations are run until the chains reach convergence. MCMC samples and
+    log posterior probabilities are returned.
+
+    Parameters:
+    -----------
+    log_posterior : function
+        Function to compute the logarithm of the posterior probability.
+    initial : numpy.ndarray
+        Initial parameter values for the MCMC walkers.
+    log_posterior_args : list
+        List containing the arguments for the log posterior function.
+    i_max : int, optional
+        Maximum number of iterations for convergence
+        Default is i_max_default
+    R_convergence : float, optional
+        Convergence threshold for the Gelman-Rubin statistic
+        Default is R_convergence_default
+    R_criterion : str, optional
+        Criterion to calculate the Gelman-Rubin statistic
+        Default is R_criterion_default
+    burnin_steps : int, optional
+        Number of burn-in steps for the MCMC sampler
+        Default is burnin_steps_default
+    MCMC_iteration_steps : int, optional
+        Number of MCMC iteration steps
+        Default is MCMC_iteration_steps_default
+    print_progress : bool, optional
+        Whether to print progress of the MCMC run
+        Default is True
+
+    Returns:
+    --------
+    Tuple containing:
+    - samples: numpy.ndarray
+        Array containing MCMC samples.
+    - pdfs: numpy.ndarray
+        Array containing log posterior probabilities for MCMC samples.
+
+    """
+
+    nwalkers, ndims = initial.shape
+
+    # Set the sampler
+    sampler = emcee.EnsembleSampler(
+        nwalkers, ndims, log_posterior, args=log_posterior_args
+    )
+
+    start = time.perf_counter()
+
+    if print_progress:
+        print("Initial run")
+
+    state = sampler.run_mcmc(initial, burnin_steps, progress=print_progress)
+
+    sampler.reset()
+    if print_progress:
+        print("Burn-in dropped, here starts the proper run")
+
+    R = 1e100
+    i = 0
+
+    # Run until convergence or until reached maximum number of iterations
+    while np.abs(R - 1) > R_convergence and i < i_max:
+        # Run this iteration
+        state = sampler.run_mcmc(
+            state, MCMC_iteration_steps, progress=print_progress
+        )
+
+        # Get Gelman-Rubin at this step
+        R_array = ut.get_R(sampler.get_chain())
+
+        if R_criterion.lower() == "mean_squared":
+            R = np.sqrt(np.mean(R_array**2))
+        elif R_criterion.lower() == "max":
+            R = np.max(R_array)
+        else:
+            raise ValueError("Cannot use R_criterion =", R_criterion)
+
+        if print_progress:
+            print("At this step R = %.4f" % (R))
+        i += 1
+
+    if print_progress:
+        print(
+            "This took {0:.1f} seconds \n".format(time.perf_counter() - start)
+        )
+
+    # return samples and pdfs
+    return sampler.get_chain(flat=True), sampler.get_log_prob()
 
 
 def run_MCMC(
@@ -375,6 +500,7 @@ def run_MCMC(
     R_criterion=R_criterion_default,
     burnin_steps=burnin_steps_default,
     MCMC_iteration_steps=MCMC_iteration_steps_default,
+    print_progress=True,
     path_to_MCMC_chains="generated_chains/MCMC_chains.npz",
     get_tensors_kwargs={},
     generate_catalog_kwargs={},
@@ -389,9 +515,8 @@ def run_MCMC(
 
     Parameters:
     -----------
-    priors : numpy.ndarray
-        Array containing prior parameters. Each row represents the parameters
-        for a single prior distribution.
+    priors : prior object
+        Object containing the prior probability density functions.
     T_obs_yrs : float, optional
         Total observation time in years
         Default is 10.33
@@ -434,6 +559,9 @@ def run_MCMC(
     MCMC_iteration_steps : int, optional
         Number of MCMC iteration steps
         Default is MCMC_iteration_steps_default
+    print_progress : bool, optional
+        Whether to print progress of the MCMC run
+        Default is True
     path_to_MCMC_chains : str, optional
         Path to save MCMC chains
         Default is "generated_chains/MCMC_chains.npz"
@@ -468,6 +596,7 @@ def run_MCMC(
         generate_catalog_kwargs=generate_catalog_kwargs,
     )
 
+    # Number of dimensions
     ndims = len(priors.parameter_names)
 
     # Generate the initial points if not provided
@@ -483,7 +612,7 @@ def run_MCMC(
         nwalkers = len(initial)
 
     # Args for the posterior
-    args = [
+    log_posterior_args = [
         jnp.array(frequency),
         signal_model,
         jnp.array(response_IJ),
@@ -492,46 +621,21 @@ def run_MCMC(
         priors,
     ]
 
-    # Set the sampler
-    sampler = emcee.EnsembleSampler(nwalkers, ndims, log_posterior, args=args)
-
-    start = time.perf_counter()
-
-    print("Initial run")
-    state = sampler.run_mcmc(initial, burnin_steps, progress=True)
-
-    sampler.reset()
-    print("Burn-in dropped, here starts the proper run")
-
-    R = 1e100
-    i = 0
-
-    # Run until convergence or until reached maximum number of iterations
-    while np.abs(R - 1) > R_convergence and i < i_max:
-        # Run this iteration
-        state = sampler.run_mcmc(state, MCMC_iteration_steps, progress=True)
-
-        # Get Gelman-Rubin at this step
-        R_array = ut.get_R(sampler.get_chain())
-
-        if R_criterion.lower() == "mean_squared":
-            R = np.sqrt(np.mean(R_array**2))
-        elif R_criterion.lower() == "max":
-            R = np.max(R_array)
-        else:
-            raise ValueError("Cannot use R_criterion =", R_criterion)
-
-        # state = None
-        print("At this step R = %.4f" % (R))
-        i += 1
-
     # Samples and pdfs
-    samples = sampler.get_chain(flat=True)
-    pdfs = sampler.lnprobability
-
-    print("This took {0:.1f} seconds \n".format(time.perf_counter() - start))
+    samples, pdfs = get_MCMC_samples(
+        log_posterior,
+        initial,
+        log_posterior_args,
+        i_max=i_max,
+        R_convergence=R_convergence,
+        R_criterion=R_criterion,
+        burnin_steps=burnin_steps,
+        MCMC_iteration_steps=MCMC_iteration_steps,
+        print_progress=print_progress,
+    )
 
     print("Storing as", path_to_MCMC_chains)
     np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)
 
+    # Return the samples and pdfs
     return samples, pdfs

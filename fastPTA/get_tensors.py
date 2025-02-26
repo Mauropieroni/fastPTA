@@ -14,8 +14,11 @@ import fastPTA.utils as ut
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
-jax.config.update("jax_enable_x64", True)
+# Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
 
 
 # Just some constants

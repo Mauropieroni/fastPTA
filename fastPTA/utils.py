@@ -19,22 +19,26 @@ else:
         return sph_harm(m, ell, phi, theta)
 
 
-jax.config.update("jax_enable_x64", True)
-
-
 # If you want to use your GPU change here
 which_device = "cpu"
 jax.config.update("jax_default_device", jax.devices(which_device)[0])
 
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
+
 
 # H0/h = 100 km/s/Mpc expressed in meters
 Hubble_over_h = 3.24e-18
+
 # Hour
 hour = 3600
+
 # Day
 day = 24 * hour
+
 # Year in seconds
 yr = 365.25 * day
+
 # Frequency associated with 1yr
 f_yr = 1 / yr
 
@@ -124,10 +128,8 @@ def hc_from_CP(CP, frequency, T_obs_s):
     -----------
     CP : numpy.ndarray or jax.numpy.ndarray
         Amplitude of the Common Process (in seconds^3)
-
     frequency : numpy.ndarray or jax.numpy.ndarray
         Frequency (in Hz) at which the characteristic strain is measured.
-
     T_obs_s : float
         Observation time (in seconds)
 
@@ -645,9 +647,9 @@ def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
     -----------
     gLM_grid : numpy.ndarray
         Array of sqrt basis coefficients.
-    l_max_lin : int
-        Maximum ell value for the linear basis.
-    real_basis_input : bool
+    l_max_lin : int, optional
+        Maximum ell value for the linear basis. Default is -1.
+    real_basis_input : bool, optional
         If True, the input is in the real basis. Default is False.
 
     Returns:
