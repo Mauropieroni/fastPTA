@@ -2,7 +2,6 @@
 import jax
 from jax import jacfwd
 import jax.numpy as jnp
-from numpy import s_
 
 # Local
 from fastPTA.utils import which_device
