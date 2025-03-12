@@ -613,11 +613,11 @@ def run_MCMC(
 
     # Args for the posterior
     log_posterior_args = [
+        jnp.array(MCMC_data),
         jnp.array(frequency),
         signal_model,
         jnp.array(response_IJ),
         jnp.array(strain_omega),
-        jnp.array(MCMC_data),
         priors,
     ]
 

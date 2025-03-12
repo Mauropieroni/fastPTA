@@ -10,7 +10,7 @@ from wigners import clebsch_gordan
 import jax
 import jax.numpy as jnp
 
-if sys.version_info.minor > 10:
+if sys.version_info.minor >= 10:
     from scipy.special import sph_harm_y
 else:
     from scipy.special import sph_harm
