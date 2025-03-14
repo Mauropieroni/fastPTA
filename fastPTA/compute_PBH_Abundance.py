@@ -1,9 +1,17 @@
 import numpy as np
+import sys
 
 import jax
 import jax.numpy as jnp
 from jax.scipy.interpolate import RegularGridInterpolator
 
+
+if sys.version_info.minor >= 10:
+    from jax.numpy import trapezoid
+else:
+    from jax.numpy import trapz
+    def trapezoid(y, x=None, dx=1.0, axis=-1):
+        return trapz(y, x=None, dx=1.0, axis=-1)
 
 from functools import partial
 
