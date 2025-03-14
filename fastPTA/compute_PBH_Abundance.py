@@ -321,7 +321,7 @@ def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
     to_integrate = integrand_spectrum(k_vec, r_max, scalar_spectrum)
 
     # Compute the integral in eq A8 of xxxx.xxxxx
-    integral_result = jnp.trapezoid(to_integrate, x=jnp.log(k_vec), axis=-1)
+    integral_result = trapezoid(to_integrate, x=jnp.log(k_vec), axis=-1)
 
     # Return the square root of the integral times Phi
     return jnp.sqrt((4.0 / 9.0) * integral_result) * phi_QCD(mass_hubble_volume)
@@ -446,7 +446,7 @@ def compute_beta_NL_C_QCD(
     beta_integrand = integrand_beta(cal_C_G_vec, sigma_c, mass_hubble_volume)
 
     # Return the integral in eq A12 of xxxx.xxxxx
-    return jnp.trapezoid(beta_integrand, x=cal_C_G_vec, axis=0)
+    return trapezoid(beta_integrand, x=cal_C_G_vec, axis=0)
 
 
 @partial(jax.jit, static_argnums=(3,))
@@ -498,7 +498,7 @@ def f_PBH_NL_QCD(r_max_vec_mpc, k_vec_mpc, scalar_spectrum, len_C_G_vec=100):
     )
 
     # get f_PBH integrating beta over the mass in a Hubble volume
-    return jnp.trapezoid(prefactor * integrand_M, x=M_H_vec)
+    return trapezoid(prefactor * integrand_M, x=M_H_vec)
 
 
 # Lognormal spectrum
