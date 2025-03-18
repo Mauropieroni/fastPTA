@@ -1,5 +1,4 @@
 [flake8]
 max-line-length = 80
 extend-select = 
-exclude = tests/mod_Chiara_test_functions.py
 extend-ignore = E203
