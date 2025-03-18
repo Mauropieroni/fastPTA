@@ -59,7 +59,7 @@ entropy_dofs = RegularGridInterpolator(
     fill_value=None,
 )
 
-# Kappa of critical collapse (appearing in eq A11 of xxxx.xxxxx) as a function
+# Kappa of critical collapse (appearing in eq A11 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
 kappa_QCD = RegularGridInterpolator(
     (data_f_PBH_MH[:, 0],),
@@ -68,7 +68,7 @@ kappa_QCD = RegularGridInterpolator(
     fill_value=None,
 )
 
-# Gamma of critical collapse (appearing in eq A11 of xxxx.xxxxx) as a function
+# Gamma of critical collapse (appearing in eq A11 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
 gamma_QCD = RegularGridInterpolator(
     (data_f_PBH_MH[:, 0],),
@@ -78,7 +78,7 @@ gamma_QCD = RegularGridInterpolator(
 )
 
 # Critical value of the compaction function (lower limit for the integral in
-# eq A11 of xxxx.xxxxx) as a function of mass in a Hubble volume in solar masses
+# eq A11 of 2503.10805) as a function of mass in a Hubble volume in solar masses
 delta_QCD = RegularGridInterpolator(
     (data_f_PBH_MH[:, 0],),
     data_f_PBH_MH[:, 3],
@@ -86,7 +86,7 @@ delta_QCD = RegularGridInterpolator(
     fill_value=None,
 )
 
-# Phi (scalar potential appearing in eq A3 of xxxx.xxxxx) as a function of
+# Phi (scalar potential appearing in eq A3 of 2503.10805) as a function of
 # mass in a Hubble volume in solar masses
 phi_QCD = RegularGridInterpolator(
     (data_f_PBH_MH[:, 0],),
@@ -103,7 +103,7 @@ del g_data, data_f_PBH_MH
 def k_of_T_MeV(temperature_MeV):
     """
     Compute the comoving wavenumber k corresponding to a given temperature in
-    MeV (see eq. 2 of xxxx.xxxxx).
+    MeV (see eq. 2 of 2503.10805).
 
     Parameters:
     -----------
@@ -120,12 +120,12 @@ def k_of_T_MeV(temperature_MeV):
     # The factor 1e3 is to convert MeV to GeV
     prefactor = (1.5e7 / 1e3) * temperature_MeV
 
-    # Second factor in eq. 2 of xxxx.xxxxx
+    # Second factor in eq. 2 of 2503.10805
     relativistic_dofs_term = jnp.sqrt(
         relativistic_dofs(temperature_MeV) / g_sm_tot
     )
 
-    # Third factor in eq. 2 of xxxx.xxxxx
+    # Third factor in eq. 2 of 2503.10805
     entropy_dofs_term = (entropy_dofs(temperature_MeV) / g_sm_tot) ** (
         -1.0 / 3.0
     )
@@ -137,7 +137,7 @@ def k_of_T_MeV(temperature_MeV):
 def hubble_mass_of_T_MeV(temperature_MeV):
     """
     Compute the mass in a Hubble volume in solar masses corresponding to a given
-    temperature in MeV (see eq. A2 of xxxx.xxxxx).
+    temperature in MeV (see eq. A2 of 2503.10805).
 
     Parameters:
     -----------
@@ -186,7 +186,7 @@ del T_range, M_of_T, k_of_T
 def M_H_of_k(k_vec_mpc, rm_to_k_factor):
     """
     Compute the mass in a Hubble volume corresponding to a given comoving
-    wavenumber. This matches 36 of xxxx.xxxxx.
+    wavenumber. This matches 36 of 2503.10805.
 
     Parameters:
     -----------
@@ -218,7 +218,7 @@ def M_H_of_k(k_vec_mpc, rm_to_k_factor):
 @jax.jit
 def window(k_vec, r_max):
     """
-    Compute the window function (see eq A10 of xxxx.xxxxx).
+    Compute the window function (see eq A10 of 2503.10805).
 
     Parameters:
     -----------
@@ -243,7 +243,7 @@ def window(k_vec, r_max):
 @jax.jit
 def transfer_function(k_vec, r_max):
     """
-    Compute the window function (see eq A10 of xxxx.xxxxx).
+    Compute the window function (see eq A10 of 2503.10805).
 
     Parameters:
     -----------
@@ -265,7 +265,7 @@ def transfer_function(k_vec, r_max):
 @jax.jit
 def integrand_spectrum(k_vec, r_max, scalar_spectrum):
     """
-    Compute the integrand in eq A8 of xxxx.xxxxx given spectrum, window and
+    Compute the integrand in eq A8 of 2503.10805 given spectrum, window and
     transfer function.
 
     Parameters:
@@ -283,7 +283,7 @@ def integrand_spectrum(k_vec, r_max, scalar_spectrum):
         Integrand of the spectrum.
     """
 
-    # Evaluate the factors in eq A8 of xxxx.xxxxx
+    # Evaluate the factors in eq A8 of 2503.10805
     prefactor = (r_max * k_vec) ** 4.0
     window_term = window(k_vec, r_max) ** 2.0
     transfer_term = transfer_function(k_vec, r_max) ** 2.0
@@ -295,7 +295,7 @@ def integrand_spectrum(k_vec, r_max, scalar_spectrum):
 def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
     """
     Compute the std (as sqrt of the variance) of the compaction function.
-    This is the square root of the integral in eq. A8 of xxxx.xxxxx.
+    This is the square root of the integral in eq. A8 of 2503.10805.
 
     Parameters:
     -----------
@@ -315,10 +315,10 @@ def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
 
     """
 
-    # Compute the integrand in eq A8 of xxxx.xxxxx
+    # Compute the integrand in eq A8 of 2503.10805
     to_integrate = integrand_spectrum(k_vec, r_max, scalar_spectrum)
 
-    # Compute the integral in eq A8 of xxxx.xxxxx
+    # Compute the integral in eq A8 of 2503.10805
     integral_result = trapezoid(to_integrate, x=jnp.log(k_vec), axis=-1)
 
     # Return the square root of the integral times Phi
@@ -356,7 +356,7 @@ def P_G(cal_C_G, sigma_c):
 @jax.jit
 def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     """
-    Compute the integrand in eq A12 of xxxx.xxxxx.
+    Compute the integrand in eq A12 of 2503.10805.
 
     Parameters:
     -----------
@@ -371,11 +371,11 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     Returns:
     --------
     integrand : jax.numpy.ndarray
-        Integrand in eq A12 of xxxx.xxxxx.
+        Integrand in eq A12 of 2503.10805.
 
     """
 
-    # All the "constants" in eq A12 of xxxx.xxxxx vary around the QCD PT
+    # All the "constants" in eq A12 of 2503.10805 vary around the QCD PT
     # A coefficient related to the eos parameter (see text after eq A4)
     P_QCD = phi_QCD(mass_hubble_volume)
 
@@ -388,14 +388,14 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     # Critical exponent for the critical collapse (see eq A12)
     G_QCD = gamma_QCD(mass_hubble_volume)
 
-    # This is the quantity in the first condition in eq A13 of xxxx.xxxxx
+    # This is the quantity in the first condition in eq A13 of 2503.10805
     # we take the full cal_C as Gaussian part + first quadratic term - threshold
     condition_1 = cal_C_G - 1.0 / (4.0 * P_QCD) * cal_C_G**2 - cal_C_th
 
-    # This is the quantity in the second condition in eq A13 of xxxx.xxxxx
+    # This is the quantity in the second condition in eq A13 of 2503.10805
     condition_2 = 2.0 * P_QCD - cal_C_G
 
-    # This is the integrand in eq A12 of xxxx.xxxxx
+    # This is the integrand in eq A12 of 2503.10805
     result = K_QCD * condition_1**G_QCD * P_G(cal_C_G, sigma_c)
 
     # Return the integrand where the conditions are satisfied else return 0
@@ -407,7 +407,7 @@ def compute_beta_NL_C_QCD(
     k_vec, r_max, scalar_spectrum, mass_hubble_volume, cal_C_G_vec
 ):
     """
-    Compute the beta (for the f_PBH integral) in eq A12 of xxxx.xxxxx.
+    Compute the beta (for the f_PBH integral) in eq A12 of 2503.10805.
 
     Parameters:
     -----------
@@ -431,19 +431,19 @@ def compute_beta_NL_C_QCD(
     Returns:
     --------
     beta : jax.numpy.ndarray
-        Beta in eq A12 of xxxx.xxxxx.
+        Beta in eq A12 of 2503.10805.
 
     """
 
-    # Get sigma_c from eq A8 of xxxx.xxxxx
+    # Get sigma_c from eq A8 of 2503.10805
     sigma_c = compute_sigma_c_NL_QCD(
         k_vec, r_max, scalar_spectrum, mass_hubble_volume
     )
 
-    # Compute the integrand in eq A12 of xxxx.xxxxx
+    # Compute the integrand in eq A12 of 2503.10805
     beta_integrand = integrand_beta(cal_C_G_vec, sigma_c, mass_hubble_volume)
 
-    # Return the integral in eq A12 of xxxx.xxxxx
+    # Return the integral in eq A12 of 2503.10805
     return trapezoid(beta_integrand, x=cal_C_G_vec, axis=0)
 
 
@@ -487,10 +487,10 @@ def f_PBH_NL_QCD(r_max_vec_mpc, k_vec_mpc, scalar_spectrum, len_C_G_vec=100):
     entropy_dofs_term = entropy_dofs(T_v) / g_sm_tot
     M_H_factor = 1.0 / 7.9e-10 / Omega_DM / M_H_vec**1.5
 
-    # compute the prefactor in eq. A1 of xxxx.xxxxx
+    # compute the prefactor in eq. A1 of 2503.10805
     prefactor = M_H_factor * relativistic_dofs_term / entropy_dofs_term
 
-    # compute the beta as given by A12 of xxxx.xxxxx
+    # compute the beta as given by A12 of 2503.10805
     integrand_M = compute_beta_NL_C_QCD(
         k_vec_mpc, r_max_vec_mpc[:, None], scalar_spectrum, M_H_vec, cal_C_G_vec
     )
