@@ -9,9 +9,7 @@ from jax.scipy.interpolate import RegularGridInterpolator
 if sys.version_info.minor > 8:
     from jax.numpy import trapezoid
 else:
-    from jax.numpy import trapz
-    def trapezoid(y, x=None, dx=1.0, axis=-1):
-        return trapz(y, x=None, dx=1.0, axis=-1)
+    from jax.numpy import trapz as trapezoid
 
 from functools import partial
 
