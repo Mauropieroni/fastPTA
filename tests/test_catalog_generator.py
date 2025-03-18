@@ -32,7 +32,8 @@ def test_generation(parameter, n_pulsars, pulsar_dictionary):
         x = np.cos(x)
 
     dist = test_dictionary[parameter + "_dict"]
-    # This is a Kolmogorov–Smirnov test to check whether the pulsars in the catalog are distributed as expected
+    # This is a Kolmogorov–Smirnov test to check whether the pulsars in the
+    # catalog are distributed as expected
 
     if dist["which_distribution"] == "uniform" and len(x) > 3:
         _stats, p = kstest(
@@ -64,7 +65,7 @@ class TestCatalogGenerator(unittest.TestCase):
         """
 
         for p in tu.parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 30, tu.EPTAlike_test) > 1e-4)  # type: ignore
+            self.assertTrue(test_generation(p, 30, tu.EPTAlike_test) > 1e-4)
 
     def test_generation_EPTA_noiseless(self):
         """
@@ -74,7 +75,7 @@ class TestCatalogGenerator(unittest.TestCase):
 
         for p in tu.parameters_to_test.keys():
             self.assertTrue(
-                test_generation(p, 50, tu.EPTAlike_noiseless_test) > 1e-4  # type: ignore
+                test_generation(p, 50, tu.EPTAlike_noiseless_test) > 1e-4
             )
 
     def test_generation_SKAlike(self):
@@ -84,7 +85,7 @@ class TestCatalogGenerator(unittest.TestCase):
         """
 
         for p in tu.parameters_to_test.keys():
-            self.assertTrue(test_generation(p, 500, tu.mockSKA10_test) > 1e-4)  # type: ignore
+            self.assertTrue(test_generation(p, 500, tu.mockSKA10_test) > 1e-4)
 
     def test_generation_ng_positions(self):
         """

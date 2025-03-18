@@ -24,6 +24,8 @@ get_tensors_Binned_data_path = test_data_path + "get_tensors_Binned.npz"
 get_tensors_Legendre_data_path = test_data_path + "get_tensors_Legendre.npz"
 Fisher_data_path = test_data_path + "Fisher_data.npz"
 Fisher_data_path2 = test_data_path + "Fisher_data2.npz"
+f_PBH_lognormal_data_path = test_data_path + "f_PBH_lognormal.npz"
+find_A_PBH_lognormal_data_path = test_data_path + "find_A_PBH_lognormal.npz"
 
 parameters_to_test = {
     "phi": "phi",
