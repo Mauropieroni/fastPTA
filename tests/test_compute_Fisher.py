@@ -94,7 +94,8 @@ class TestFisher(unittest.TestCase):
 
     def test_compute_fisher_legendre(self):
         """
-        Test the function that computes the Fisher matrix with HD projected onto Legendre polynomials
+        Test the function that computes the Fisher matrix with HD projected onto
+        Legendre polynomials
 
         """
 
@@ -117,7 +118,8 @@ class TestFisher(unittest.TestCase):
 
     def test_compute_fisher_binned(self):
         """
-        Test the function that computes the Fisher matrix with HD projected onto the binned basis
+        Test the function that computes the Fisher matrix with HD projected onto
+        the binned basis
 
         """
 

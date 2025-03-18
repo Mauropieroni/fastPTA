@@ -14,8 +14,11 @@ import fastPTA.utils as ut
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
 
 
-jax.config.update("jax_enable_x64", True)
+# Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
 
 
 # Just some constants
@@ -961,7 +964,8 @@ def binned_projection(zeta_IJ, time_tensor_IJ, masks):
     --------
     binned_projection : numpy.ndarray or jax.numpy.ndarray
         4D array with the binned projection of the Hellings and Downs
-        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is number of bins, F is the number of frequencies, and N is the number of
+        correlations. The shape is (HD_order + 1, F, N, N), where HD_order is
+        number of bins, F is the number of frequencies, and N is the number of
         pulsars.
 
     """
@@ -1103,7 +1107,8 @@ def get_tensors(
         the anisotropy decomposition (spherical harmonics or sqrt basis).
     - HD_functions_IJ : numpy.ndarray or jax.numpy.ndarray
         4D array with the Legendre or binned projection of the Hellings and
-        Downs correlations. The shape is (HD_order + 1, F, N, N), where HD_order is the maximum order of Legendre polynomials / bins, F is the
+        Downs correlations. The shape is (HD_order + 1, F, N, N), where
+        HD_order is the maximum order of Legendre polynomials / bins, F is the
         number of frequencies,and N is the number of pulsars.
     - HD_coefficients : numpy.ndarray or jax.numpy.ndarray
         Legendre coefficients for Hellings and Downs correlations values up to

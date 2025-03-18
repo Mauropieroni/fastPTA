@@ -4,15 +4,20 @@ import jax.numpy as jnp
 
 # Local
 import fastPTA.utils as ut
-from fastPTA.signals import SMBBH_parameters, get_model
+from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
 
-# Set some global parameters for jax
-jax.config.update("jax_enable_x64", True)
+
+# Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
+
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
+
 
 # Default value for signal_lm
 default_signal_lm = jnp.array([1.0 / jnp.sqrt(4 * jnp.pi)])
+power_law_model = get_signal_model("power_law")
 
 
 @jax.jit
@@ -456,7 +461,7 @@ def get_integrands_lm(
 def compute_fisher(
     T_obs_yrs=10.33,
     n_frequencies=30,
-    signal_label="power_law",
+    signal_model=power_law_model,
     signal_parameters=SMBBH_parameters,
     signal_lm=default_signal_lm,
     get_tensors_kwargs={},
@@ -475,9 +480,9 @@ def compute_fisher(
     n_frequencies : int, optional
         Number of frequency bins
         default is 30
-    signal_label : str, optional
-        Label indicating the type of signal model to use
-        default is "power_law".
+    signal_model : signal_model object, optional
+        Object containing the signal model and its derivatives
+        Default is a power_law model
     signal_parameters : dict, optional
         Dictionary containing parameters for the signal model
         default is SMBBH_parameters.
@@ -525,21 +530,12 @@ def compute_fisher(
     # Setting the frequency vector from the observation time
     frequency = (1.0 + jnp.arange(n_frequencies)) / (T_obs_yrs * ut.yr)
 
-    # Get the functions for the signal and its derivatives
-    model = get_model(signal_label)
-    signal_model = model["signal_model"]
-    dsignal_model = model["dsignal_model"]
+    # Compute the signal
+    signal = signal_model.template(frequency, signal_parameters)
 
-    # Computing the signal
-    signal = signal_model(frequency, signal_parameters)
-
-    # Building the signal derivatives
-    dsignal = jnp.array(
-        [
-            dsignal_model(i, frequency, signal_parameters)
-            for i in range(0, len(signal_parameters))
-        ]
-    )
+    # Building the signal derivatives we transpose to have shape (P, F) where P
+    # is the number of parameters and F is the number of frequencies
+    dsignal = signal_model.d1(frequency, signal_parameters).T
 
     # Gets all the ingredients to compute the fisher
     strain_omega, response_IJ, HD_functions_IJ, HD_coefficients = get_tensors(
