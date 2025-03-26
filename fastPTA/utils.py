@@ -1,7 +1,7 @@
 # Global
 import os
-import sys
 import yaml
+import scipy
 import numpy as np
 import healpy as hp
 
@@ -10,8 +10,40 @@ from wigners import clebsch_gordan
 import jax
 import jax.numpy as jnp
 
-if sys.version_info.minor >= 10:
+
+def compare_versions(version1, version2):
+    """
+    Compare two versions of a software package.
+    Returns True if version1 >= version2, False otherwise.
+
+    Parameters:
+    -----------
+    version1 : str
+        First version to compare.
+    version2 : str
+        Second version to compare.
+
+    Returns:
+    --------
+    is_greater : bool
+        True if version1 >= version2, False otherwise.
+    """
+
+    version1 = version1.split(".")
+    version2 = version2.split(".")
+
+    for i in range(3):
+        if int(version1[i]) < int(version2[i]):
+            return False
+        elif int(version1[i]) > int(version2[i]):
+            return True
+
+    return True
+
+
+if compare_versions(scipy.__version__, "1.17.0"):
     from scipy.special import sph_harm_y
+
 else:
     from scipy.special import sph_harm
 

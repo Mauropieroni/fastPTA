@@ -1,21 +1,21 @@
 import numpy as np
-import sys
 
 import jax
 import jax.numpy as jnp
 from jax.scipy.interpolate import RegularGridInterpolator
 
 
-if sys.version_info.minor > 8:
+# Local
+import fastPTA.utils as ut
+
+
+if ut.compare_versions(jax.__version__, "0.4.24"):
     from jax.numpy import trapezoid
 else:
     from jax.numpy import trapz as trapezoid
 
 from functools import partial
 
-
-# Local
-import fastPTA.utils as ut
 
 # Set some global parameters for jax
 jax.config.update("jax_enable_x64", True)
