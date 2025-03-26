@@ -1,31 +1,14 @@
 build/
+.vscode/
 fastPTA.egg-info/
 
-tests/__pycache__/
-fastPTA/__pycache__/
-examples/__pycache__/
+**/__pycache__/
+**/.python-version
 
-.vscode/
-.python-version
+**/plots/
+**/generated_data/
+**/generated_chains/
+**/pulsar_configurations/
 
-examples/plots/
-examples/generated_data/
-examples/generated_chains/
-examples/pulsar_configurations/
-
-examples/examples_first_paper/plots/
-examples/examples_first_paper/generated_data/
-examples/examples_first_paper/generated_chains/
-examples/examples_first_paper/pulsar_configurations/
-
-examples/examples_paper_anisotropies/pulsar_configurations/
-examples/examples_paper_anisotropies/generated_chains/
-examples/examples_paper_anisotropies/generated_data/
-examples/examples_paper_anisotropies/plots/
-
-examples/examples_paper_SIGWB/plots/
-examples/examples_paper_SIGWB/generated_data/
-examples/examples_paper_SIGWB/generated_chains/
-examples/examples_paper_SIGWB/pulsar_configurations/
 
 tests/test_data/test_catalog2.txt
