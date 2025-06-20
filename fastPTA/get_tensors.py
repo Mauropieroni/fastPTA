@@ -1045,7 +1045,7 @@ def get_tensors(
     l_max=0,
     nside=16,
     regenerate_catalog=False,
-    **generate_catalog_kwargs
+    **generate_catalog_kwargs,
 ):
     """
     Generate all tensors (noise, response and Hellings and Downs) needed for
