@@ -41,7 +41,7 @@ def get_tensors_and_shapes(
         regenerate_catalog=True,
         HD_basis=HD_basis,
         HD_order=HD_order,
-        **tu.EPTAlike_test
+        **tu.EPTAlike_test,
     )
 
     HD_shape = HD_order + 1 if HD_order else HD_order

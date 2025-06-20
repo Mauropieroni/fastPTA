@@ -514,7 +514,7 @@ def get_signal_model(signal_label):
                 s_ut.d1SMBH_and_broken_power_law,
                 frequency,
                 parameters,
-                **kwargs
+                **kwargs,
             )
 
         # Initialize the signal model
