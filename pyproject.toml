@@ -35,12 +35,12 @@ dependencies = [
     "corner>=2.2.1",
     "emcee>=3.1.2",
     "wigners>=0.3.0",
-    "pytest",
+
     "flake8",
 ]
 
 [project.optional-dependencies]
-dev = ["flake8-black>=0.3.6"]
+dev = ["flake8-black>=0.3.6", "pytest"]
 
 [tool.setuptools]
 packages = ["fastPTA"]
