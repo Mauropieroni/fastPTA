@@ -60,9 +60,6 @@ class TestGetTensors(unittest.TestCase):
         # Compute D_IJ
         D_IJ = dc.get_D_IJ(fi, h_tilde, distances, p_vec, theta, phi)
 
-        print(D_IJ[0])
-        print(expected_D_IJ[0])
-
         self.assertAlmostEqual(
             float(jnp.sum(jnp.abs(expected_D_IJ - D_IJ))),
             0.0,

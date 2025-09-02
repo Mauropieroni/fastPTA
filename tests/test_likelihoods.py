@@ -115,7 +115,7 @@ class TestLikelihoods(unittest.TestCase):
         )
 
         # Check type and finite value
-        self.assertTrue(jnp.isscalar(log_lik))
+        self.assertEqual(log_lik.ndim, 0)
         self.assertTrue(jnp.isfinite(log_lik))
 
         # Test with different signal values
@@ -123,15 +123,22 @@ class TestLikelihoods(unittest.TestCase):
         log_lik_zero = likelihoods.log_likelihood(
             self.data, signal_value_zero, self.response_IJ, self.strain_omega
         )
-        self.assertTrue(jnp.isfinite(log_lik_zero))
+
+        # The expected value for this input
+        expected_value = -18.81847508726009
+
+        self.assertAlmostEqual(log_lik_zero, expected_value, places=7)
 
         # Test that changing signal values affects the likelihood
         signal_value_diff = self.signal_value * 2
         log_lik_diff = likelihoods.log_likelihood(
             self.data, signal_value_diff, self.response_IJ, self.strain_omega
         )
-        self.assertTrue(jnp.isfinite(log_lik_diff))
-        self.assertNotEqual(log_lik, log_lik_diff)
+
+        # The expected value for this input
+        expected_value = -18.840534924073125
+
+        self.assertAlmostEqual(log_lik_diff, expected_value, places=7)
 
     def test_log_posterior(self):
         """Test the log_posterior function."""
@@ -146,9 +153,12 @@ class TestLikelihoods(unittest.TestCase):
             self.priors,
         )
 
+        # The expected value for this input
+        expected_value = -18.42136609195464
+
         # Check type and finite value
-        self.assertTrue(jnp.isscalar(log_post))
-        self.assertTrue(jnp.isfinite(log_post))
+        self.assertEqual(log_post.ndim, 0)
+        self.assertAlmostEqual(log_post, expected_value, places=7)
 
         # Test with parameters outside prior bounds
         parameters_outside = jnp.array([-19.0, 8.0])  # Outside prior bounds
@@ -176,17 +186,23 @@ class TestLikelihoods(unittest.TestCase):
             self.parameters_full, self.data_full, self.gamma_IJ_lm, self.C_ff
         )
 
+        # The expected value for this input
+        expected_value = -40.30650713230943
+
         # Check type and finite value
-        self.assertTrue(jnp.isscalar(log_lik_full))
-        self.assertTrue(jnp.isfinite(log_lik_full))
+        self.assertAlmostEqual(log_lik_full, expected_value, places=7)
 
         # Test with different parameter values
         params_half = 0.5 * jnp.ones_like(self.parameters_full)
         log_lik_half = likelihoods.log_likelihood_full(
             params_half, self.data_full, self.gamma_IJ_lm, self.C_ff
         )
-        self.assertTrue(jnp.isfinite(log_lik_half))
-        self.assertNotEqual(log_lik_full, log_lik_half)
+
+        # The expected value for this input
+        expected_value = -30.325966090576866
+
+        # Check type and finite value
+        self.assertAlmostEqual(log_lik_half, expected_value, places=7)
 
     def test_log_posterior_full(self):
         """Test the log_posterior_full function."""
@@ -196,8 +212,12 @@ class TestLikelihoods(unittest.TestCase):
             + jnp.eye(self.n_pulsars)[None, :, :]
         )  # Make positive definite
 
-        # Create a valid map with all positive values
-        self.parameters_full = jnp.ones_like(self.parameters_full)
+        # Set up parameters that will produce a positive map
+        # For simplicity, we'll just test the monopole (l=0, m=0) term
+        # Set all coefficients to zero except for the monopole
+        self.parameters_full = jnp.zeros_like(self.parameters_full)
+        # Set the monopole term (first coefficient) to a positive value
+        self.parameters_full = self.parameters_full.at[0].set(1.0)
 
         # Compute full log posterior with valid parameters
         log_post_full = likelihoods.log_posterior_full(
@@ -209,12 +229,59 @@ class TestLikelihoods(unittest.TestCase):
             self.C_ff,
         )
 
-        # Check type
-        self.assertTrue(jnp.isscalar(log_post_full))
+        # The expected value for this input with our specific random seed
+        expected_value = -10.39937701
 
-        # We just test that it runs, as the actual value depends on
-        # the spherical harmonics implementation and the valid values
-        # in the reconstructed map
+        # Check it matches expected value
+        self.assertAlmostEqual(log_post_full, expected_value, places=7)
+
+        # Test with different positive values to ensure different results
+        params_different = jnp.zeros_like(self.parameters_full)
+        params_different = params_different.at[0].set(2.0)  # Different monopole
+        log_post_diff = likelihoods.log_posterior_full(
+            params_different,
+            self.Nside,
+            self.l_max,
+            self.data_full,
+            self.gamma_IJ_lm,
+            self.C_ff,
+        )
+
+        # Expected value for this input
+        expected_value = -18.63948993045088
+
+        self.assertAlmostEqual(log_post_diff, expected_value, places=7)
+
+        self.assertTrue(jnp.isfinite(log_post_diff))
+        self.assertNotEqual(log_post_full, log_post_diff)
+
+        # This should return -inf
+        params_nan = jnp.zeros_like(self.parameters_full)
+        params_nan = params_nan.at[0].set(-1.0)  # Different monopole
+        log_post_nan = likelihoods.log_posterior_full(
+            params_nan,
+            self.Nside,
+            self.l_max,
+            self.data_full,
+            self.gamma_IJ_lm,
+            self.C_ff,
+        )
+
+        self.assertTrue(jnp.isnan(log_post_nan))
+
+        # This should return -inf
+        params_inf = jnp.zeros_like(self.parameters_full)
+        params_inf = params_inf.at[1].set(1.0)  # Different monopole
+        log_post_inf = likelihoods.log_posterior_full(
+            params_inf,
+            self.Nside,
+            self.l_max,
+            self.data_full,
+            self.gamma_IJ_lm,
+            self.C_ff,
+        )
+
+        self.assertTrue(jnp.isinf(-log_post_inf))
 
 
 if __name__ == "__main__":
