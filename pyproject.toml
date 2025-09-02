@@ -13,6 +13,7 @@ authors = [
     { name = "Gabriele Franciolini", email = "gabriele.franciolini@cern.ch" },
     { name = "Chiara Cecchini", email = "chiara.cecchini@unitn.it" },
 ]
+license = { text = "GNU General Public License v3.0 only" }
 keywords = ["PTAs", "GWs"]
 urls = { Homepage = "https://github.com/Mauropieroni/fastPTA/" }
 
@@ -29,14 +30,11 @@ dependencies = [
     "healpy==1.16.2; python_version < '3.9'",
     "typing_extensions>=4.10.0; python_version == '3.11'",
     "matplotlib>=3.7.4",
-    "pandas>=2.0.3",
     "tqdm>=4.64.1",
     "pyyaml>=6.0",
     "corner>=2.2.1",
     "emcee>=3.1.2",
     "wigners>=0.3.0",
-
-    "flake8",
 ]
 
 [project.optional-dependencies]
@@ -46,7 +44,7 @@ dev = ["flake8-black>=0.3.6", "pytest"]
 packages = ["fastPTA"]
 
 [tool.setuptools.package-data]
-fastPTA = ["defaults/*"]
+fastPTA = ["angular_decomposition/*", "data/*", "defaults/*", "inference_tools/*", "signal_templates/*"]
 
 [tool.black]
 line_length = 80
