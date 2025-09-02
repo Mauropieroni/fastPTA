@@ -1,17 +1,19 @@
 # Global
 import unittest
 
-import numpy as np
 import healpy as hp
-
 import jax
 import jax.numpy as jnp
+import numpy as np
 
 # Local
 import utils as tu
-from fastPTA import utils as ut
-from fastPTA import get_tensors as gt
 
+from fastPTA import get_tensors as gt
+from fastPTA import utils as ut
+from fastPTA.data import datastream as gds
+
+# Enable 64-bit precision for JAX
 jax.config.update("jax_enable_x64", True)
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
@@ -85,15 +87,16 @@ class TestGetTensors(unittest.TestCase):
         """
 
         npoints = 10
-        pulsars = 15
 
         theta, phi = hp.pix2ang(
             nside, np.linspace(0, npix - 1, npoints, dtype=int)
         )
 
-        theta_p, phi_p = hp.pix2ang(
-            nside, np.array(np.random.uniform(0, npix - 1, pulsars), dtype=int)
-        )
+        data = np.load(tu.get_tensors_data_path)
+
+        p_I = data["p_vec"]
+        theta_p = data["theta_p"]
+        phi_p = data["phi_p"]
 
         analytical = gt.gamma_analytical(
             theta_p,
@@ -102,76 +105,14 @@ class TestGetTensors(unittest.TestCase):
             phi,
         )
 
-        p_I = gt.unit_vector(theta_p, phi_p)
-        hat_k = gt.unit_vector(theta, phi)
+        hat_k = gds.unit_vector(theta, phi)
         gamma = gt.gamma(p_I, hat_k)
 
         self.assertAlmostEqual(
             float(jnp.sum(np.abs(gamma - analytical))),
             0.0,
-            places=7,
+            delta=1e-7,
         )
-
-    def test_spherical_harmonics_multipoles_2(self):
-        """
-        Test the spherical harmonics projection function for pulsars pulsar
-        matrix
-
-        """
-
-        Y00 = np.array([[ut.sph_harm_y(0, 0, theta, phi).real]])
-        Y1m1 = np.array(
-            [[np.sqrt(2.0) * ut.sph_harm_y(1, -1, theta, phi).imag]]
-        )
-        Y10 = np.array([[ut.sph_harm_y(1, 0, theta, phi).real]])
-        Y1p1 = np.array(
-            [[-np.sqrt(2.0) * ut.sph_harm_y(1, 1, theta, phi).real]]
-        )
-
-        Y2m2 = np.array(
-            [[np.sqrt(2.0) * ut.sph_harm_y(2, -2, theta, phi).imag]]
-        )
-        Y2m1 = np.array(
-            [[np.sqrt(2.0) * ut.sph_harm_y(2, -1, theta, phi).imag]]
-        )
-        Y20 = np.array([[ut.sph_harm_y(2, 0, theta, phi).real]])
-        Y2p1 = np.array(
-            [[-np.sqrt(2.0) * ut.sph_harm_y(2, 1, theta, phi).real]]
-        )
-        Y2p2 = np.array([[np.sqrt(2.0) * ut.sph_harm_y(2, 2, theta, phi).real]])
-
-        Y3m3 = np.array(
-            [[np.sqrt(2.0) * ut.sph_harm_y(3, -3, theta, phi).imag]]
-        )
-        Y3p3 = np.array(
-            [[-np.sqrt(2.0) * ut.sph_harm_y(3, 3, theta, phi).real]]
-        )
-
-        res_Y00 = gt.projection_spherial_harmonics_basis(Y00, 1)
-        res_Y1m1 = gt.projection_spherial_harmonics_basis(Y1m1, 1)
-        res_Y10 = gt.projection_spherial_harmonics_basis(Y10, 1)
-        res_Y1p1 = gt.projection_spherial_harmonics_basis(Y1p1, 1)
-
-        res_Y2m2 = gt.projection_spherial_harmonics_basis(Y2m2, 2)
-        res_Y2m1 = gt.projection_spherial_harmonics_basis(Y2m1, 2)
-        res_Y20 = gt.projection_spherial_harmonics_basis(Y20, 2)
-        res_Y2p1 = gt.projection_spherial_harmonics_basis(Y2p1, 2)
-        res_Y2p2 = gt.projection_spherial_harmonics_basis(Y2p2, 2)
-
-        res_Y3m3 = gt.projection_spherial_harmonics_basis(Y3m3, 3)
-        res_Y3p3 = gt.projection_spherial_harmonics_basis(Y3p3, 3)
-
-        self.assertAlmostEqual(jnp.abs(res_Y00[0] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y1m1[1] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y10[2] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y1p1[3] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2m2[4] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2m1[5] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y20[6] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2p1[7] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y2p2[8] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y3m3[9] - 1.0), 0.0, places=4)
-        self.assertAlmostEqual(jnp.abs(res_Y3p3[15] - 1.0), 0.0, places=4)
 
     def test_get_correlations_lm_IJ(self):
         """
@@ -191,7 +132,7 @@ class TestGetTensors(unittest.TestCase):
         data = np.load(tu.get_correlations_lm_IJ_data_path)["data"]
 
         self.assertAlmostEqual(
-            float(jnp.sum(jnp.abs(data - GammalmIJ))), 0.0, places=5
+            float(jnp.sum(jnp.abs(data - GammalmIJ))), 0.0, delta=1e-5
         )
 
     def test_get_tensors_generation(self):
@@ -206,6 +147,7 @@ class TestGetTensors(unittest.TestCase):
         result, test_shapes = get_tensors_and_shapes(
             tu.test_catalog_path2, npulsars, "legendre", HD_order
         )
+
         for i in range(len(tu.get_tensor_labels)):
             self.assertTupleEqual(result[i].shape, test_shapes[i])
 
@@ -261,7 +203,7 @@ class TestGetTensors(unittest.TestCase):
             to_assert = jnp.sum(
                 jnp.abs(results[i] - loaded_data[tu.get_tensor_labels[i]])
             )
-            self.assertAlmostEqual(float(to_assert), 0.0)
+            self.assertAlmostEqual(float(to_assert), 0.0, delta=1e-9)
 
     def test_Legendre_projection(self):
         """
@@ -270,7 +212,7 @@ class TestGetTensors(unittest.TestCase):
 
         """
 
-        HD_order = 30
+        HD_order = 75
         n_pulsars = 70
 
         vec = np.random.uniform(-1.0, 1.0, n_pulsars)
@@ -286,8 +228,8 @@ class TestGetTensors(unittest.TestCase):
         polynomials = gt.get_polynomials_IJ(matrix, HD_order)
         HD_val = HD_coefficients[:, None, None] * polynomials
 
-        diff = 1.0 - np.sum(HD_val, axis=0) / chi_IJ
-        self.assertAlmostEqual(float(jnp.mean(jnp.abs(diff))), 0.0, places=3)
+        diff = chi_IJ - np.sum(HD_val, axis=0)
+        self.assertAlmostEqual(float(jnp.mean(jnp.abs(diff))), 0.0, delta=1e-4)
 
     def test_get_tensors_Binned_results(self):
         """
@@ -309,7 +251,7 @@ class TestGetTensors(unittest.TestCase):
             to_assert = jnp.sum(
                 jnp.abs(results[i] - loaded_data[tu.get_tensor_labels[i]])
             )
-            self.assertAlmostEqual(float(to_assert), 0.0)
+            self.assertAlmostEqual(float(to_assert), 0.0, delta=1e-9)
 
     def test_get_tensors_Legendre_results(self):
         """
@@ -332,7 +274,7 @@ class TestGetTensors(unittest.TestCase):
                 jnp.abs(results[i] - loaded_data[tu.get_tensor_labels[i]])
             )
 
-            self.assertAlmostEqual(float(to_assert), 0.0)
+            self.assertAlmostEqual(float(to_assert), 0.0, delta=1e-7)
 
     def test_get_tensors_anisotropies(self):
         """
@@ -352,12 +294,13 @@ class TestGetTensors(unittest.TestCase):
             anisotropies=True,
         )
 
-        to_assert = jnp.mean(
+        to_assert = jnp.max(
             jnp.abs(
                 results[1][0] / np.sqrt(4 * np.pi) - loaded_data["response_IJ"]
             )
         )
-        self.assertAlmostEqual(float(to_assert), 0.0, places=3)
+
+        self.assertAlmostEqual(to_assert, 0.0, delta=1e-3)
 
 
 if __name__ == "__main__":

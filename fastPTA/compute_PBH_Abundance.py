@@ -107,12 +107,12 @@ def k_of_T_MeV(temperature_MeV):
 
     Parameters:
     -----------
-    temperature_MeV : jax.numpy.ndarray
+    temperature_MeV : Array
         Temperature in MeV.
 
     Returns:
     --------
-    k : jax.numpy.ndarray
+    k : Array
         Comoving wavenumber k in Mpc^{-1}.
 
     """
@@ -141,12 +141,12 @@ def hubble_mass_of_T_MeV(temperature_MeV):
 
     Parameters:
     -----------
-    temperature_MeV : jax.numpy.ndarray
+    temperature_MeV : Array
         Temperature in MeV.
 
     Returns:
     --------
-    M_H : jax.numpy.ndarray
+    M_H : Array
         mass in a Hubble volume in solar masses.
 
     """
@@ -190,14 +190,14 @@ def M_H_of_k(k_vec_mpc, rm_to_k_factor):
 
     Parameters:
     -----------
-    k_vec_mpc : jax.numpy.ndarray
+    k_vec_mpc : Array
         Comoving wavenumber k in Mpc^{-1}.
     rm_to_k_factor : float
         Parameter mapping length scales in wave numbers.
 
     Returns:
     --------
-    M_H : jax.numpy.ndarray
+    M_H : Array
         mass in a Hubble volume in solar masses.
 
     """
@@ -222,14 +222,14 @@ def window(k_vec, r_max):
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
     r_max : float
         Typical size of the perturbation in the same units as 1 / k_vec.
 
     Returns:
     --------
-    window : jax.numpy.ndarray
+    window : Array
         Window function.
 
     """
@@ -247,14 +247,14 @@ def transfer_function(k_vec, r_max):
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
     r_max : float
         Typical size of the perturbation in the same units as 1 / k_vec.
 
     Returns:
     --------
-    transfer_function : jax.numpy.ndarray
+    transfer_function : Array
         Transfer function.
 
     """
@@ -270,16 +270,16 @@ def integrand_spectrum(k_vec, r_max, scalar_spectrum):
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
-    r_max : jax.numpy.ndarray
+    r_max : Array
         Length scale for the perturbations in the same units as 1 / k_vec.
-    scalar_spectrum : jax.numpy.ndarray
+    scalar_spectrum : Array
         Scalar power spectrum.
 
     Returns:
     --------
-    integrand_spectrum : jax.numpy.ndarray
+    integrand_spectrum : Array
         Integrand of the spectrum.
     """
 
@@ -299,13 +299,13 @@ def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
     r_max : float
         Length scale for the perturbations in the same units as 1 / k_vec.
-    scalar_spectrum : jax.numpy.ndarray
+    scalar_spectrum : Array
         Scalar power spectrum.
-    mass_hubble_volume : jax.numpy.ndarray
+    mass_hubble_volume : Array
         mass in a Hubble volume in solar masses.
 
     Returns:
@@ -334,7 +334,7 @@ def P_G(cal_C_G, sigma_c):
 
     Parameters:
     -----------
-    cal_C_G : jax.numpy.ndarray
+    cal_C_G : Array
         Gaussian part of the compaction function in some units.
     sigma_c : float
         Standard deviation of the compaction function. This quantity must
@@ -342,7 +342,7 @@ def P_G(cal_C_G, sigma_c):
 
     Returns:
     --------
-    P_G : jax.numpy.ndarray
+    P_G : Array
         Probability of the compaction function.
 
     """
@@ -360,9 +360,9 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
 
     Parameters:
     -----------
-    cal_C_G : jax.numpy.ndarray
+    cal_C_G : Array
         Gaussian part of the compaction function in some units.
-    mass_hubble_volume : jax.numpy.ndarray
+    mass_hubble_volume : Array
         mass in a Hubble volume in solar masses.
     sigma_c : float
         Standard deviation of the compaction function. This quantity must be in
@@ -370,7 +370,7 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
 
     Returns:
     --------
-    integrand : jax.numpy.ndarray
+    integrand : Array
         Integrand in eq A12 of 2503.10805.
 
     """
@@ -411,26 +411,26 @@ def compute_beta_NL_C_QCD(
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
         This is a 2d array, the first index runs over the masses and the second
         index runs over the set of ks we integrate over to get the variance.
-    r_max : jax.numpy.ndarray
+    r_max : Array
         Typical size of the perturbation in the same units as 1 / k_vec.
         This is a 1d array with size equal to the second axis of k_vec.
-    scalar_spectrum : jax.numpy.ndarray
+    scalar_spectrum : Array
         Scalar power spectrum.
         This is a 2d array with the same shape as k_vec.
-    mass_hubble_volume : jax.numpy.ndarray
+    mass_hubble_volume : Array
         mass in a Hubble volume in solar masses.
-    cal_C_G_vec : jax.numpy.ndarray
+    cal_C_G_vec : Array
         Gaussian part of the compaction function in some units.
         This is a 2d array, the first index runs over the set of values to be
         used in the cal_G integral, the second index runs over masses.
 
     Returns:
     --------
-    beta : jax.numpy.ndarray
+    beta : Array
         Beta in eq A12 of 2503.10805.
 
     """
@@ -454,14 +454,14 @@ def f_PBH_NL_QCD(r_max_vec_mpc, k_vec_mpc, scalar_spectrum, len_C_G_vec=100):
 
     Parameters:
     -----------
-    r_max_vec_mpc : jax.numpy.ndarray
+    r_max_vec_mpc : Array
         Typical size of the perturbation in Mpc.
         This is a 1d array with size equal to the first axis of k_vec_mpc.
-    k_vec_mpc : jax.numpy.ndarray
+    k_vec_mpc : Array
         Comoving wavenumber k in Mpc^{-1}.
         This is a 2d array, the first index runs over the masses and the second
         index runs over the set of ks we integrate over to get the variance.
-    scalar_spectrum : jax.numpy.ndarray
+    scalar_spectrum : Array
         Scalar power spectrum evaluated in k_vec_mpc.
     len_C_G_vec : int, optional
         Number of points in the CG vector (default is 100).
@@ -507,7 +507,7 @@ def lognormal_spectrum(k_vec, amplitude, delta, ks):
 
     Parameters:
     -----------
-    k_vec : jax.numpy.ndarray
+    k_vec : Array
         Comoving wavenumber k in some units.
     amplitude : float
         Amplitude of the spectrum.
@@ -518,7 +518,7 @@ def lognormal_spectrum(k_vec, amplitude, delta, ks):
 
     Returns:
     --------
-    lognormal_spectrum : jax.numpy.ndarray
+    lognormal_spectrum : Array
         Lognormal spectrum.
 
     """

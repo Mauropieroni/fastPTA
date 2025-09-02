@@ -1,145 +1,308 @@
 # Global
+import os
 import unittest
 
+import jax.numpy as jnp
 import numpy as np
-import healpy as hp
+import yaml
 
 # Local
-import utils as tu
 from fastPTA import utils as ut
 
 
-nside = 64
-npix = hp.nside2npix(nside)
-theta, phi = hp.pix2ang(nside, np.arange(npix))
+class TestUtils(unittest.TestCase):
 
-
-class TestGetTensors(unittest.TestCase):
-
-    def test_get_sort_indexes(self):
+    def test_compare_versions(self):
         """
-        Test the function to get the (l,m) pairs sorted correctly
-
+        Test the compare_versions function
         """
+        # Test cases where version1 > version2
+        self.assertTrue(ut.compare_versions("1.2.3", "1.2.2"))
+        self.assertTrue(ut.compare_versions("2.0.0", "1.9.9"))
+        self.assertTrue(ut.compare_versions("1.3.0", "1.2.9"))
 
-        data = np.loadtxt(tu.lm_indexes)
-        inds = ut.get_sort_indexes(5)
+        # Test cases where version1 < version2
+        self.assertFalse(ut.compare_versions("1.2.2", "1.2.3"))
+        self.assertFalse(ut.compare_versions("1.9.9", "2.0.0"))
+        self.assertFalse(ut.compare_versions("1.2.9", "1.3.0"))
 
-        self.assertTrue(np.allclose(inds[2][inds[-1]], data[:, 0]))
-        self.assertTrue(np.allclose(inds[3][inds[-1]], data[:, 1]))
+        # Test cases where version1 == version2
+        self.assertTrue(ut.compare_versions("1.2.3", "1.2.3"))
+        self.assertTrue(ut.compare_versions("0.0.0", "0.0.0"))
 
-    def test_complex_to_real(self):
+    def test_dot_product(self):
         """
-        Test the function to go from complex to real spherical harmonics
-        coefficients assuming complex are sorted according to the healpy scheme
-
+        Test the dot_product function
         """
+        # Test parallel vectors (along z-axis)
+        theta1 = 0.0  # z-axis
+        phi1 = 0.0
+        theta2 = 0.0  # z-axis
+        phi2 = 0.0
+        result = ut.dot_product(theta1, phi1, theta2, phi2)
+        self.assertAlmostEqual(float(result), 1.0)
 
-        l_max = 2
-        n_coefficients = ut.get_n_coefficients_complex(l_max)
+        # Test anti-parallel vectors (along z-axis)
+        theta1 = 0.0  # z-axis
+        phi1 = 0.0
+        theta2 = np.pi  # negative z-axis
+        phi2 = 0.0
+        result = ut.dot_product(theta1, phi1, theta2, phi2)
+        self.assertAlmostEqual(float(result), -1.0)
 
-        complex_vals = np.random.normal(
-            0.0, 1.0, n_coefficients
-        ) + 1j * np.random.normal(0.0, 1.0, n_coefficients)
+        # Test perpendicular vectors (z-axis and x-axis)
+        theta1 = 0.0  # z-axis
+        phi1 = 0.0
+        theta2 = np.pi / 2  # x-axis
+        phi2 = 0.0
+        result = ut.dot_product(theta1, phi1, theta2, phi2)
+        self.assertAlmostEqual(float(result), 0.0)
 
-        test_real_vals = np.array(
-            [
-                complex_vals[0].real,
-                -np.sqrt(2) * complex_vals[3].imag,
-                complex_vals[1].real,
-                -np.sqrt(2) * complex_vals[3].real,
-                np.sqrt(2) * complex_vals[5].imag,
-                -np.sqrt(2) * complex_vals[4].imag,
-                complex_vals[2].real,
-                -np.sqrt(2) * complex_vals[4].real,
-                np.sqrt(2) * complex_vals[5].real,
-            ]
+        # Test with arrays
+        thetas1 = jnp.array([0.0, np.pi / 4, np.pi / 2])
+        phis1 = jnp.array([0.0, 0.0, 0.0])
+        thetas2 = jnp.array([0.0, np.pi / 4, np.pi / 2])
+        phis2 = jnp.array([0.0, 0.0, 0.0])
+        results = ut.dot_product(thetas1, phis1, thetas2, phis2)
+        expected = jnp.array([1.0, 1.0, 1.0])
+        np.testing.assert_allclose(results, expected)
+
+    def test_characteristic_strain_to_Omega(self):
+        """
+        Test the characteristic_strain_to_Omega function
+        """
+        # Test with a single frequency
+        frequency = 1e-8  # Hz
+        result = ut.characteristic_strain_to_Omega(frequency)
+        expected = 2 * np.pi**2 * frequency**2 / 3 / ut.Hubble_over_h**2
+        self.assertAlmostEqual(float(result), float(expected))
+
+        # Test with an array of frequencies
+        frequencies = jnp.array([1e-9, 1e-8, 1e-7])
+        results = ut.characteristic_strain_to_Omega(frequencies)
+        expected = 2 * np.pi**2 * frequencies**2 / 3 / ut.Hubble_over_h**2
+        np.testing.assert_allclose(results, expected)
+
+    def test_strain_to_Omega(self):
+        """
+        Test the strain_to_Omega function
+        """
+        # Test with a single frequency
+        frequency = 1e-8  # Hz
+        result = ut.strain_to_Omega(frequency)
+        expected = 2 * np.pi**2 * frequency**3 / 3 / ut.Hubble_over_h**2
+        self.assertAlmostEqual(float(result), float(expected))
+
+        # Test with an array of frequencies
+        frequencies = jnp.array([1e-9, 1e-8, 1e-7])
+        results = ut.strain_to_Omega(frequencies)
+        expected = 2 * np.pi**2 * frequencies**3 / 3 / ut.Hubble_over_h**2
+        np.testing.assert_allclose(results, expected)
+
+    def test_hc_from_CP(self):
+        """
+        Test the hc_from_CP function
+        """
+        # Test with a single frequency
+        CP = 1e-30  # seconds^3
+        frequency = 1e-8  # Hz
+        T_obs_s = 3.0 * 365.25 * 24 * 3600  # 3 years in seconds
+        result = ut.hc_from_CP(CP, frequency, T_obs_s)
+        expected = (
+            2 * np.sqrt(3) * CP * frequency**1.5 * np.pi * np.sqrt(T_obs_s)
+        )
+        self.assertAlmostEqual(float(result), float(expected))
+
+        # Test with arrays
+        CPs = jnp.array([1e-30, 2e-30, 3e-30])
+        frequencies = jnp.array([1e-9, 1e-8, 1e-7])
+        results = ut.hc_from_CP(CPs, frequencies, T_obs_s)
+        expected = (
+            2 * np.sqrt(3) * CPs * frequencies**1.5 * np.pi * np.sqrt(T_obs_s)
+        )
+        np.testing.assert_allclose(results, expected)
+
+    def test_load_yaml(self):
+        """
+        Test the load_yaml function
+        """
+        # Create a temporary YAML file
+        test_yaml_path = os.path.join(
+            os.path.dirname(__file__), "test_data", "test_config.yaml"
+        )
+        os.makedirs(os.path.dirname(test_yaml_path), exist_ok=True)
+
+        test_data = {
+            "test_key": "test_value",
+            "test_list": [1, 2, 3],
+            "test_dict": {"nested_key": "nested_value"},
+        }
+
+        with open(test_yaml_path, "w") as f:
+            yaml.dump(test_data, f)
+
+        # Test loading the file
+        loaded_data = ut.load_yaml(test_yaml_path)
+
+        # Check that the loaded data matches the original data
+        self.assertEqual(loaded_data["test_key"], test_data["test_key"])
+        self.assertEqual(loaded_data["test_list"], test_data["test_list"])
+        nested_key = "nested_key"
+        self.assertEqual(
+            loaded_data["test_dict"][nested_key],
+            test_data["test_dict"][nested_key],
         )
 
-        real_vals = ut.complex_to_real_conversion(complex_vals)
+        # Clean up
+        os.remove(test_yaml_path)
 
-        self.assertTrue(np.allclose(real_vals, test_real_vals))
-
-    def test_complex_to_real_to_complex(self):
+    def test_compute_inverse(self):
         """
-        Check that starting from complex coefficients the operations commute
-
+        Test the compute_inverse function
         """
+        # Test with a simple 2x2 matrix
+        matrix = jnp.array([[4.0, 1.0], [1.0, 3.0]])
+        result = ut.compute_inverse(matrix)
+        # Analytically computed inverse
+        expected = jnp.array([[3 / 11, -1 / 11], [-1 / 11, 4 / 11]])
+        np.testing.assert_allclose(result, expected, rtol=1e-5)
 
-        l_max = 2
-        n_coefficients = ut.get_n_coefficients_complex(l_max)
-        m_grid = np.array([0, 0, 0, 1, 1, 2], dtype=int)
+        # Test with a batch of matrices
+        matrices = jnp.array(
+            [[[4.0, 1.0], [1.0, 3.0]], [[2.0, 0.5], [0.5, 2.0]]]
+        )
+        results = ut.compute_inverse(matrices)
+        expected1 = jnp.array([[3 / 11, -1 / 11], [-1 / 11, 4 / 11]])
 
-        complex_vals = np.random.normal(
-            0.0, 1.0, n_coefficients
-        ) + 1j * np.random.normal(0.0, 1.0, n_coefficients)
+        # For the second matrix, compute inverse directly
+        matrix2 = matrices[1]
+        expected2 = jnp.linalg.inv(matrix2)
 
-        complex_vals[m_grid == 0] = complex_vals[m_grid == 0].real
+        np.testing.assert_allclose(results[0], expected1, rtol=1e-5)
+        np.testing.assert_allclose(results[1], expected2, rtol=1e-5)
 
-        real_vals = ut.complex_to_real_conversion(complex_vals)
+        # Test that A * inv(A) = I
+        identity = jnp.matmul(matrix, result)
+        np.testing.assert_allclose(identity, jnp.eye(2), atol=1e-14)
 
-        test_complex_vals = ut.real_to_complex_conversion(real_vals)
-
-        self.assertTrue(np.allclose(complex_vals, test_complex_vals))
-
-    def test_get_real_spherical_harmonics(self, l_max=5):
+    def test_logdet_kronecker_product(self):
         """
-        Test the function to get the spherical harmonics
-
+        Test the logdet_kronecker_product function
         """
+        # Test with simple matrices
+        A = jnp.array([[2.0, 1.0], [1.0, 3.0]])
+        B = jnp.array([[4.0, 1.0], [1.0, 5.0]])
 
-        sp_harm = ut.get_real_spherical_harmonics(l_max, theta, phi)
+        result = ut.logdet_kronecker_product(A, B)
 
-        c = 0
-        for ell in range(l_max + 1):
-            for m in range(-ell, ell + 1):
-                sp = ut.sph_harm_y(ell, np.abs(m), theta, phi)
+        # Calculate expected logdet manually
+        # For Kronecker product, det(A ⊗ B) = det(A)^dim(B) * det(B)^dim(A)
+        # Thus, log(det(A ⊗ B)) = dim(B) * log(det(A)) + dim(A) * log(det(B))
+        logdet_A = jnp.log(jnp.linalg.det(A))
+        logdet_B = jnp.log(jnp.linalg.det(B))
+        expected = 2 * logdet_A + 2 * logdet_B
 
-                if m == 0:
-                    sp = sp.real
-                elif m > 0:
-                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.real
-                elif m < 0:
-                    sp = np.sqrt(2.0) * (-1.0) ** m * sp.imag
-                else:
-                    raise ValueError("Nope")
+        self.assertAlmostEqual(float(result), float(expected))
 
-                # Checks that (with the correct normalization) the scalar
-                # product is 1 withing 3 decimal places
-                self.assertAlmostEqual(
-                    np.abs(np.mean(4 * np.pi * sp_harm[c] * sp) - 1.0),
-                    0.0,
-                    places=3,
-                )
-
-                c += 1
-
-    def test_spherical_harmonics_multipoles(self, l_max=3):
+    def test_compute_D_IJ_mean(self):
         """
-        Test the spherical harmonics projection function
-
+        Test the compute_D_IJ_mean function
         """
+        # Create test data
+        x = np.linspace(0, np.pi, 100)
+        y = np.cos(x)  # Simple function with known behavior
+        nbins = 10
 
-        inds = ut.get_sort_indexes(l_max)
-        ll = inds[2][inds[-1]]
-        mm = inds[3][inds[-1]]
+        # Compute results
+        bin_means, bin_std, bin_centers = ut.compute_D_IJ_mean(x, y, nbins)
 
-        for ind in range(len(ll)):
-            YY = np.array(ut.sph_harm_y(ll[ind], np.abs(mm[ind]), theta, phi))
+        # Check shape of results
+        self.assertEqual(len(bin_means), nbins)
+        self.assertEqual(len(bin_std), nbins)
+        self.assertEqual(len(bin_centers), nbins)
 
-            if mm[ind] < 0:
-                # The m < 0 is the complex conjugate of the m > 0 so need a -1
-                YY = -np.sqrt(2.0) * (-1.0) ** mm[ind] * YY.imag
-            elif mm[ind] > 0:
-                # For the m > 0 we just need the real part of Y
-                YY = np.sqrt(2.0) * (-1.0) ** mm[ind] * YY.real
-            else:
-                # For the m = 0 we just need the real part of Y
-                YY = YY.real
+        # Check if bin centers are evenly spaced
+        bin_width = bin_centers[1] - bin_centers[0]
+        for i in range(1, nbins - 1):
+            self.assertAlmostEqual(
+                bin_centers[i + 1] - bin_centers[i], bin_width, places=5
+            )
 
-            res_YY = ut.spherical_harmonics_projection(YY, l_max)
-            self.assertAlmostEqual(np.abs(res_YY[ind] - 1.0), 0.0, places=4)
+        # Check if mean values follow the expected trend (decreasing for cosine)
+        for i in range(nbins - 1):
+            self.assertGreaterEqual(bin_means[i], bin_means[i + 1])
+
+    def test_compute_pulsar_average_D_IJ(self):
+        """
+        Test the compute_pulsar_average_D_IJ function
+        """
+        # Create test data: 3 realizations, each with a 4x4 correlation matrix
+        n_realizations = 3
+        n_pulsars = 4
+
+        # Create angles between pulsars (symmetric matrix)
+        ang_list = np.zeros((n_realizations, n_pulsars, n_pulsars))
+        for r in range(n_realizations):
+            for i in range(n_pulsars):
+                for j in range(i + 1, n_pulsars):
+                    ang = np.random.uniform(0, np.pi)
+                    ang_list[r, i, j] = ang
+                    ang_list[r, j, i] = ang
+
+        # Create correlation values based on angles (using HD curve as example)
+        def hd_curve(ang):
+            x = 0.5 * (1 - np.cos(ang))
+            return x * np.log(x) - 0.25 * (1 - np.cos(ang))
+
+        D_IJ_list = np.zeros_like(ang_list)
+        for r in range(n_realizations):
+            for i in range(n_pulsars):
+                for j in range(n_pulsars):
+                    if i != j:
+                        D_IJ_list[r, i, j] = hd_curve(ang_list[r, i, j])
+
+        # Compute results
+        x_avg, y_avg = ut.compute_pulsar_average_D_IJ(
+            ang_list, D_IJ_list, nbins=5
+        )
+
+        # Check shapes
+        self.assertEqual(x_avg.shape[0], n_realizations)
+        self.assertEqual(y_avg.shape[0], n_realizations)
+        self.assertEqual(x_avg.shape[1], 5)  # nbins
+        self.assertEqual(y_avg.shape[1], 5)  # nbins
+
+    def test_get_R(self):
+        """
+        Test the get_R function for computing Gelman-Rubin statistic
+        """
+        # Create mock MCMC samples with known properties
+        # 3 chains, 2 parameters, 1000 steps each
+        n_steps = 1000
+        n_chains = 3
+        n_params = 2
+
+        # Create samples with different means for different chains
+        samples = np.zeros((n_steps, n_chains, n_params))
+        for chain in range(n_chains):
+            # Parameter 1: All chains have same mean - should converge
+            samples[:, chain, 0] = np.random.normal(5.0, 1.0, n_steps)
+
+            # Parameter 2: Different means - should not converge well
+            samples[:, chain, 1] = np.random.normal(5.0 + chain, 1.0, n_steps)
+
+        # Compute R statistic
+        R = ut.get_R(samples)
+
+        # Check shape
+        self.assertEqual(len(R), n_params)
+
+        # First parameter should have R close to 1 (good convergence)
+        self.assertLess(R[0], 1.1)
+
+        # Second parameter should have R > 1 (poor convergence)
+        self.assertGreater(R[1], 1.1)
 
 
 if __name__ == "__main__":
-    unittest.main(verbosity=2)
+    unittest.main()

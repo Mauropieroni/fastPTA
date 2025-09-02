@@ -1,5 +1,9 @@
+# Global imports
 import os
 import numpy as np
+
+
+# Local imports
 from fastPTA.utils import load_yaml
 
 
@@ -19,13 +23,17 @@ test_catalog_path = test_data_path + "test_catalog.txt"
 test_catalog_path2 = test_data_path + "test_catalog2.txt"
 test_catalog_path3 = test_data_path + "test_catalog3.txt"
 get_tensors_data_path = test_data_path + "get_tensors.npz"
+get_datastream_data_path = test_data_path + "datastream.npz"
+get_correlations_data_path = test_data_path + "data_correlations.npz"
 get_correlations_lm_IJ_data_path = test_data_path + "get_correlations_lm_IJ.npz"
 get_tensors_Binned_data_path = test_data_path + "get_tensors_Binned.npz"
 get_tensors_Legendre_data_path = test_data_path + "get_tensors_Legendre.npz"
+iterative_estimation_data_path = test_data_path + "iterative_estimation.npz"
 Fisher_data_path = test_data_path + "Fisher_data.npz"
 Fisher_data_path2 = test_data_path + "Fisher_data2.npz"
 f_PBH_lognormal_data_path = test_data_path + "f_PBH_lognormal.npz"
 find_A_PBH_lognormal_data_path = test_data_path + "find_A_PBH_lognormal.npz"
+mock_pulsar_noises = test_data_path + "mock_pulsar_noises.npz"
 
 parameters_to_test = {
     "phi": "phi",
