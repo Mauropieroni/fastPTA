@@ -5,18 +5,16 @@
     </td>
     <td>
       <h1>fastPTA</h1>
-      <h2>-- </h2>
+      <h2>
+      A jit-enhanced Python code to forecast the sensitivity of future Pulsar Timing Array (PTA) configurations and assess constraints on Stochastic Gravitational Wave Background (SGWB) parameters. 
+ </h2>
       <p>
-  A jit-enhanced Python code to forecast the sensitivity of future Pulsar Timing Array (PTA) configurations and assess constraints on Stochastic Gravitational Wave Background (SGWB) parameters.     
+The code can generate mock PTA catalogs with noise levels compatible with current and future PTA experiments.
+These catalogs can then be used to perform Fisher forecasts of MCMC simulations.
       </p>
     </td>
   </tr>
 </table>
-
-# fastPTA
-A jit-enhanced Python code to forecast the sensitivity of future Pulsar Timing Array (PTA) configurations and assess constraints on Stochastic Gravitational Wave Background (SGWB) parameters. 
-The code can generate mock PTA catalogs with noise levels compatible with current and future PTA experiments.
-These catalogs can then be used to perform Fisher forecasts of MCMC simulations.
 
 # Installation
 - Clone from this repository:
