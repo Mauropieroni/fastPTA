@@ -1,12 +1,38 @@
 # Global
 import numpy as np
-import pandas as pd
+from scipy.stats import norm
 
 # Local
 from fastPTA.utils import (
+    save_table,
     default_pulsar_parameters,
     path_to_default_NANOGrav_positions,
 )
+
+
+def generate_distance(
+    n_pulsars, loc=3.1356587021094077, scale=0.2579495260515389
+):
+    """
+    Generate distances for a given number of pulsars based on a normal
+    distribution. The loc and scale are fitted from the NANOGrav set of pulsars.
+
+    Args:
+        n_pulsars (int): Number of pulsars to generate distances for.
+        loc (float, optional): Mean of the normal distribution.
+            Defaults to 3.1356587021094077.
+        scale (float, optional): Standard deviation of the normal distribution.
+            Defaults to 0.2579495260515389.
+
+    Returns:
+        numpy.ndarray: Array of generated distances in parsecs (pc).
+    """
+
+    # Generate log10 of the distance in parsecs
+    log10d = norm.rvs(size=n_pulsars, loc=loc, scale=scale)
+
+    # The fit was done for log10 of the distance in parsecs
+    return 10**log10d
 
 
 def generate_parameter(n_pulsars, parameter_dict):
@@ -32,7 +58,7 @@ def generate_parameter(n_pulsars, parameter_dict):
 
     Returns:
     --------
-    data : numpy.ndarray or jax.numpy.ndarray
+    data : Array
         Generated parameters for the catalog of pulsars.
 
     """
@@ -73,7 +99,7 @@ def generate_noise_parameter(
         Each dictionary should have keys:
             - "min": float, minimum value for noise parameter.
             - "max": float, maximum value for noise parameter.
-    noise_probabilities : numpy.ndarray or jax.numpy.ndarray
+    noise_probabilities : Array
         Array of probabilities corresponding to each noise parameter.
     do_filter : bool, optional
         Flag indicating whether to apply filtering to noise parameters,
@@ -81,7 +107,7 @@ def generate_noise_parameter(
 
     Returns:
     --------
-    noise_vals : numpy.ndarray or jax.numpy.ndarray
+    noise_vals : Array
         Generated noise parameters for the pulsars.
 
     """
@@ -137,11 +163,12 @@ def generate_pulsars_catalog(
     save_catalog=False,
     outname="pulsar_configurations/new_pulsars_catalog.txt",
     use_ng_positions=False,
+    verbose=False,
 ):
     """
     Generate a catalog of pulsars with specified parameters (mostly timing and
-    noise characteristics). The generated catalog is returned as a pandas
-    DataFrame. If save_catalog is True, the generated catalog is saved to the
+    noise characteristics). The generated catalog is returned as a dictionary.
+    If save_catalog is True, the generated catalog is saved to the
     specified output file.
 
     Parameters:
@@ -177,6 +204,9 @@ def generate_pulsars_catalog(
     use_ng_positions : bool, optional
         Flag indicating whether to use NANOGrav positions for pulsars,
         default is False.
+    verbose : bool, optional
+        Flag indicating whether to print verbose output during catalog
+        generation, default is False.
 
     Returns:
     --------
@@ -235,9 +265,12 @@ def generate_pulsars_catalog(
         ).T
     )
 
-    DF = pd.DataFrame(catalog)
-
     if save_catalog:
-        DF.to_csv(outname, sep=" ", index=False)
+        # Save to .txt with headers
+        save_table(
+            outname,
+            catalog,
+            verbose=verbose,
+        )
 
-    return DF
+    return catalog

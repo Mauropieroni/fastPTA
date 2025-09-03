@@ -5,7 +5,7 @@ import jax.numpy as jnp
 from scipy import stats
 
 # Local
-from fastPTA.priors import Priors
+from fastPTA.inference_tools.priors import Priors
 
 
 class TestSignals(unittest.TestCase):

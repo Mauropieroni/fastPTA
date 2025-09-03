@@ -1,4 +1,4 @@
-# Global
+# Global imports
 import corner
 import matplotlib
 import matplotlib.patches
@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from scipy.special import legendre
 
-
+# Local imports
 from fastPTA import get_tensors as gt
 
 
@@ -205,3 +205,148 @@ def plot_corner(
         plt.legend(handles=custom_lines, bbox_to_anchor=bbox_to_anchor, loc=0)
     else:
         plt.legend(loc=0)
+
+
+def plot_chain_results(
+    flat_samples, posterior_mean, posterior_std, injected_means
+):
+    n_params = flat_samples.shape[1]
+
+    param_groups = []
+    param_idx, ell = 0, 0
+    while param_idx < n_params:
+        n_params_this_l = 2 * ell + 1
+        if param_idx + n_params_this_l <= n_params:
+            param_groups.append(
+                list(range(param_idx, param_idx + n_params_this_l))
+            )
+            param_idx += n_params_this_l
+            ell += 1
+        else:
+            param_groups.append(list(range(param_idx, n_params)))
+            break
+
+    labels = [""] * n_params
+    for ell, group in enumerate(param_groups):
+        for i, param_idx in enumerate(group):
+            m = i - ell
+            labels[param_idx] = f"$c_{{{ell}{m if m != 0 else '0'}}}$"
+
+    n_rows, max_cols = len(param_groups), max(
+        len(group) for group in param_groups
+    )
+    fig, axes = plt.subplots(
+        n_rows, max_cols, figsize=(3 * max_cols, 3 * n_rows)
+    )
+
+    if n_rows == 1:
+        axes = axes.reshape(1, -1)
+    elif max_cols == 1:
+        axes = axes.reshape(-1, 1)
+    if n_rows == 1 and max_cols == 1:
+        axes = np.array([[axes]])
+
+    legend_created = False
+
+    for row_idx, group in enumerate(param_groups):
+        for col_idx, param_idx in enumerate(group):
+            ax = axes[row_idx, col_idx]
+
+            ax.hist(
+                flat_samples[:, param_idx],
+                bins=25,
+                density=True,
+                alpha=0.3,
+                color="steelblue",
+                edgecolor="black",
+                linewidth=0.5,
+            )
+
+            q_values = np.percentile(
+                flat_samples[:, param_idx],
+                [5, 50, 95],
+            )
+
+            ax.axvline(
+                q_values[0],
+                color="red",
+                linestyle="--",
+                alpha=1,
+                linewidth=3,
+                label="5th/95th percentile" if not legend_created else "",
+            )
+            ax.axvline(
+                q_values[2],
+                color="red",
+                linestyle="--",
+                alpha=1,
+                linewidth=3,
+            )
+
+            ax.axvline(
+                q_values[1],
+                color="red",
+                linestyle="-",
+                alpha=1,
+                linewidth=3,
+                label="Median (50th percentile)" if not legend_created else "",
+            )
+
+            mean = posterior_mean[param_idx]
+            std = posterior_std[param_idx]
+
+            x = np.linspace(mean - 4 * std, mean + 4 * std, 100)
+            y = (
+                1
+                / (std * np.sqrt(2 * np.pi))
+                * np.exp(-0.5 * ((x - mean) / std) ** 2)
+            )
+
+            ax.plot(x, y, color="blue", linewidth=2, label="Posterior PDF")
+
+            if param_idx < len(injected_means):
+                ax.axvline(
+                    injected_means[param_idx],
+                    color="Black",
+                    linestyle="-",
+                    linewidth=3,
+                    alpha=1,
+                    label="True value" if not legend_created else "",
+                )
+
+            ax.set_xlabel(labels[param_idx], fontsize=8)
+            ax.set_ylabel("Density", fontsize=8)
+            median, upper, lower = (
+                q_values[1],
+                q_values[2] - q_values[1],
+                q_values[1] - q_values[0],
+            )
+            ax.set_title(
+                f"{median:.3f}$^{{+{upper:.3f}}}_{{-{lower:.3f}}}$", fontsize=8
+            )
+            ax.tick_params(axis="both", labelsize=6)
+            ax.locator_params(nbins=3)
+            ax.grid(True, alpha=0.3)
+
+            legend_created = True
+
+    for row_idx, group in enumerate(param_groups):
+        for col_idx in range(len(group), max_cols):
+            axes[row_idx, col_idx].set_visible(False)
+
+    plt.tight_layout()
+
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    fig.legend(
+        handles,
+        labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, -0.02),
+        ncol=len(labels),
+        fontsize=10,
+        frameon=True,
+    )
+
+    plt.subplots_adjust(bottom=0.1)
+
+    plt.show()

@@ -1,14 +1,66 @@
-# Global
+# Global imports
 import os
-import yaml
-import scipy
-import numpy as np
-import healpy as hp
-
-from wigners import clebsch_gordan
 
 import jax
 import jax.numpy as jnp
+import numpy as np
+import yaml
+from scipy.stats import binned_statistic
+
+# If you want to use your GPU change here
+which_device = "cpu"
+jax.config.update("jax_default_device", jax.devices(which_device)[0])
+
+# Enable 64-bit precision
+jax.config.update("jax_enable_x64", True)
+
+
+# H0/h = 100 km/s/Mpc expressed in meters
+Hubble_over_h = 3.24e-18
+
+# Hour
+hour = 3600
+
+# Day
+day = 24 * hour
+
+# Year in seconds
+yr = 365.25 * day
+
+# Frequency associated with 1yr
+f_yr = 1 / yr
+
+# Light speed in m/s
+light_speed = 299792458.0
+
+# Parsec in meters
+parsec = 3.085677581491367e16
+
+# Megaparsec in meters
+Mpc = 1e6 * parsec
+
+# Set the path to the default pulsar parameters
+path_to_defaults = os.path.join(os.path.dirname(__file__), "defaults/")
+
+# Set the path to the default pulsar parameters
+path_to_default_pulsar_parameters = os.path.join(
+    path_to_defaults, "default_pulsar_parameters.yaml"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_pulsar_catalog = os.path.join(
+    path_to_defaults, "default_catalog.txt"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_NANOGrav_positions = os.path.join(
+    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
+)
+
+# Set the path to the default pulsar catalog
+path_to_default_NANOGrav_positions = os.path.join(
+    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
+)
 
 
 def compare_versions(version1, version2):
@@ -41,62 +93,94 @@ def compare_versions(version1, version2):
     return True
 
 
-if compare_versions(scipy.__version__, "1.17.0"):
-    from scipy.special import sph_harm_y
+def save_table(filename: str, data: dict, verbose: bool = False):
+    """
+    Save a dict of columns (arrays or lists) into a single .txt file with
+    headers. Handles both numeric and string columns.
+    """
+    if verbose:
+        print(f"Saving data to {filename}")
 
-else:
-    from scipy.special import sph_harm
+    keys = list(data.keys())
+    cols = [np.array(data[k]) for k in keys]
 
-    def sph_harm_y(ell, m, theta, phi):
-        return sph_harm(m, ell, phi, theta)
+    # Build object array (n_rows x n_cols) → no dtype promotion
+    arr = np.empty((len(cols[0]), len(cols)), dtype=object)
+    for j, col in enumerate(cols):
+        arr[:, j] = col
 
+    # Build format specifiers per column
+    fmts = []
+    for col in cols:
+        if np.issubdtype(col.dtype, np.number):
+            fmts.append("%.6g")  # numeric
+        else:
+            fmts.append("%s")  # string
 
-# If you want to use your GPU change here
-which_device = "cpu"
-jax.config.update("jax_default_device", jax.devices(which_device)[0])
-
-# Enable 64-bit precision
-jax.config.update("jax_enable_x64", True)
-
-
-# H0/h = 100 km/s/Mpc expressed in meters
-Hubble_over_h = 3.24e-18
-
-# Hour
-hour = 3600
-
-# Day
-day = 24 * hour
-
-# Year in seconds
-yr = 365.25 * day
-
-# Frequency associated with 1yr
-f_yr = 1 / yr
+    # Save
+    np.savetxt(filename, arr, fmt=fmts, header=" ".join(keys), comments="# ")
 
 
-# Set the path to the default pulsar parameters
-path_to_defaults = os.path.join(os.path.dirname(__file__), "defaults/")
+def load_table(filename: str, verbose: bool = False):
+    """
+    Load a table from a text file into a dictionary.
+    """
+    if verbose:
+        print(f"Loading data from {filename}")
 
-# Set the path to the default pulsar parameters
-path_to_default_pulsar_parameters = os.path.join(
-    path_to_defaults, "default_pulsar_parameters.yaml"
-)
+    # Load with genfromtxt: dtype=None lets it infer per-column types
+    arr = np.genfromtxt(filename, dtype=None, encoding=None, names=True)
 
-# Set the path to the default pulsar catalog
-path_to_default_pulsar_catalog = os.path.join(
-    path_to_defaults, "default_catalog.txt"
-)
+    result = {}
+    for name in arr.dtype.names:
+        col = arr[name]
 
-# Set the path to the default pulsar catalog
-path_to_default_NANOGrav_positions = os.path.join(
-    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
-)
+        # If column is object/string-like, keep as np.array of strings
+        if np.issubdtype(col.dtype, np.number):
+            result[name] = jnp.array(col)  # convert to JAX numeric array
+        else:
+            result[name] = np.array(col, dtype=str)  # keep as strings
 
-# Set the path to the default pulsar catalog
-path_to_default_NANOGrav_positions = os.path.join(
-    os.path.dirname(__file__), "defaults/NANOGrav_positions.txt"
-)
+    return result
+
+
+@jax.jit
+def dot_product(theta_1, phi_1, theta_2, phi_2):
+    """
+    Compute the dot product of two unit vectors given their spherical
+    coordinates. Theta is the polar angle (co-latitude) and phi is the
+    azimuthal angle (longitude). The input angles theta and phi should be given
+    in radians.
+
+    Parameters:
+    -----------
+    theta_1 : Array
+        Array of angles in radians representing the polar angle (co-latitude)
+        of the first vector.
+    phi_1 : Array
+        Array of angles in radians representing the azimuthal angle (longitude)
+        of the first vector.
+    theta_2 : Array
+        Array of angles in radians representing the polar angle (co-latitude)
+        of the second vector.
+    phi_2 : Array
+        Array of angles in radians representing the azimuthal angle (longitude)
+        of the second vector.
+
+    Returns:
+    --------
+    dot_product : Array
+        Array of dot products computed for the given unit vectors.
+
+    """
+
+    # Sum of the product of x and y components
+    term1 = jnp.sin(theta_1) * jnp.sin(theta_2) * jnp.cos(phi_1 - phi_2)
+
+    # The product of the z components
+    term2 = jnp.cos(theta_1) * jnp.cos(theta_2)
+
+    return term1 + term2
 
 
 def characteristic_strain_to_Omega(frequency):
@@ -106,12 +190,12 @@ def characteristic_strain_to_Omega(frequency):
 
     Parameters:
     -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
+    frequency : Array
         Frequency (in Hz) at which the characteristic strain is measured.
 
     Returns:
     --------
-    Omega_gw : numpy.ndarray or jax.numpy.ndarray
+    Omega_gw : Array
         Dimensionless gravitational wave energy density parameter
         at the given frequencies.
 
@@ -132,12 +216,12 @@ def strain_to_Omega(frequency):
 
     Parameters:
     -----------
-    frequency : numpy.ndarray or jax.numpy.ndarray
+    frequency : Array
         Frequency (in Hz) at which the characteristic strain is measured.
 
     Returns:
     --------
-    Omega_gw : numpy.ndarray or jax.numpy.ndarray
+    Omega_gw : Array
         Dimensionless gravitational wave energy density parameter
         at the given frequencies.
 
@@ -158,16 +242,16 @@ def hc_from_CP(CP, frequency, T_obs_s):
 
     Parameters:
     -----------
-    CP : numpy.ndarray or jax.numpy.ndarray
+    CP : Array
         Amplitude of the Common Process (in seconds^3)
-    frequency : numpy.ndarray or jax.numpy.ndarray
+    frequency : Array
         Frequency (in Hz) at which the characteristic strain is measured.
     T_obs_s : float
         Observation time (in seconds)
 
     Returns:
     --------
-    hc : numpy.ndarray or jax.numpy.ndarray
+    hc : Array
         Characteristic strain at the given frequencies.
 
     Notes:
@@ -208,587 +292,6 @@ def load_yaml(path_to_file):
 default_pulsar_parameters = load_yaml(path_to_default_pulsar_parameters)
 
 
-def get_l_max_real(real_spherical_harmonics):
-    """
-    Given the real spherical harmonics coefficients, this function returns the
-    maximum ell value.
-
-    Parameters:
-    -----------
-    real_spherical_harmonics : numpy.ndarray
-        Array of real spherical harmonics coefficients. If dimension is > 1, lm
-        must be the first index
-
-    Returns:
-    --------
-    l_max : int
-        Maximum ell value.
-
-    """
-
-    return int(np.sqrt(len(real_spherical_harmonics)) - 1)
-
-
-def get_l_max_complex(complex_spherical_harmonics):
-    """
-    Given the complex spherical harmonics coefficients, this function returns
-    the maximum ell value.
-
-    Parameters:
-    -----------
-    complex_spherical_harmonics : numpy.ndarray
-        Array of complex spherical harmonics coefficients. If dimension is > 1,
-        lm must be the first index
-
-    Returns:
-    --------
-    l_max : int
-        Maximum ell value.
-
-    """
-
-    return int(np.sqrt(1.0 + 8.0 * len(complex_spherical_harmonics)) / 2 - 1.5)
-
-
-def get_n_coefficients_complex(l_max):
-    """
-    Given the maximum ell value, this function returns the number of spherical
-    harmonics coefficients for the complex representation.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    n_coefficients : int
-        Number of spherical harmonics coefficients.
-
-    """
-
-    return int((l_max + 1) * (l_max + 2) / 2)
-
-
-def get_n_coefficients_real(l_max):
-    """
-    Given the maximum ell value, this function returns the number of spherical
-    harmonics coefficients for the real representation.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    n_coefficients : int
-        Number of spherical harmonics coefficients.
-
-    """
-
-    return int((l_max + 1) ** 2)
-
-
-def get_sort_indexes(l_max):
-    """
-    Given the maximum ell value, this function returns the indexes to sort the
-    indexes of the spherical harmonics coefficients when going from real to
-    complex representation and viceversa.
-
-    The complex representation is assumed to be sorted as in map2alm of healpy
-    (see https://healpy.readthedocs.io/en/latest/) i.e. according to (m, l).
-    The ouput allows to sort the real representation according to (l, m).
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    l_grid : numpy.ndarray
-        Array of l values.
-    m_grid : numpy.ndarray
-        Array of m values.
-    ll : numpy.ndarray
-        Array of l values corresponding to the sorted indexes.
-    mm : numpy.ndarray
-        Array of m values corresponding to the sorted indexes.
-    sort_indexes : numpy.ndarray
-        Array of indexes to sort the spherical harmonics coefficients.
-
-    """
-
-    # Create arrays for l and m
-    l_values = np.arange(l_max + 1)
-    m_values = np.arange(l_max + 1)
-
-    # Create a grid of all possible (l, m) pairs
-    l_grid, m_grid = np.meshgrid(l_values, m_values, indexing="xy")
-
-    # Flatten the grid
-    l_flat = l_grid.flatten()
-    m_flat = m_grid.flatten()
-
-    # Select only the m values that are allowed for a given ell\
-    l_grid = l_flat[np.abs(m_flat) <= l_flat]
-    m_grid = m_flat[np.abs(m_flat) <= l_flat]
-
-    # Create a vector with all the m<0 and then all the m>=0
-    mm = np.append(-np.flip(m_grid[m_grid > 0]), m_grid)
-
-    # Create a vector with all the ls corresponding to mm
-    ll = np.append(np.flip(l_grid[m_grid > 0]), l_grid)
-
-    # Return the sorted indexes
-    return l_grid, m_grid, ll, mm, np.lexsort((mm, ll))
-
-
-def spherical_harmonics_projection(quantity, l_max):
-    """
-    Compute the spherical harmonics projection of a given quantity. Quantity
-    should be an array in pixel space, and compatible with healpy (see
-    https://healpy.readthedocs.io/en/latest/). The spherical harmonics
-    coefficients are sorted as described in the get_sort_indexes function in
-    utils.
-
-    Parameters:
-    -----------
-    quantity : numpy.ndarray
-        Array of quantities to project on spherical harmonics.
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    real_alm : numpy.ndarray
-        Array of real spherical harmonics coefficients, with len
-        lm = (l_max + 1)**2 is the number of spherical harmonics coefficients.
-
-    """
-
-    # Get the complex alm coefficients.
-    # These are sorted with the m values and are only for m>=0
-    alm = hp.map2alm(quantity, lmax=l_max)
-
-    # Create arrays the m_values and the indexes to sort
-    inds = get_sort_indexes(l_max)
-
-    # Unpack m_grid and sorted_indexes
-    m_grid = inds[1]
-    sorted_indexes = inds[-1]
-
-    # Compute the sign for the m > 0 values
-    sign = (-1.0) ** m_grid[m_grid > 0]
-
-    # The m != 0 values are multiplied by sqrt(2) and then take real/imag part
-    positive_alm = np.sqrt(2.0) * alm[m_grid > 0]
-
-    # Build the real alm selecting imaginary and real part and sort in the two
-    # blocks in ascending order
-    negative_m = np.flip(sign * positive_alm.imag)
-    positive_m = sign * positive_alm.real
-
-    # Concatenate the negative, zero and positive m values
-    real_alm = np.concatenate((negative_m, alm[m_grid == 0.0].real, positive_m))
-
-    # Sort with the indexes
-    return real_alm[sorted_indexes]
-
-
-def complex_to_real_conversion(spherical_harmonics):
-    """
-    Converts the complex spherical harmonics (or the coefficients) to real
-    spherical harmonics (or the coefficients).
-
-    Parameters:
-    -----------
-    spherical_harmonics : numpy.ndarray
-        2D (or 1D) array of complex spherical harmonics coefficients.
-        If 2D, the shape is (lm, pp), where lm runs over l,m (with m > 0), and
-        pp is the number of theta and phi values. If 1D, the shape is (lm,).
-
-    Returns:
-    --------
-    all_spherical_harmonics : numpy.ndarray
-        2D (or 1D) array of real spherical harmonics coefficients. If 2D, the
-        shape is (lm, pp), where lm runs over l,m (with -l <= m <= l), and pp
-        is the number of theta and phi values. If 1D, the shape is (lm,).
-
-    """
-
-    # Get the right value of l_max from the input complex coefficients
-    l_max = get_l_max_complex(spherical_harmonics)
-
-    # Create arrays the m_values and the indexes to sort
-    _, m_grid, _, _, sort_indexes = get_sort_indexes(l_max)
-
-    # Pick only m = 0
-    zero_m = spherical_harmonics[m_grid == 0.0].real
-
-    # Compute the sign for the m > 0 values
-    sign = (-1.0) ** m_grid[m_grid > 0]
-
-    # The m != 0 values are multiplied by sqrt(2) and then take real/imag part
-    positive_spherical = np.sqrt(2.0) * spherical_harmonics[m_grid > 0.0]
-
-    # Build the m > 0 values
-    positive_m = np.einsum("i,i...->i...", sign, positive_spherical.real)
-
-    # Build the m < 0 values
-    negative_m = np.einsum("i,i...->i...", sign, positive_spherical.imag)
-
-    # Concatenate the negative, zero and positive m values
-    all_spherical_harmonics = np.concatenate(
-        (np.flip(negative_m, axis=0), zero_m, positive_m), axis=0
-    )
-
-    # Return spherical harmonics (coefficients) sorted by l and m
-    return all_spherical_harmonics[sort_indexes]
-
-
-def real_to_complex_conversion(real_spherical_harmonics):
-    """
-    Converts the real spherical harmonics (or the coefficients) back to complex
-    spherical harmonics (or the coefficients).
-
-    Parameters:
-    -----------
-    real_spherical_harmonics : numpy.ndarray
-        1D array of real spherical harmonics coefficients.
-        The shape is (lm,), where lm runs over l,m (with -l <= m <= l).
-    l_max : int
-        Maximum ell value.
-
-    Returns:
-    --------
-    complex_spherical_harmonics : numpy.ndarray
-        1D array of complex spherical harmonics coefficients.
-        The shape is (lm,), where lm runs over l,m (with m >= 0).
-    """
-
-    # Get the right value of l_max from the input real coefficients
-    l_max = get_l_max_real(real_spherical_harmonics)
-
-    # Get sort indexes
-    _, _, _, mm, sort_indexes = get_sort_indexes(l_max)
-
-    # Reorder the input real coefficients to the original order
-    ordered_real_spherical_harmonics = np.zeros_like(real_spherical_harmonics)
-    ordered_real_spherical_harmonics[sort_indexes] = real_spherical_harmonics
-
-    # Split the ordered real coefficients into negative, zero, and positive
-    # m values
-    zero_m = ordered_real_spherical_harmonics[mm == 0]
-    positive_m = ordered_real_spherical_harmonics[mm > 0]
-    negative_m = ordered_real_spherical_harmonics[mm < 0]
-
-    # Compute the corresponding m values for positive and negative m
-    m_positive = mm[mm > 0]
-
-    # Reconstruct the complex coefficients
-    complex_positive_m = (positive_m + 1j * negative_m[::-1]) / (
-        np.sqrt(2.0) * (-1.0) ** m_positive
-    )
-
-    # Combine zero and positive m values to form the full complex coefficients
-    complex_spherical_harmonics = np.concatenate(
-        (zero_m, complex_positive_m), axis=0
-    )
-
-    return complex_spherical_harmonics
-
-
-def get_real_spherical_harmonics(l_max, theta, phi):
-    """
-    Compute the real spherical harmonics for a given maximum ell value and for
-    a given set of theta and phi values.
-
-    Parameters:
-    -----------
-    l_max : int
-        Maximum ell value.
-    theta : numpy.ndarray or jax.numpy.ndarray
-        Array of polar angles (co-latitudes).
-    phi : numpy.ndarray or jax.numpy.ndarray
-        Array of azimuthal angles (longitudes).
-
-    Returns:
-    --------
-    all_spherical_harmonics : numpy.ndarray
-        2D array of spherical harmonics computed for the given maximum ell
-        value, and theta and phi values. The shape will be (lm, pp), where pp
-        is the number of theta and phi values, and lm = (l_max + 1)**2 is the
-        number of spherical harmonics coefficients.
-
-    """
-
-    # Create arrays the m_values and the indexes to sort
-    inds = get_sort_indexes(l_max)
-
-    # Unpack m_grid and sorted_indexes
-    l_grid = inds[0]
-    m_grid = inds[1]
-
-    # Compute all the spherical harmonics
-    spherical_harmonics = sph_harm_y(
-        l_grid[:, None], m_grid[:, None], theta[None, :], phi[None, :]
-    )
-
-    # Return sorted
-    return complex_to_real_conversion(spherical_harmonics)
-
-
-def get_CL_from_real_clm(clm_real):
-    """
-    Compute the angular power spectrum from the spherical harmonics
-    coefficients.
-
-    Parameters:
-    -----------
-    clm_real : numpy.ndarray
-        Array of spherical harmonics coefficients, if dimension > 1 the first
-        axis must run over the coefficients.
-
-    Returns:
-    --------
-    CL : numpy.ndarray
-        Array of angular power spectrum.
-
-    """
-
-    # Get the shape of the input coefficients
-    clm_shape = clm_real.shape
-
-    # Get the maximum ell value
-    l_max = get_l_max_real(clm_real)
-
-    # Compute the angular power spectrum
-    CL = np.zeros(tuple([l_max + 1] + list(clm_shape[1:])))
-
-    # A counter for the coefficients used up to that value of ell
-    i = 0
-
-    for ell in range(0, l_max + 1):
-        # Average the square of the coefficients for all ms at fixed ell
-        CL[ell] = np.mean(clm_real[i : i + 2 * ell + 1] ** 2, axis=0)
-
-        # Update the counter
-        i += 2 * ell + 1
-
-    return CL
-
-
-def get_Cl_limits(
-    means,
-    cov,
-    shape_params,
-    n_points=int(1e4),
-    limit_cl=0.95,
-    max_iter=100,
-    prior=5.0 / (4.0 * np.pi),
-):
-    """
-    Compute the upper limit on the angular power spectrum from the means and
-    covariance matrix of the spherical harmonics coefficients.
-
-    Parameters:
-    -----------
-    means : numpy.ndarray
-        Array of means for the spherical harmonics coefficients.
-    cov : numpy.ndarray
-        Array of covariance matrix for the spherical harmonics coefficients.
-    shape_params : int
-        Number of parameters for the SGWB shape.
-    n_points : int, optional
-        Number of points to generate.
-    limit_cl : float, optional
-        Quantile to compute the upper limit.
-    max_iter : int, optional
-        Maximum number of iterations to generate points.
-    prior : float, optional
-        Prior value to restrict the points.
-
-    Returns:
-    --------
-    Cl_limits : numpy.ndarray
-        Array of upper limits on the angular power spectrum from the covariance
-    Cl_limits_prior : numpy.ndarray
-        Array of upper limits on the angular power spectrum including the prior
-
-    """
-
-    # Generate gaussian data from the covariance matrix
-    data = np.random.multivariate_normal(
-        means, cov, n_points, check_valid="ignore", tol=1e-4
-    )
-
-    # Select only the points that are within the prior
-    data_prior = data[np.max(np.abs(data[:, shape_params:]), axis=-1) <= prior]
-
-    # Initialize the counter and the length of the data
-    i_add = 0
-    len_restricted = len(data_prior)
-
-    # Use a while loop to generate enough points
-    while len_restricted < n_points and i_add < max_iter:
-
-        # Generate more points
-        add_data = np.random.multivariate_normal(
-            means, cov, 10 * n_points, check_valid="ignore", tol=1e-4
-        )
-
-        # Select only the points that are within the prior and append
-        data_prior = np.append(
-            data_prior,
-            add_data[
-                np.max(np.abs(add_data[:, shape_params:]), axis=-1) <= prior
-            ],
-            axis=0,
-        )
-
-        # Update the counter and the length of the data
-        len_restricted = len(data_prior)
-        i_add += 1
-
-    # Compute the angular power spectra without and with the prior
-    correlations_lm = get_CL_from_real_clm(data.T[shape_params - 1 :])[1:]
-    correlations_lm_prior = get_CL_from_real_clm(
-        data_prior.T[shape_params - 1 :]
-    )[1:]
-
-    # Compute the upper limits without the prior
-    Cl_limits = np.quantile(correlations_lm, limit_cl, axis=-1)
-
-    # And with the prior if there are enough points
-    if len_restricted == 0:
-        Cl_limits_prior = np.nan * Cl_limits
-
-    else:
-        Cl_limits_prior = np.quantile(correlations_lm_prior, limit_cl, axis=-1)
-
-    return Cl_limits, Cl_limits_prior
-
-
-def sqrt_to_lin_conversion(gLM_grid, l_max_lin=-1, real_basis_input=False):
-    """
-    Convert the sqrt basis to the linear basis.
-
-    Parameters:
-    -----------
-    gLM_grid : numpy.ndarray
-        Array of sqrt basis coefficients.
-    l_max_lin : int, optional
-        Maximum ell value for the linear basis. Default is -1.
-    real_basis_input : bool, optional
-        If True, the input is in the real basis. Default is False.
-
-    Returns:
-    --------
-    clm_real : numpy.ndarray
-        Array of real coefficients in the linear basis.
-
-    """
-
-    # If gLM are in the real basis convert the complex basis
-    if real_basis_input:
-        gLM_complex = real_to_complex_conversion(gLM_grid)
-    else:
-        gLM_complex = gLM_grid
-
-    # Get the maximum ell value for the sqrt basis
-    l_max_sqrt = get_l_max_complex(gLM_complex)
-
-    # Get the grid of all possible L values for the sqrt basis
-    L_grid_all = np.arange(l_max_sqrt + 1)
-
-    # If the maximum ell value for the linear basis is not provided, set it
-    if l_max_lin < 0:
-        l_max_lin = 2 * l_max_sqrt
-
-    # Get the number of coefficients for the linear basis
-    n_coefficients = get_n_coefficients_complex(l_max_lin)
-
-    # Initialize the array for the linear basis
-    clm_complex = np.zeros(n_coefficients, dtype=np.cdouble)
-
-    # Get the indexes for the linear and sqrt basis
-    l_lin, m_lin, _, _, _ = get_sort_indexes(l_max_lin)
-    l_sqrt, m_sqrt, _, _, _ = get_sort_indexes(l_max_sqrt)
-
-    # Compute the sign for the gLM with m < 0
-    gLnegM_complex = (-1) ** np.abs(m_sqrt) * np.conj(gLM_complex)
-
-    for ind_linear in range(len(m_lin)):
-        # Get the values of ell and m
-        m = m_lin[ind_linear]
-        ell = l_lin[ind_linear]
-
-        for L1 in L_grid_all:
-
-            # Build a mask using the conditions from the selection rules
-            mask_L2 = (np.abs(L1 - L_grid_all) <= ell) * (
-                L_grid_all >= ell - L1
-            )
-
-            # Run over the L2 allowed by the mask
-            for L2 in L_grid_all[mask_L2]:
-                # Compute the Clebsch-Gordan coefficient for all ms = 0
-                cg0 = clebsch_gordan(L1, 0, L2, 0, ell, 0)
-
-                # If the coefficient is not zero compute the prefactor
-                if cg0 != 0.0:
-                    prefac = np.sqrt(
-                        (2.0 * L1 + 1.0)
-                        * (2.0 * L2 + 1.0)
-                        / (4.0 * np.pi * (2.0 * ell + 1.0))
-                    )
-
-                    # These are all the values of M1 to use
-                    M1_grid_all = np.arange(-L1, L1 + 1)
-
-                    # Enforce m +M1 + M2 = 0
-                    M2_grid_all = m - M1_grid_all
-
-                    # Check that the values of M2 are consistent with L2
-                    mask_M = np.abs(M2_grid_all) <= L2
-
-                    # Apply the mask
-                    M1_grid = M1_grid_all[mask_M]
-                    M2_grid = M2_grid_all[mask_M]
-
-                    for iM in range(len(M1_grid)):
-                        # Get the values of M1 and M2
-                        M1 = M1_grid[iM]
-                        M2 = M2_grid[iM]
-
-                        # Compute the Clebsch-Gordan coefficient for ms neq 0
-                        cg1 = clebsch_gordan(L1, M1, L2, M2, ell, m)
-
-                        # Mask to get the corresponding value of gLM_complex
-                        b1_mask = (l_sqrt == L1) & (m_sqrt == np.abs(M1))
-                        b2_mask = (l_sqrt == L2) & (m_sqrt == np.abs(M2))
-
-                        # Get the values of gLM_complex for the given L and M
-                        b1 = (
-                            gLM_complex[b1_mask]
-                            if M1 >= 0
-                            else gLnegM_complex[b1_mask]
-                        )
-
-                        b2 = (
-                            gLM_complex[b2_mask]
-                            if M2 >= 0
-                            else gLnegM_complex[b2_mask]
-                        )
-
-                        # Multiply everything and sum to the right index
-                        clm_complex[ind_linear] += prefac * cg0 * cg1 * b1 * b2
-
-    return complex_to_real_conversion(clm_complex)
-
-
 @jax.jit
 def compute_inverse(matrix):
     """
@@ -797,13 +300,13 @@ def compute_inverse(matrix):
 
     Parameters:
     -----------
-    matrix : numpy.ndarray or jax.numpy.ndarray
+    matrix : Array
         Input matrix to compute the inverse of. The shape is assumed to be
         (..., N, N) and the inverse is computed on the last 2 indexes
 
     Returns:
     --------
-    c_inverse : numpy.ndarray or jax.numpy.ndarray
+    c_inverse : Array
         Inverse of the input matrix.
 
     Notes:
@@ -817,6 +320,151 @@ def compute_inverse(matrix):
     rescaling = rescaling_vec[..., :, None] * rescaling_vec[..., None, :]
 
     return jnp.linalg.inv(matrix / rescaling) / rescaling
+
+
+@jax.jit
+def logdet_kronecker_product(A, B):
+    """
+    Computes the logarithm of the determinant of a Kronecker product of two
+    matrices without explicitly computing the Kronecker product.
+
+    For two matrices A and B, the determinant of their Kronecker product
+    A ⊗ B has the property: det(A ⊗ B) = det(A)^dim(B) * det(B)^dim(A).
+    Taking the logarithm:
+    log(det(A ⊗ B)) = dim(B) * log(det(A)) + dim(A) * log(det(B)).
+    This avoids the need to compute the potentially large Kronecker product.
+
+    Parameters:
+    -----------
+    A : Array
+        First matrix in the Kronecker product, with shape (m, m).
+    B : Array
+        Second matrix in the Kronecker product, with shape (J, J).
+
+    Returns:
+    --------
+    logdet_kron : float
+        The logarithm of the determinant of the Kronecker product A ⊗ B.
+    """
+    # Get dimensions of the matrices
+    m, _ = A.shape
+    _, J = B.shape
+
+    # Compute the log determinants of each matrix separately
+    _, logdet_A = jnp.linalg.slogdet(A)
+    _, logdet_B = jnp.linalg.slogdet(B)
+
+    # Compute the log determinant of the Kronecker product
+    # log(det(A ⊗ B)) = dim(B) * log(det(A)) + dim(A) * log(det(B))
+    logdet_kron = J * logdet_A + m * logdet_B
+
+    return logdet_kron
+
+
+def compute_D_IJ_mean(x, y, nbins):
+    """
+    Computes binned statistics for the correlation coefficients (D_IJ)
+    as a function of angular separation between pulsars.
+
+    This function bins the provided data (typically angular separations and
+    correlation coefficients) and computes the mean and standard deviation
+    in each bin. It is commonly used for analyzing pulsar correlation
+    patterns like the Hellings-Downs curve.
+
+    Parameters:
+    -----------
+    x : Array
+        Array of angular separations between pulsars (in radians).
+        Typically ranges from 0 to pi.
+    y : Array
+        Array of correlation coefficients corresponding to the angular
+        separations in x.
+    nbins : int
+        Number of bins to divide the range [0, pi] into.
+
+    Returns:
+    --------
+    bin_means : Array
+        Mean value of y in each bin.
+    bin_std : Array
+        Standard deviation of y in each bin.
+    bin_centers : Array
+        Central value of each bin (average of bin edges).
+    """
+    # Compute mean values in each bin
+    bin_means, bin_edges, _ = binned_statistic(
+        x, y, statistic="mean", bins=np.linspace(0, np.pi, nbins + 1)
+    )
+
+    # Compute standard deviations in each bin
+    bin_std, _, _ = binned_statistic(
+        x, y, statistic="std", bins=np.linspace(0, np.pi, nbins + 1)
+    )
+
+    # Calculate bin centers for plotting
+    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+
+    return bin_means, bin_std, bin_centers
+
+
+def compute_pulsar_average_D_IJ(ang_list, D_IJ_list, nbins=20):
+    """
+    Computes the average pulsar correlation coefficients across multiple
+    realizations, binned by angular separation.
+
+    This function processes multiple realizations of pulsar correlation data,
+    filters out very small angular separations, and bins the data for each
+    realization. It's useful for analyzing the consistency of correlation
+    patterns (like Hellings-Downs curves) across different simulations or
+    data subsets.
+
+    Parameters:
+    -----------
+    ang_list : Array
+        Array of angular separations between pulsars for multiple realizations.
+        Shape: (n_realizations, n_pulsars, n_pulsars) where each slice [i,:,:]
+        is a matrix of angular separations between pulsar pairs.
+    D_IJ_list : Array
+        Array of correlation coefficients corresponding to the angular
+        separations in ang_list, with the same shape.
+    nbins : int, optional
+        Number of bins to divide the range [0, pi] into. Default is 20.
+
+    Returns:
+    --------
+    x_avg : Array
+        Array of bin centers for each realization.
+        Shape: (n_realizations, nbins)
+    y_avg : Array
+        Array of mean correlation values for each realization and bin.
+        Shape: (n_realizations, nbins)
+    """
+    # Initialize lists to store binned data for each realization
+    x_avg = []
+    y_avg = []
+
+    # Get the number of realizations from the shape of the input
+    n_realizations = ang_list.shape[0]
+
+    # Process each realization separately
+    for i in range(n_realizations):
+        # Flatten the angular separations and correlations for this realization
+        x = ang_list[i].flatten()
+        y = D_IJ_list[i].flatten()
+
+        # Filter out very small angular separations (self-correlations)
+        y = y[x > 1e-5]
+        x = x[x > 1e-5]
+
+        # Compute binned statistics for this realization
+        bin_means, _, bin_centers = compute_D_IJ_mean(x, y, nbins)
+
+        # Store the results
+        x_avg.append(bin_centers)
+        y_avg.append(bin_means)
+
+    # Convert lists to arrays for return
+    return np.array(x_avg), np.array(y_avg)
 
 
 def get_R(samples):
