@@ -1,3 +1,18 @@
+<table border="10">
+  <tr>
+    <td>
+      <img src="fast_PTA.png" alt="fast_PTA" width="700"/>
+    </td>
+    <td>
+      <h1>fastPTA</h1>
+      <h2>-- </h2>
+      <p>
+  A jit-enhanced Python code to forecast the sensitivity of future Pulsar Timing Array (PTA) configurations and assess constraints on Stochastic Gravitational Wave Background (SGWB) parameters.     
+      </p>
+    </td>
+  </tr>
+</table>
+
 # fastPTA
 A jit-enhanced Python code to forecast the sensitivity of future Pulsar Timing Array (PTA) configurations and assess constraints on Stochastic Gravitational Wave Background (SGWB) parameters. 
 The code can generate mock PTA catalogs with noise levels compatible with current and future PTA experiments.
@@ -10,11 +25,11 @@ https://github.com/Mauropieroni/fastPTA
 ```
 - Install using the following command (you can delete the `fastPTA` folder afterwords).
 ```
-python3 -m pip install ./fastPTA
+python3 -m pip install .
 ``` 
   [alternatively, to have changes in the code propagate instantaneously: (do not delete `fastPTA` in this case!)]
 ```
-python3 -m pip install -e ./fastPTA
+python3 -m pip install -e .
 ```
 
 # To test:
