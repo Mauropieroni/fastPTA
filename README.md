@@ -40,6 +40,6 @@ pytest $(cd fastPTA/)
 - Navigate to examples for some scripts and jupyter notebooks explaining how to use the code.
     
 # How to cite this code:
-If you use fastPTA, please cite [2404.02864](https://arxiv.org/pdf/2404.02864) and, if appropriate, [2407.14460](https://arxiv.org/pdf/2407.14460), [2508.21131] (https://arxiv.org/abs/2508.21131) for anisotropies searches,
+If you use fastPTA, please cite [2404.02864](https://arxiv.org/pdf/2404.02864) and, if appropriate, [2407.14460](https://arxiv.org/pdf/2407.14460), [2508.21131](https://arxiv.org/abs/2508.21131) for anisotropies searches,
 and [2503.10805](https://arxiv.org/pdf/2503.10805) for SIGW searches. 
 There's also a [Zenodo](https://zenodo.org/records/12820730) entry associated with this code.
