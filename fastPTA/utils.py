@@ -97,6 +97,16 @@ def save_table(filename: str, data: dict, verbose: bool = False):
     """
     Save a dict of columns (arrays or lists) into a single .txt file with
     headers. Handles both numeric and string columns.
+
+    Parameters:
+    -----------
+    filename : str
+        Path to the output text file.
+    data : dict
+        Dictionary where keys are column names and values are arrays/lists of
+        column data.
+    verbose : bool, optional
+        If True, prints status messages. Default is False.
     """
     if verbose:
         print(f"Saving data to {filename}")
@@ -124,6 +134,13 @@ def save_table(filename: str, data: dict, verbose: bool = False):
 def load_table(filename: str, verbose: bool = False):
     """
     Load a table from a text file into a dictionary.
+
+    Parameters:
+    -----------
+    filename : str
+        Path to the input text file.
+    verbose : bool, optional
+        If True, prints status messages. Default is False.
     """
     if verbose:
         print(f"Loading data from {filename}")

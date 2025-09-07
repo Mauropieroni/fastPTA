@@ -14,6 +14,31 @@ find_A_PBH_lognormal_data = np.load(tu.find_A_PBH_lognormal_data_path)
 class Test_Abundance_Extended(unittest.TestCase):
     """Extended tests for the compute_PBH_Abundance module."""
 
+    def test_k_of_T_MeV(self):
+        """
+        Test function for k_of_T_MeV
+        """
+
+        T_MeV = np.geomspace(2e-3, 9e9, 100)
+
+        k_MeV = cpa.k_of_T_MeV(T_MeV)
+        TT_MeV = cpa.T_of_k(k_MeV)
+
+        self.assertTrue(np.allclose(T_MeV, TT_MeV, rtol=1e-5))
+
+    def test_hubble_mass_of_T_MeV(self):
+        """
+        Test function for k_of_T_MeV
+        """
+
+        T_MeV = np.geomspace(2e-3, 9e9, 100)
+
+        HM = cpa.hubble_mass_of_T_MeV(T_MeV)
+
+        TT_MeV = cpa.T_of_M_H(HM)
+
+        self.assertTrue(np.allclose(T_MeV, TT_MeV, rtol=1e-2))
+
     def test_f_PBH(self):
         """
         Test function for f_PBH_NL_QCD_lognormal

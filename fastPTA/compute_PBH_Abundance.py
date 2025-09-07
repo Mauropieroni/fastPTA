@@ -1,5 +1,3 @@
-import numpy as np
-
 import jax
 import jax.numpy as jnp
 from jax.scipy.interpolate import RegularGridInterpolator
@@ -36,34 +34,37 @@ g_sm_tot = 106.75
 regenerate_T_file = False
 
 # Importing data
-g_data = np.loadtxt(ut.path_to_defaults + "gstar_T.txt")
-
-# This contains some quantities for the PBH abundance
-data_f_PBH_MH = np.loadtxt(ut.path_to_defaults + "data_f_PBH_MH.txt")
-
+dofs_data = ut.load_table(ut.path_to_defaults + "dofs_T.txt")
 
 # --- Define interpolators from the data
 # Effective number of relativistic dofs as a function of temperature in MeV
 relativistic_dofs = RegularGridInterpolator(
-    (g_data[:, 0],),
-    g_data[:, 1],
+    (dofs_data["Temperature_MeV"],),
+    dofs_data["relativistic_dofs_MeV"],
     bounds_error=False,
     fill_value=None,
 )
 
 # Effective number of entropy dofs as a function of temperature in MeV
 entropy_dofs = RegularGridInterpolator(
-    (g_data[:, 0],),
-    g_data[:, 3],
+    (dofs_data["Temperature_MeV"],),
+    dofs_data["entropy_dofs_MeV"],
     bounds_error=False,
     fill_value=None,
 )
 
+# After building the interpolators we can delete the data
+del dofs_data
+
+# This contains some quantities for the PBH abundance
+f_PBH_data = ut.load_table(ut.path_to_defaults + "f_PBH_data.txt")
+
+
 # Kappa of critical collapse (appearing in eq A11 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
 kappa_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 1],
+    (f_PBH_data["Temperature_MeV"],),
+    f_PBH_data["kappa_QCD"],
     bounds_error=False,
     fill_value=None,
 )
@@ -71,8 +72,8 @@ kappa_QCD = RegularGridInterpolator(
 # Gamma of critical collapse (appearing in eq A11 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
 gamma_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 2],
+    (f_PBH_data["Temperature_MeV"],),
+    f_PBH_data["gamma_QCD"],
     bounds_error=False,
     fill_value=None,
 )
@@ -80,8 +81,8 @@ gamma_QCD = RegularGridInterpolator(
 # Critical value of the compaction function (lower limit for the integral in
 # eq A11 of 2503.10805) as a function of mass in a Hubble volume in solar masses
 delta_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 3],
+    (f_PBH_data["Temperature_MeV"],),
+    f_PBH_data["delta_QCD"],
     bounds_error=False,
     fill_value=None,
 )
@@ -89,14 +90,26 @@ delta_QCD = RegularGridInterpolator(
 # Phi (scalar potential appearing in eq A3 of 2503.10805) as a function of
 # mass in a Hubble volume in solar masses
 phi_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 4],
+    (f_PBH_data["Temperature_MeV"],),
+    f_PBH_data["phi_QCD"],
     bounds_error=False,
     fill_value=None,
 )
 
-# After we defined the interpolators we can delete the data
-del g_data, data_f_PBH_MH
+# The temperature (in MeV) corresponding to a mass (in solar masses) in the
+# Hubble volume
+T_of_M_H = RegularGridInterpolator(
+    (jnp.flip(f_PBH_data["Horizon_mass_solar"]),),
+    jnp.flip(f_PBH_data["Temperature_MeV"]),
+)
+
+# The temperature (in MeV) corresponding to a comoving wavenumber (in Mpc^{-1}
+T_of_k = RegularGridInterpolator(
+    (f_PBH_data["comoving_wavenumber"],), f_PBH_data["Temperature_MeV"]
+)
+
+# After building the interpolators we can delete the data
+del f_PBH_data
 
 
 @jax.jit
@@ -157,29 +170,6 @@ def hubble_mass_of_T_MeV(temperature_MeV):
     )
 
     return prefactor / relativistic_dofs_term
-
-
-# If the flag is set to True, regenerate the file
-if regenerate_T_file:
-    T_range = jnp.geomspace(1e-3, 1e10, 10000)
-    M_of_T = hubble_mass_of_T_MeV(T_range)
-    k_of_T = k_of_T_MeV(T_range)
-    np.savetxt(
-        ut.path_to_defaults + "T_data.txt",
-        np.vstack((T_range, M_of_T, k_of_T)).T,
-    )
-
-# Load the data if the flag is set to False
-else:
-    T_range, M_of_T, k_of_T = np.loadtxt(ut.path_to_defaults + "T_data.txt").T
-
-# Define the interpolators
-# The mass in is solar masses, k is in Mpc^{-1} and T is in MeV
-T_of_M_H = RegularGridInterpolator((jnp.flip(M_of_T),), jnp.flip(T_range))
-T_of_k = RegularGridInterpolator((k_of_T,), T_range)
-
-# Delete the data
-del T_range, M_of_T, k_of_T
 
 
 @jax.jit
