@@ -2,7 +2,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 from jax.scipy.interpolate import RegularGridInterpolator
-from sympy import jn
 
 
 # Local
