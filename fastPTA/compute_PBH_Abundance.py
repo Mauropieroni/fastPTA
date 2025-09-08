@@ -1,6 +1,8 @@
 import jax
 import jax.numpy as jnp
+import numpy as np
 from jax.scipy.interpolate import RegularGridInterpolator
+from sympy import jn
 
 
 # Local
@@ -34,79 +36,252 @@ g_sm_tot = 106.75
 regenerate_T_file = False
 
 # Importing data
-dofs_data = ut.load_table(ut.path_to_defaults + "dofs_T.txt")
+dofs_data = dict(np.load(ut.path_to_defaults + "dofs_T.npz"))
+# This contains some quantities for the PBH abundance
+f_PBH_data = dict(np.load(ut.path_to_defaults + "f_PBH_data.npz"))
 
 # --- Define interpolators from the data
 # Effective number of relativistic dofs as a function of temperature in MeV
-relativistic_dofs = RegularGridInterpolator(
-    (dofs_data["Temperature_MeV"],),
-    dofs_data["relativistic_dofs_MeV"],
+relativistic_dofs_log = RegularGridInterpolator(
+    (jnp.log(dofs_data["Temperature_MeV"]),),
+    jnp.log(dofs_data["relativistic_dofs_MeV"]),
     bounds_error=False,
     fill_value=None,
 )
 
+
 # Effective number of entropy dofs as a function of temperature in MeV
-entropy_dofs = RegularGridInterpolator(
-    (dofs_data["Temperature_MeV"],),
-    dofs_data["entropy_dofs_MeV"],
+entropy_dofs_log = RegularGridInterpolator(
+    (jnp.log(dofs_data["Temperature_MeV"]),),
+    jnp.log(dofs_data["entropy_dofs_MeV"]),
     bounds_error=False,
     fill_value=None,
 )
+
+
+@jax.jit
+def relativistic_dofs(temperature_MeV):
+    """
+    Compute the effective number of relativistic dofs as a function of
+    temperature in MeV.
+
+    Parameters:
+    -----------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    Returns:
+    --------
+    g_eff : Array
+        Effective number of relativistic dofs.
+
+    """
+
+    return jnp.exp(relativistic_dofs_log(jnp.log(temperature_MeV)))
+
+
+@jax.jit
+def entropy_dofs(temperature_MeV):
+    """
+    Compute the effective number of entropy dofs as a function of temperature
+    in MeV.
+
+    Parameters:
+    -----------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    Returns:
+    --------
+    g_eff : Array
+        Effective number of entropy dofs.
+
+    """
+
+    return jnp.exp(entropy_dofs_log(jnp.log(temperature_MeV)))
+
 
 # After building the interpolators we can delete the data
 del dofs_data
 
-# This contains some quantities for the PBH abundance
-f_PBH_data = ut.load_table(ut.path_to_defaults + "f_PBH_data.txt")
 
-
-# Kappa of critical collapse (appearing in eq A11 of 2503.10805) as a function
+# Kappa of critical collapse (appearing in eq A10 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
-kappa_QCD = RegularGridInterpolator(
-    (f_PBH_data["Temperature_MeV"],),
-    f_PBH_data["kappa_QCD"],
+kappa_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Temperature_MeV"]),),
+    jnp.log(f_PBH_data["kappa_QCD"]),
     bounds_error=False,
     fill_value=None,
 )
 
-# Gamma of critical collapse (appearing in eq A11 of 2503.10805) as a function
+# Gamma of critical collapse (appearing in eq A10 of 2503.10805) as a function
 # of mass in a Hubble volume in solar masses
-gamma_QCD = RegularGridInterpolator(
-    (f_PBH_data["Temperature_MeV"],),
-    f_PBH_data["gamma_QCD"],
+gamma_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Temperature_MeV"]),),
+    jnp.log(f_PBH_data["gamma_QCD"]),
     bounds_error=False,
     fill_value=None,
 )
 
 # Critical value of the compaction function (lower limit for the integral in
 # eq A11 of 2503.10805) as a function of mass in a Hubble volume in solar masses
-delta_QCD = RegularGridInterpolator(
-    (f_PBH_data["Temperature_MeV"],),
-    f_PBH_data["delta_QCD"],
+delta_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Temperature_MeV"]),),
+    jnp.log(f_PBH_data["delta_QCD"]),
     bounds_error=False,
     fill_value=None,
 )
 
-# Phi (scalar potential appearing in eq A3 of 2503.10805) as a function of
+# Phi (scalar potential appearing in eq A4 of 2503.10805) as a function of
 # mass in a Hubble volume in solar masses
-phi_QCD = RegularGridInterpolator(
-    (f_PBH_data["Temperature_MeV"],),
-    f_PBH_data["phi_QCD"],
+phi_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Temperature_MeV"]),),
+    jnp.log(f_PBH_data["phi_QCD"]),
     bounds_error=False,
     fill_value=None,
 )
+
+
+@jax.jit
+def kappa_QCD(mass_hubble_volume):
+    """
+    Compute kappa of critical collapse (appearing in eq A10 of 2503.10805)
+    as a function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    kappa : Array
+        Kappa of critical collapse.
+
+    """
+
+    return jnp.exp(kappa_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def gamma_QCD(mass_hubble_volume):
+    """
+    Compute gamma of critical collapse (appearing in eq A10 of 2503.10805)
+    as a function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    gamma : Array
+        Gamma of critical collapse.
+
+    """
+
+    return jnp.exp(gamma_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def delta_QCD(mass_hubble_volume):
+    """
+    Compute the critical value of the compaction function (lower limit for
+    the integral in eq A11 of 2503.10805) as a function of mass in a Hubble
+    volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    delta : Array
+        Critical value of the compaction function.
+
+    """
+
+    return jnp.exp(delta_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def phi_QCD(mass_hubble_volume):
+    """
+    Compute phi (scalar potential appearing in eq A4 of 2503.10805) as a
+    function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    phi : Array
+        Scalar potential.
+
+    """
+
+    return jnp.exp(phi_QCD_log(jnp.log(mass_hubble_volume)))
+
 
 # The temperature (in MeV) corresponding to a mass (in solar masses) in the
 # Hubble volume
-T_of_M_H = RegularGridInterpolator(
-    (jnp.flip(f_PBH_data["Horizon_mass_solar"]),),
-    jnp.flip(f_PBH_data["Temperature_MeV"]),
+T_of_M_H_log = RegularGridInterpolator(
+    (jnp.flip(jnp.log(f_PBH_data["Horizon_mass_solar"])),),
+    jnp.flip(jnp.log(f_PBH_data["Temperature_MeV"])),
 )
 
 # The temperature (in MeV) corresponding to a comoving wavenumber (in Mpc^{-1}
-T_of_k = RegularGridInterpolator(
-    (f_PBH_data["comoving_wavenumber"],), f_PBH_data["Temperature_MeV"]
+T_of_k_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["comoving_wavenumber"]),),
+    jnp.log(f_PBH_data["Temperature_MeV"]),
 )
+
+
+@jax.jit
+def T_of_M_H(mass_hubble_volume):
+    """
+    Compute the temperature (in MeV) corresponding to a mass (in solar masses)
+    in the Hubble volume.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    """
+
+    return jnp.exp(T_of_M_H_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def T_of_k(k_vec_mpc):
+    """
+    Compute the temperature (in MeV) corresponding to a comoving wavenumber
+    (in Mpc^{-1}).
+
+    Parameters:
+    -----------
+    k_vec_mpc : Array
+        Comoving wavenumber k in Mpc^{-1}.
+
+    Returns:
+    --------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    """
+
+    return jnp.exp(T_of_k_log(jnp.log(k_vec_mpc)))
+
 
 # After building the interpolators we can delete the data
 del f_PBH_data
