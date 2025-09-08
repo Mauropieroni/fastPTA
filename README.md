@@ -71,15 +71,12 @@ fastPTA/
 │   ├── datastream.py                             # Data stream handling and processing
 │   └── generate_data.py                          # Functions to generate mock PTA data
 ├── defaults/                                     # Default configuration and parameters
-│   ├── cgvals.txt                                # Cosmic growth values for calculations
-│   ├── data_f_PBH_MH.txt                         # Data for PBH mass-fraction relationships
+│   ├── dofs_T.txt                                # Data for relativistic / entropy dofs
+│   ├── f_PBH_data.txt                            # Data for PBH mass-fraction relationships
 │   ├── default_catalog.txt                       # Default pulsar catalog
 │   ├── default_pulsar_parameters.yaml            # Default pulsar parameters in YAML format
-│   ├── fvals.txt                                 # Frequency values for default calculations
-│   ├── gstar_T.txt                               # Temperature-dependent g* values
 │   ├── NANOGrav_positions.txt                    # NANOGrav pulsar positions
-│   ├── SIGWB_prefactor_data.txt                  # Prefactor data for SIGWB calculations
-│   └── T_data.txt                                # Temperature data for various calculations
+│   └── SIGWB_prefactor_data.txt                  # Prefactor data for SIGWB calculations
 ├── inference_tools/                              # Statistical inference utilities
 │   ├── iterative_estimation.py                   # Iterative parameter estimation methods
 │   ├── likelihoods.py                            # Likelihood functions for PTA data
