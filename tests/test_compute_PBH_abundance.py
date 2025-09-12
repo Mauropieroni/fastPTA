@@ -14,23 +14,54 @@ find_A_PBH_lognormal_data = np.load(tu.find_A_PBH_lognormal_data_path)
 class Test_Abundance_Extended(unittest.TestCase):
     """Extended tests for the compute_PBH_Abundance module."""
 
+    def test_k_of_T_MeV(self):
+        """
+        Test function for k_of_T_MeV
+        """
+
+        T_MeV = np.geomspace(4, 7.3e3, 100)
+
+        k_MeV = cpa.k_of_T_MeV(T_MeV)
+        TT_MeV = cpa.T_of_k(k_MeV)
+
+        self.assertAlmostEqual(
+            np.sum(np.abs(T_MeV / TT_MeV - 1)), 0.0, delta=1e-5
+        )
+
+    def test_hubble_mass_of_T_MeV(self):
+        """
+        Test function for k_of_T_MeV
+        """
+
+        T_MeV = np.geomspace(4, 7.3e3, 100)
+
+        HM = cpa.hubble_mass_of_T_MeV(T_MeV)
+
+        TT_MeV = cpa.T_of_M_H(HM)
+
+        self.assertAlmostEqual(
+            np.sum(np.abs(T_MeV / TT_MeV - 1)), 0.0, delta=1e-5
+        )
+
     def test_f_PBH(self):
         """
         Test function for f_PBH_NL_QCD_lognormal
         """
+
         for v in f_PBH_lognormal_data["data"]:
             self.assertAlmostEqual(
-                cpa.f_PBH_NL_QCD_lognormal(*v[:3]),
-                v[-1],
-                places=5,
+                cpa.f_PBH_NL_QCD_lognormal(*v[:3]) / v[-1] - 1, 0.0, delta=1e-3
             )
 
     def test_find_A(self):
         """
         Test function for find_A_NL_QCD
         """
+
         for v in find_A_PBH_lognormal_data["data"]:
-            self.assertAlmostEqual(cpa.find_A_NL_QCD(*v[:3]), v[-1], places=3)
+            self.assertAlmostEqual(
+                cpa.find_A_NL_QCD(*v[:3]) / v[-1] - 1, 0.0, delta=1e-5
+            )
 
     def test_window(self):
         """

@@ -36,74 +36,99 @@ g_sm_tot = 106.75
 regenerate_T_file = False
 
 # Importing data
-g_data = np.loadtxt(ut.path_to_defaults + "gstar_T.txt")
+dofs_k_M_data = dict(np.load(ut.path_to_defaults + "dofs_k_MH.npz"))
 
 # This contains some quantities for the PBH abundance
-data_f_PBH_MH = np.loadtxt(ut.path_to_defaults + "data_f_PBH_MH.txt")
+f_PBH_data = dict(np.load(ut.path_to_defaults + "f_PBH_data.npz"))
 
 
 # --- Define interpolators from the data
 # Effective number of relativistic dofs as a function of temperature in MeV
-relativistic_dofs = RegularGridInterpolator(
-    (g_data[:, 0],),
-    g_data[:, 1],
+relativistic_dofs_log = RegularGridInterpolator(
+    (jnp.log(dofs_k_M_data["Temperature_MeV"]),),
+    jnp.log(dofs_k_M_data["relativistic_dofs_MeV"]),
     bounds_error=False,
     fill_value=None,
 )
+
 
 # Effective number of entropy dofs as a function of temperature in MeV
-entropy_dofs = RegularGridInterpolator(
-    (g_data[:, 0],),
-    g_data[:, 3],
+entropy_dofs_log = RegularGridInterpolator(
+    (jnp.log(dofs_k_M_data["Temperature_MeV"]),),
+    jnp.log(dofs_k_M_data["entropy_dofs_MeV"]),
     bounds_error=False,
     fill_value=None,
 )
 
-# Kappa of critical collapse (appearing in eq A11 of 2503.10805) as a function
-# of mass in a Hubble volume in solar masses
-kappa_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 1],
+# The temperature (in MeV) corresponding to a mass (in solar masses) in the
+# Hubble volume
+T_of_M_H_log = RegularGridInterpolator(
+    (jnp.flip(jnp.log(dofs_k_M_data["Horizon_mass_Msolar"])),),
+    jnp.flip(jnp.log(dofs_k_M_data["Temperature_MeV"])),
     bounds_error=False,
     fill_value=None,
 )
 
-# Gamma of critical collapse (appearing in eq A11 of 2503.10805) as a function
-# of mass in a Hubble volume in solar masses
-gamma_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 2],
+# The temperature (in MeV) corresponding to a comoving wavenumber (in Mpc^{-1}
+T_of_k_log = RegularGridInterpolator(
+    (jnp.log(dofs_k_M_data["comoving_wavenumber_Mpc"]),),
+    jnp.log(dofs_k_M_data["Temperature_MeV"]),
     bounds_error=False,
     fill_value=None,
 )
 
-# Critical value of the compaction function (lower limit for the integral in
-# eq A11 of 2503.10805) as a function of mass in a Hubble volume in solar masses
-delta_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 3],
-    bounds_error=False,
-    fill_value=None,
-)
 
-# Phi (scalar potential appearing in eq A3 of 2503.10805) as a function of
-# mass in a Hubble volume in solar masses
-phi_QCD = RegularGridInterpolator(
-    (data_f_PBH_MH[:, 0],),
-    data_f_PBH_MH[:, 4],
-    bounds_error=False,
-    fill_value=None,
-)
+# After building the interpolators we can delete the data
+del dofs_k_M_data
 
-# After we defined the interpolators we can delete the data
-del g_data, data_f_PBH_MH
+
+@jax.jit
+def relativistic_dofs(temperature_MeV):
+    """
+    Compute the effective number of relativistic dofs as a function of
+    temperature in MeV.
+
+    Parameters:
+    -----------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    Returns:
+    --------
+    g_eff : Array
+        Effective number of relativistic dofs.
+
+    """
+
+    return jnp.exp(relativistic_dofs_log(jnp.log(temperature_MeV)))
+
+
+@jax.jit
+def entropy_dofs(temperature_MeV):
+    """
+    Compute the effective number of entropy dofs as a function of temperature
+    in MeV.
+
+    Parameters:
+    -----------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    Returns:
+    --------
+    g_eff : Array
+        Effective number of entropy dofs.
+
+    """
+
+    return jnp.exp(entropy_dofs_log(jnp.log(temperature_MeV)))
 
 
 @jax.jit
 def k_of_T_MeV(temperature_MeV):
     """
     Compute the comoving wavenumber k corresponding to a given temperature in
-    MeV (see eq. 2 of 2503.10805).
+    MeV (see eq 2 of 2503.10805).
 
     Parameters:
     -----------
@@ -120,12 +145,12 @@ def k_of_T_MeV(temperature_MeV):
     # The factor 1e3 is to convert MeV to GeV
     prefactor = (1.5e7 / 1e3) * temperature_MeV
 
-    # Second factor in eq. 2 of 2503.10805
+    # Second factor in eq 2 of 2503.10805
     relativistic_dofs_term = jnp.sqrt(
         relativistic_dofs(temperature_MeV) / g_sm_tot
     )
 
-    # Third factor in eq. 2 of 2503.10805
+    # Third factor in eq 2 of 2503.10805
     entropy_dofs_term = (entropy_dofs(temperature_MeV) / g_sm_tot) ** (
         -1.0 / 3.0
     )
@@ -137,7 +162,7 @@ def k_of_T_MeV(temperature_MeV):
 def hubble_mass_of_T_MeV(temperature_MeV):
     """
     Compute the mass in a Hubble volume in solar masses corresponding to a given
-    temperature in MeV (see eq. A2 of 2503.10805).
+    temperature in MeV (see eq A2 of 2503.10805).
 
     Parameters:
     -----------
@@ -159,27 +184,46 @@ def hubble_mass_of_T_MeV(temperature_MeV):
     return prefactor / relativistic_dofs_term
 
 
-# If the flag is set to True, regenerate the file
-if regenerate_T_file:
-    T_range = jnp.geomspace(1e-3, 1e10, 10000)
-    M_of_T = hubble_mass_of_T_MeV(T_range)
-    k_of_T = k_of_T_MeV(T_range)
-    np.savetxt(
-        ut.path_to_defaults + "T_data.txt",
-        np.vstack((T_range, M_of_T, k_of_T)).T,
-    )
+@jax.jit
+def T_of_M_H(mass_hubble_volume):
+    """
+    Compute the temperature (in MeV) corresponding to a mass (in solar masses)
+    in the Hubble volume.
 
-# Load the data if the flag is set to False
-else:
-    T_range, M_of_T, k_of_T = np.loadtxt(ut.path_to_defaults + "T_data.txt").T
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
 
-# Define the interpolators
-# The mass in is solar masses, k is in Mpc^{-1} and T is in MeV
-T_of_M_H = RegularGridInterpolator((jnp.flip(M_of_T),), jnp.flip(T_range))
-T_of_k = RegularGridInterpolator((k_of_T,), T_range)
+    Returns:
+    --------
+    temperature_MeV : Array
+        Temperature in MeV.
 
-# Delete the data
-del T_range, M_of_T, k_of_T
+    """
+
+    return jnp.exp(T_of_M_H_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def T_of_k(k_vec_mpc):
+    """
+    Compute the temperature (in MeV) corresponding to a comoving wavenumber
+    (in Mpc^{-1}).
+
+    Parameters:
+    -----------
+    k_vec_mpc : Array
+        Comoving wavenumber k in Mpc^{-1}.
+
+    Returns:
+    --------
+    temperature_MeV : Array
+        Temperature in MeV.
+
+    """
+
+    return jnp.exp(T_of_k_log(jnp.log(k_vec_mpc)))
 
 
 @jax.jit
@@ -205,20 +249,147 @@ def M_H_of_k(k_vec_mpc, rm_to_k_factor):
     # Compute the temperature corresponding to the comoving wavenumber
     temperature = T_of_k(k_vec_mpc)
 
-    # Compute the k_dependent term in eq. 36 of the draft
+    # Compute the k_dependent term in eq 36 of the draft
     prefactor = 10.7e12 * (k_vec_mpc / rm_to_k_factor) ** -2.0
 
-    # Compute the relativistic and entropy dofs terms in eq. 36 of the draft
+    # Compute the relativistic and entropy dofs terms in eq 36 of the draft
     relativistic_dofs_term = jnp.sqrt(relativistic_dofs(temperature) / g_sm_tot)
     entropy_dofs_term = (entropy_dofs(temperature) / g_sm_tot) ** (-2.0 / 3.0)
 
     return prefactor * relativistic_dofs_term * entropy_dofs_term
 
 
+# Kappa of critical collapse (appearing in eq A10 of 2503.10805) as a function
+# of mass in a Hubble volume in solar masses
+kappa_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Horizon_mass_Msolar"]),),
+    jnp.log(f_PBH_data["kappa_QCD"]),
+    bounds_error=False,
+    fill_value=None,
+)
+
+# Gamma of critical collapse (appearing in eq A10 of 2503.10805) as a function
+# of mass in a Hubble volume in solar masses
+gamma_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Horizon_mass_Msolar"]),),
+    jnp.log(f_PBH_data["gamma_QCD"]),
+    bounds_error=False,
+    fill_value=None,
+)
+
+
+# Critical value of the compaction function (lower limit for the integral in
+# eq A11 of 2503.10805) as a function of mass in a Hubble volume in solar masses
+delta_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Horizon_mass_Msolar"]),),
+    jnp.log(f_PBH_data["delta_QCD"]),
+    bounds_error=False,
+    fill_value=None,
+)
+
+# Phi (scalar potential appearing in the eqs of Appendix A of 2503.10805) as a
+# function of mass in a Hubble volume in solar masses
+phi_QCD_log = RegularGridInterpolator(
+    (jnp.log(f_PBH_data["Horizon_mass_Msolar"]),),
+    jnp.log(f_PBH_data["phi_QCD"]),
+    bounds_error=False,
+    fill_value=None,
+)
+
+
+# After we defined the interpolators we can delete the data
+del f_PBH_data
+
+
+@jax.jit
+def kappa_QCD(mass_hubble_volume):
+    """
+    Compute kappa of critical collapse (appearing in eq A10 of 2503.10805)
+    as a function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    kappa : Array
+        Kappa of critical collapse.
+
+    """
+
+    return jnp.exp(kappa_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def gamma_QCD(mass_hubble_volume):
+    """
+    Compute gamma of critical collapse (appearing in eq A10 of 2503.10805)
+    as a function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    gamma : Array
+        Gamma of critical collapse.
+
+    """
+
+    return jnp.exp(gamma_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def delta_QCD(mass_hubble_volume):
+    """
+    Compute the critical value of the compaction function (lower limit for
+    the integral in eq A11 of 2503.10805) as a function of mass in a Hubble
+    volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    delta : Array
+        Critical value of the compaction function.
+
+    """
+
+    return jnp.exp(delta_QCD_log(jnp.log(mass_hubble_volume)))
+
+
+@jax.jit
+def phi_QCD(mass_hubble_volume):
+    """
+    Compute phi (scalar potential appearing in the eqs of Appendix A of
+    2503.10805) as a function of mass in a Hubble volume in solar masses.
+
+    Parameters:
+    -----------
+    mass_hubble_volume : Array
+        Mass in a Hubble volume in solar masses.
+
+    Returns:
+    --------
+    phi : Array
+        Scalar potential.
+
+    """
+
+    return jnp.exp(phi_QCD_log(jnp.log(mass_hubble_volume)))
+
+
 @jax.jit
 def window(k_vec, r_max):
     """
-    Compute the window function (see eq A10 of 2503.10805).
+    Compute the window function (see eq A9 of 2503.10805).
 
     Parameters:
     -----------
@@ -243,7 +414,7 @@ def window(k_vec, r_max):
 @jax.jit
 def transfer_function(k_vec, r_max):
     """
-    Compute the window function (see eq A10 of 2503.10805).
+    Compute the transfer function (see eq A9 of 2503.10805).
 
     Parameters:
     -----------
@@ -265,8 +436,8 @@ def transfer_function(k_vec, r_max):
 @jax.jit
 def integrand_spectrum(k_vec, r_max, scalar_spectrum):
     """
-    Compute the integrand in eq A8 of 2503.10805 given spectrum, window and
-    transfer function.
+    Compute the integrand in eq A8 (first line) of 2503.10805 given spectrum,
+    window and transfer function.
 
     Parameters:
     -----------
@@ -295,7 +466,7 @@ def integrand_spectrum(k_vec, r_max, scalar_spectrum):
 def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
     """
     Compute the std (as sqrt of the variance) of the compaction function.
-    This is the square root of the integral in eq. A8 of 2503.10805.
+    This is the square root of the integral in eq A8 of 2503.10805 (first line).
 
     Parameters:
     -----------
@@ -315,10 +486,10 @@ def compute_sigma_c_NL_QCD(k_vec, r_max, scalar_spectrum, mass_hubble_volume):
 
     """
 
-    # Compute the integrand in eq A8 of 2503.10805
+    # Compute the integrand in eq A8 (first line) of 2503.10805
     to_integrate = integrand_spectrum(k_vec, r_max, scalar_spectrum)
 
-    # Compute the integral in eq A8 of 2503.10805
+    # Compute the integral in eq A8 (first line) of 2503.10805
     integral_result = trapezoid(to_integrate, x=jnp.log(k_vec), axis=-1)
 
     # Return the square root of the integral times Phi
@@ -356,7 +527,7 @@ def P_G(cal_C_G, sigma_c):
 @jax.jit
 def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     """
-    Compute the integrand in eq A12 of 2503.10805.
+    Compute the integrand in eq A10 of 2503.10805.
 
     Parameters:
     -----------
@@ -371,21 +542,21 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     Returns:
     --------
     integrand : Array
-        Integrand in eq A12 of 2503.10805.
+        Integrand in eq A10 of 2503.10805.
 
     """
 
-    # All the "constants" in eq A12 of 2503.10805 vary around the QCD PT
+    # All the "constants" in eq A10 of 2503.10805 vary around the QCD PT
     # A coefficient related to the eos parameter (see text after eq A4)
     P_QCD = phi_QCD(mass_hubble_volume)
 
-    # This is the threshold value cal_C_th to form a PBH cal_C_th see eq A12
+    # This is the threshold value cal_C_th to form a PBH cal_C_th see eq A10
     cal_C_th = delta_QCD(mass_hubble_volume)
 
-    # Proportionality coefficient for critical collapse (see eq A12)
+    # Proportionality coefficient for critical collapse (see eq A10)
     K_QCD = kappa_QCD(mass_hubble_volume)
 
-    # Critical exponent for the critical collapse (see eq A12)
+    # Critical exponent for the critical collapse (see eq A10)
     G_QCD = gamma_QCD(mass_hubble_volume)
 
     # This is the quantity in the first condition in eq A13 of 2503.10805
@@ -395,7 +566,7 @@ def integrand_beta(cal_C_G, sigma_c, mass_hubble_volume):
     # This is the quantity in the second condition in eq A13 of 2503.10805
     condition_2 = 2.0 * P_QCD - cal_C_G
 
-    # This is the integrand in eq A12 of 2503.10805
+    # This is the integrand in eq A10 of 2503.10805
     result = K_QCD * condition_1**G_QCD * P_G(cal_C_G, sigma_c)
 
     # Return the integrand where the conditions are satisfied else return 0
@@ -407,7 +578,7 @@ def compute_beta_NL_C_QCD(
     k_vec, r_max, scalar_spectrum, mass_hubble_volume, cal_C_G_vec
 ):
     """
-    Compute the beta (for the f_PBH integral) in eq A12 of 2503.10805.
+    Compute the beta (for the f_PBH integral) in eq A10 of 2503.10805.
 
     Parameters:
     -----------
@@ -431,7 +602,7 @@ def compute_beta_NL_C_QCD(
     Returns:
     --------
     beta : Array
-        Beta in eq A12 of 2503.10805.
+        Beta in eq A10 of 2503.10805.
 
     """
 
@@ -440,10 +611,10 @@ def compute_beta_NL_C_QCD(
         k_vec, r_max, scalar_spectrum, mass_hubble_volume
     )
 
-    # Compute the integrand in eq A12 of 2503.10805
+    # Compute the integrand in eq A10 of 2503.10805
     beta_integrand = integrand_beta(cal_C_G_vec, sigma_c, mass_hubble_volume)
 
-    # Return the integral in eq A12 of 2503.10805
+    # Return the integral in eq A10 of 2503.10805
     return trapezoid(beta_integrand, x=cal_C_G_vec, axis=0)
 
 
@@ -487,7 +658,7 @@ def f_PBH_NL_QCD(r_max_vec_mpc, k_vec_mpc, scalar_spectrum, len_C_G_vec=100):
     entropy_dofs_term = entropy_dofs(T_v) / g_sm_tot
     M_H_factor = 1.0 / 7.9e-10 / Omega_DM / M_H_vec**1.5
 
-    # compute the prefactor in eq. A1 of 2503.10805
+    # compute the prefactor in eq A1 of 2503.10805
     prefactor = M_H_factor * relativistic_dofs_term / entropy_dofs_term
 
     # compute the beta as given by A12 of 2503.10805

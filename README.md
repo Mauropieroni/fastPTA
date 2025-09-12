@@ -17,29 +17,39 @@ These catalogs can then be used to perform Fisher forecasts of MCMC simulations.
 </table>
 
 # Installation
+
 - Clone from this repository:
+
 ```
 https://github.com/Mauropieroni/fastPTA
 ```
+
 - Install using the following command (you can delete the `fastPTA` folder afterwards).
+
 ```
 cd fastPTA/
 pip install .
-``` 
+```
+
   alternatively, to have changes in the code propagate instantaneously (do not delete the `fastPTA` folder in this case!):
+
 ```
 cd fastPTA/
 pip install -e .
 ```
 
 # To test:
+
 After installation (see above), you can run the following command
+
 ```
 pytest $(cd fastPTA/)
 ```
+
 a series of tests will run to check that everything works fine.
 
 # Repository structure:
+
 ```
 fastPTA/
 ├── __init__.py                                   # Package initialization, version, and 
@@ -71,15 +81,13 @@ fastPTA/
 │   ├── datastream.py                             # Data stream handling and processing
 │   └── generate_data.py                          # Functions to generate mock PTA data
 ├── defaults/                                     # Default configuration and parameters
-│   ├── cgvals.txt                                # Cosmic growth values for calculations
-│   ├── data_f_PBH_MH.txt                         # Data for PBH mass-fraction relationships
+│   ├── dofs_k_MH.npz                             # Data for relativistic/entropy dofs +
+│   │    					  # comoving wavevector and Horizon mass
+│   ├── f_PBH_data.npz                            # Data for PBH mass-fraction relationships
 │   ├── default_catalog.txt                       # Default pulsar catalog
 │   ├── default_pulsar_parameters.yaml            # Default pulsar parameters in YAML format
-│   ├── fvals.txt                                 # Frequency values for default calculations
-│   ├── gstar_T.txt                               # Temperature-dependent g* values
 │   ├── NANOGrav_positions.txt                    # NANOGrav pulsar positions
-│   ├── SIGWB_prefactor_data.txt                  # Prefactor data for SIGWB calculations
-│   └── T_data.txt                                # Temperature data for various calculations
+│   └── SIGWB_prefactor_data.txt                  # Prefactor data for SIGWB calculations
 ├── inference_tools/                              # Statistical inference utilities
 │   ├── iterative_estimation.py                   # Iterative parameter estimation methods
 │   ├── likelihoods.py                            # Likelihood functions for PTA data
@@ -161,13 +169,16 @@ examples/
 ```
 
 # Some examples:
-- Navigate to examples for some scripts and jupyter notebooks explaining how to use the code. <br> See above for the description of the example folder.
-    
+
+- Navigate to examples for some scripts and jupyter notebooks explaining how to use the code. `<br>` See above for the description of the example folder.
+
 # How to cite this code:
+
 If you use fastPTA, please cite
-- [2404.02864](https://arxiv.org/pdf/2404.02864), the original `fastPTA' paper 
-and if appropriate:
+
+- [2404.02864](https://arxiv.org/pdf/2404.02864), the original `fastPTA' paper
+  and if appropriate:
 - [2407.14460](https://arxiv.org/pdf/2407.14460), [2508.21131](https://arxiv.org/abs/2508.21131), for anisotropies searches,
-- [2503.10805](https://arxiv.org/pdf/2503.10805) for SIGW searches. 
+- [2503.10805](https://arxiv.org/pdf/2503.10805) for SIGW searches.
 
 There's also a [Zenodo](https://zenodo.org/records/12820730) entry associated with this code.
