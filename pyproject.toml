@@ -19,15 +19,16 @@ urls = { Homepage = "https://github.com/Mauropieroni/fastPTA/" }
 
 dependencies = [
     # Python-version-specific dependencies handled via environment markers
-    "numpy>=1.26.4; python_version >= '3.9'",
     "numpy==1.24.4; python_version < '3.9'",
+    "numpy>=1.26.4; python_version >= '3.9'",
     "scipy>=1.10.1",
-    "jax>=0.4.25; python_version >= '3.9'",
     "jax==0.4.13; python_version < '3.9'",
-    "jaxlib>=0.4.25; python_version >= '3.9'",
+    "jax>=0.4.25; python_version >= '3.9'",
     "jaxlib==0.4.13; python_version < '3.9'",
-    "healpy>=1.16.6; python_version >= '3.9'",
+    "jaxlib>=0.4.30; python_version == '3.9'",
+    "jaxlib<=0.9.1; python_version >= '3.9'",
     "healpy==1.16.2; python_version < '3.9'",
+    "healpy>=1.16.6; python_version >= '3.9'",
     "typing_extensions>=4.10.0; python_version == '3.11'",
     "matplotlib>=3.7.4",
     "tqdm>=4.64.1",
