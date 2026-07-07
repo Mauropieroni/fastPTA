@@ -5,7 +5,6 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-
 # Local
 import utils as tu
 from fastPTA import transmission_functions as tf
@@ -172,11 +171,11 @@ class TestTransmissionFunctions(unittest.TestCase):
         )
 
     def test_transmission_function_matrix_values(self):
-        """Test the values of get_tf."""
+        """Test the values of transmission_function_matrix."""
 
         # Test array values
         # Vector of frequencies and single T_obs
-        result = tf.get_tf(
+        result = tf.transmission_function_matrix(
             self.data["frequencies"], self.data["t"], self.data["Mmat"]
         )
         expected = self.data["transmission_matrix_single"]
@@ -185,19 +184,19 @@ class TestTransmissionFunctions(unittest.TestCase):
             float(jnp.sum(result - expected)), 0.0, places=10
         )
 
-    def test_get_tf_shape(self):
-        """Test the shape of get_tf output."""
+    def test_transmission_function_matrix_shape(self):
+        """Test the shape of transmission_function_matrix output."""
 
-        result = tf.get_tf(
+        result = tf.transmission_function_matrix(
             self.data["frequencies"], self.data["t"], self.data["Mmat"]
         )
 
         self.assertEqual(result.shape, self.data["frequencies"].shape)
         self.assertEqual(len(result), len(self.data["frequencies"]))
 
-    def test_get_tf_values(self):
-        """Test the values of get_tf."""
-        result = tf.get_tf(
+    def test_transmission_function_matrix_values(self):
+        """Test the values of transmission_function_matrix."""
+        result = tf.transmission_function_matrix(
             self.data["frequencies"], self.data["t"], self.data["Mmat"]
         )
 

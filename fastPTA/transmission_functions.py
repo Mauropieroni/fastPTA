@@ -110,51 +110,34 @@ def transmission_function_quadratic_1yr_peak(frequencies, T_obs):
 
 
 @jax.jit
-def get_tf(f, t, Mmat):
+def transmission_function_matrix(f, t, Mmat):
     """
     Compute the transmission function matrix given frequencies, times, and
-    design matrix. The transmission function matrix is computing according to
+    design matrix. The transmission function matrix is computed according to
     the procedure described in 1907.04341.
 
     Parameters:
     -----------
     f : Array
-        Array of frequencies (in Hz).
+        Array of frequencies (in Hz). Shape (n_frequencies,).
     t : Array
         Array of times (in seconds).
-        Must have shape (...,n_times).
+        Shape (n_times,) for a single pulsar, or
+        (n_pulsars, n_times) for multiple pulsars.
     Mmat : Array
-        Design matrix.
-        Must have shape (...,n_pulsars, n_times).
+        Design matrix of the timing model.
+        Shape (n_times, n_params) for a single pulsar, or
+        (n_pulsars, n_times, n_params) for multiple pulsars.
 
     Returns:
     --------
     Array
-        Transmission function matrix.
+        Transmission function values.
+        Shape (n_frequencies,) for a single pulsar, or
+        (n_pulsars, n_frequencies) for multiple pulsars.
     """
 
-    """
-    Compute the transmission function from a given design matrix describing
-    the timing model of the pulsar.
-
-    Parameters:
-    -----------
-    frequencies : Array
-        Array of frequencies (in Hz).
-    T_obs : float
-        Observation time (in seconds).
-    Mmat : Array
-        Design matrix of timing model.
-
-    Returns:
-    --------
-    transmission : Array
-        Array of transmission values computed for the given frequencies and
-        observation time.
-
-    """
-
-    N, m = jnp.shape(Mmat)
+    N, m = Mmat.shape[-2], Mmat.shape[-1]
     U, _, _ = jnp.linalg.svd(Mmat)
     G = U[..., m:]
 

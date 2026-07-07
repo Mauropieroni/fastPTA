@@ -733,6 +733,8 @@ def get_tensors(
     path_to_pulsar_catalog=ut.path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
     timing_model={"which_model": "approx"},
+    time_of_arrivals=None,
+    design_matrices=None,
     add_curn=False,
     HD_order=0,
     HD_basis="legendre",
@@ -760,19 +762,23 @@ def get_tensors(
         Average span of the PTA data in years.
         Default is 10.33 years.
     timing_model : dictionary, optional
-        Dictionary specifying the transmission function to use.
-        Default is {"which_model" : "approx"}.
-        There must be a "which_model" key whose value should be a string.
-        There are four options:
-        "approx", "quadratic", "quadratic+1yr" and "matrix".
-        For the first three options no additional keys are needed.
-        If "matrix" is chosen, two additional keys are needed:
-        "time_of_arrivals" : list of arrays with the time of arrivals for each
-        pulsar in seconds.
-        "design_matrices" : list of 2D arrays with the design matrices for each
-        pulsar.
-        NB!! The "matrix" option can be very memory intensive for large
-        pulsar catalogs.
+    Dictionary specifying the transmission function to use.
+    Default is {"which_model" : "approx"}.
+    There must be a "which_model" key whose value should be a string.
+    There are four options:
+    "approx", "quadratic", "quadratic+1yr" and "matrix".
+    If "matrix" is chosen, the additional arguments time_of_arrivals and
+    design_matrices must also be provided (see below).
+    NB!! The "matrix" option can be very memory intensive for large
+    pulsar catalogs.
+    time_of_arrivals : list of arrays, optional
+        List of arrays with the time of arrivals for each pulsar in seconds.
+        Required only when timing_model["which_model"] == "matrix".
+        Default is None.
+    design_matrices : list of 2D arrays, optional
+        List of 2D arrays with the design matrices for each pulsar.
+        Required only when timing_model["which_model"] == "matrix".
+        Default is None.
     add_curn : bool, optional
         Whether to add common (spatially) uncorrelated red noise (CURN).
         Default is False.
@@ -889,11 +895,14 @@ def get_tensors(
             frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
         )
     elif timing_model["which_model"].lower() == "matrix":
+        if time_of_arrivals is None or design_matrices is None:
+            raise ValueError(
+                'For timing_model["which_model"]="matrix", both '
+                "time_of_arrivals and design_matrices must be provided"
+            )
         transmission = tf.transmission_function_matrix(
-            frequencies,
-            timing_model["time_of_arrivals"],
-            timing_model["design_matrices"],
-        )
+            frequencies, time_of_arrivals, design_matrices
+        ).T
     else:
         raise ValueError(
             'timing_model["which_model"] must be "approx", "quadratic",'
