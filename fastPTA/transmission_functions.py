@@ -64,14 +64,14 @@ def transmission_function_quadratic(frequencies, T_obs):
     second_term = (
         jnp.sqrt(3)
         / (2 * jnp.pi)
-        * (-2 * jnp.sin(pix) / (pix**2) + 2 * jnp.cos(pix) / x)
+        * (-2 * jnp.sin(pix) / (jnp.pi * x**2) + 2 * jnp.cos(pix) / x)
     ) ** 2
 
     third_term = (
         jnp.sqrt(5)
         / (-4 * jnp.pi**2)
         * (
-            12 * jnp.sin(pix) / (pix**3)
+            12 * jnp.sin(pix) / (jnp.pi * x**3)
             - 12 * jnp.cos(pix) / x**2
             - 4 * jnp.pi * jnp.sin(pix) / x
         )
