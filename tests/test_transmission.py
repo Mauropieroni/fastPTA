@@ -206,6 +206,30 @@ class TestTransmissionFunctions(unittest.TestCase):
         # Check that result is real (should be due to the jnp.real call)
         self.assertTrue(jnp.all(jnp.isreal(result)))
 
+    def test_transmission_function_matrix_multi_pulsar(self):
+        """Stacked multi-pulsar input matches the single-pulsar result."""
+        # Build list inputs (one entry per pulsar), as stated in the docstring
+        toas = [self.data["t"], self.data["t"]]
+        Mmats = [self.data["Mmat"], self.data["Mmat"]]
+
+        # Stack the same way get_tensors now does, then call the function
+        result = tf.transmission_function_matrix(
+            self.data["frequencies"],
+            jnp.asarray(toas),
+            jnp.asarray(Mmats),
+        )
+
+        # Two pulsars, n frequencies: expected shape (2, n_frequencies)
+        n_freq = len(self.data["frequencies"])
+        self.assertEqual(result.shape, (2, n_freq))
+
+        # Each pulsar must reproduce the known single-pulsar result
+        expected = self.data["transmission_matrix_single"]
+        for row in result:
+            self.assertAlmostEqual(
+                float(jnp.sum(row - expected)), 0.0, places=10
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

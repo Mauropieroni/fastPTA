@@ -774,10 +774,13 @@ def get_tensors(
     time_of_arrivals : list of arrays, optional
         List of arrays with the time of arrivals for each pulsar in seconds.
         Required only when timing_model["which_model"] == "matrix".
-        Default is None.
+        All pulsars must share the same number of time samples, since the
+        per-pulsar arrays are stacked into a single array. Default is None.
     design_matrices : list of 2D arrays, optional
         List of 2D arrays with the design matrices for each pulsar.
         Required only when timing_model["which_model"] == "matrix".
+        All pulsars must share the same number of time samples and the same
+        number of timing-model parameters, for the same stacking reason.
         Default is None.
     add_curn : bool, optional
         Whether to add common (spatially) uncorrelated red noise (CURN).
@@ -901,7 +904,9 @@ def get_tensors(
                 "time_of_arrivals and design_matrices must be provided"
             )
         transmission = tf.transmission_function_matrix(
-            frequencies, time_of_arrivals, design_matrices
+            frequencies,
+            jnp.asarray(time_of_arrivals),
+            jnp.asarray(design_matrices),
         ).T
     else:
         raise ValueError(
