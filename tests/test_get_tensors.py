@@ -183,6 +183,49 @@ class TestGetTensors(unittest.TestCase):
         for i in range(len(tu.get_tensor_labels)):
             self.assertTupleEqual(result[i].shape, test_shapes[i])
 
+    def test_get_tensors_generation_matrix_timing_model(self):
+        """
+        Test that get_tensors works with timing_model={"which_model":
+        "matrix"} when time_of_arrivals and design_matrices are given as
+        lists of per-pulsar arrays (as documented), confirming they get
+        stacked correctly before being passed to
+        transmission_functions.transmission_function_matrix.
+
+        """
+
+        npulsars = 5
+        HD_order = 0
+        n_times = 200
+
+        t = np.linspace(0.0, 10.0 * ut.yr, n_times)
+        Mmat = np.array([np.ones(n_times), t, 0.5 * t**2]).T
+
+        result = gt.get_tensors(
+            tu.test_frequency,
+            path_to_pulsar_catalog=tu.test_catalog_path3,
+            save_catalog=False,
+            n_pulsars=npulsars,
+            regenerate_catalog=True,
+            HD_basis="legendre",
+            HD_order=HD_order,
+            timing_model={"which_model": "matrix"},
+            time_of_arrivals=[t for _ in range(npulsars)],
+            design_matrices=[Mmat for _ in range(npulsars)],
+            **tu.EPTAlike_test,
+        )
+
+        HD_shape = HD_order + 1 if HD_order else HD_order
+        test_shapes = [
+            (len(tu.test_frequency), npulsars, npulsars),
+            (len(tu.test_frequency), npulsars, npulsars),
+            (HD_shape, len(tu.test_frequency), npulsars, npulsars),
+            (HD_shape,),
+        ]
+
+        for i in range(len(tu.get_tensor_labels)):
+            self.assertTupleEqual(result[i].shape, test_shapes[i])
+            self.assertTrue(jnp.all(jnp.isfinite(result[i])))
+
     def test_get_tensors_results(self):
         """
         Test the get_tensors function results

@@ -771,13 +771,20 @@ def get_tensors(
     design_matrices must also be provided (see below).
     NB!! The "matrix" option can be very memory intensive for large
     pulsar catalogs.
-    time_of_arrivals : list of arrays, optional
-        List of arrays with the time of arrivals for each pulsar in seconds.
+    time_of_arrivals : array or list of arrays, optional
+        Time of arrivals for each pulsar in seconds. Either a single 2D array
+        of shape (n_pulsars, n_times), or a list of n_pulsars 1D arrays that
+        all have the same length (all pulsars must share the same number of
+        time samples, since they are stacked into a single array).
         Required only when timing_model["which_model"] == "matrix".
         All pulsars must share the same number of time samples, since the
         per-pulsar arrays are stacked into a single array. Default is None.
-    design_matrices : list of 2D arrays, optional
-        List of 2D arrays with the design matrices for each pulsar.
+    design_matrices : array or list of 2D arrays, optional
+        Design matrices for each pulsar. Either a single 3D array of shape
+        (n_pulsars, n_times, n_params), or a list of n_pulsars 2D arrays that
+        all have the same shape (all pulsars must share the same number of
+        time samples and timing-model parameters, since they are stacked
+        into a single array).
         Required only when timing_model["which_model"] == "matrix".
         All pulsars must share the same number of time samples and the same
         number of timing-model parameters, for the same stacking reason.
