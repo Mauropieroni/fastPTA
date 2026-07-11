@@ -194,7 +194,7 @@ class TestTransmissionFunctions(unittest.TestCase):
         self.assertEqual(result.shape, self.data["frequencies"].shape)
         self.assertEqual(len(result), len(self.data["frequencies"]))
 
-    def test_transmission_function_matrix_values(self):
+    def test_transmission_function_matrix_finite_and_real(self):
         """Test the values of transmission_function_matrix."""
         result = tf.transmission_function_matrix(
             self.data["frequencies"], self.data["t"], self.data["Mmat"]
