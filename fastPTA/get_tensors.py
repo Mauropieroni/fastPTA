@@ -12,6 +12,7 @@ import fastPTA.pulsar_noises as pn
 import fastPTA.data.datastream as gds
 from fastPTA.angular_decomposition import spherical_harmonics as spha
 from fastPTA.generate_new_pulsar_configuration import generate_pulsars_catalog
+import fastPTA.transmission_functions as tf
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -63,44 +64,19 @@ HD_value = HD_correlations(x)
 
 
 @jax.jit
-def transmission_function(frequencies, T_obs):
-    """
-    Compute the transmission function (see Eq. 3 of 2404.02864), which
-    represents the attenuation of signals, for some frequencies given the
-    observation time.
-
-    Parameters:
-    -----------
-    frequencies : Array
-        Array of frequencies (in Hz).
-    T_obs : float
-        Observation time (in seconds).
-
-    Returns:
-    --------
-    transmission : Array
-        Array of transmission values computed for the given frequencies and
-        observation time.
-
-    """
-
-    return 1 / (1 + 1 / (frequencies * T_obs) ** 6)
-
-
-@jax.jit
-def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
+def get_time_tensor(pta_span_yrs, Tspan_yr, transmission):
     """
     Computes the time tensor (i.e., the part of the response depending on the
     observation times) for given frequencies and observation times.
 
     Parameters:
     -----------
-    frequencies : Array
-        Array of frequencies.
     pta_span_yrs : float
         Average span of the PTA data in years.
     Tspan_yr : float
         Time span for individual pulsars in years.
+    transmission : Array
+        Array of transmission functions per pulsar.
 
     Returns:
     --------
@@ -116,11 +92,6 @@ def get_time_tensor(frequencies, pta_span_yrs, Tspan_yr):
     time_1, time_2 = jnp.meshgrid(Tspan_yr, Tspan_yr)
     # pick the minimium time in each pair
     time_IJ = jnp.min(jnp.array([time_1, time_2]), axis=0)
-
-    # Compute the transmission function for all times and frequencies
-    transmission = transmission_function(
-        frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
-    )
 
     # Build the tensor product of the two transimission function
     transmission_tensor = transmission[:, :, None] * transmission[:, None, :]
@@ -761,6 +732,9 @@ def get_tensors(
     frequencies,
     path_to_pulsar_catalog=ut.path_to_default_pulsar_catalog,
     pta_span_yrs=10.33,
+    timing_model={"which_model": "approx"},
+    time_of_arrivals=None,
+    design_matrices=None,
     add_curn=False,
     HD_order=0,
     HD_basis="legendre",
@@ -787,6 +761,34 @@ def get_tensors(
     pta_span_yrs : float, optional
         Average span of the PTA data in years.
         Default is 10.33 years.
+    timing_model : dictionary, optional
+    Dictionary specifying the transmission function to use.
+    Default is {"which_model" : "approx"}.
+    There must be a "which_model" key whose value should be a string.
+    There are four options:
+    "approx", "quadratic", "quadratic+1yr" and "matrix".
+    If "matrix" is chosen, the additional arguments time_of_arrivals and
+    design_matrices must also be provided (see below).
+    NB!! The "matrix" option can be very memory intensive for large
+    pulsar catalogs.
+    time_of_arrivals : array or list of arrays, optional
+        Time of arrivals for each pulsar in seconds. Either a single 2D array
+        of shape (n_pulsars, n_times), or a list of n_pulsars 1D arrays that
+        all have the same length (all pulsars must share the same number of
+        time samples, since they are stacked into a single array).
+        Required only when timing_model["which_model"] == "matrix".
+        All pulsars must share the same number of time samples, since the
+        per-pulsar arrays are stacked into a single array. Default is None.
+    design_matrices : array or list of 2D arrays, optional
+        Design matrices for each pulsar. Either a single 3D array of shape
+        (n_pulsars, n_times, n_params), or a list of n_pulsars 2D arrays that
+        all have the same shape (all pulsars must share the same number of
+        time samples and timing-model parameters, since they are stacked
+        into a single array).
+        Required only when timing_model["which_model"] == "matrix".
+        All pulsars must share the same number of time samples and the same
+        number of timing-model parameters, for the same stacking reason.
+        Default is None.
     add_curn : bool, optional
         Whether to add common (spatially) uncorrelated red noise (CURN).
         Default is False.
@@ -889,8 +891,38 @@ def get_tensors(
     # convert the noise in strain and then omega units
     strain_omega = pn.get_noise_omega(frequencies, noise)
 
+    # compute the transmission function for all times and frequencies
+    if timing_model["which_model"].lower() == "approx":
+        transmission = tf.transmission_function_approx(
+            frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
+        )
+    elif timing_model["which_model"].lower() == "quadratic":
+        transmission = tf.transmission_function_quadratic(
+            frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
+        )
+    elif timing_model["which_model"].lower() == "quadratic+1yr":
+        transmission = tf.transmission_function_quadratic_1yr_peak(
+            frequencies[:, None], (Tspan_yr * ut.yr)[None, :]
+        )
+    elif timing_model["which_model"].lower() == "matrix":
+        if time_of_arrivals is None or design_matrices is None:
+            raise ValueError(
+                'For timing_model["which_model"]="matrix", both '
+                "time_of_arrivals and design_matrices must be provided"
+            )
+        transmission = tf.transmission_function_matrix(
+            frequencies,
+            jnp.asarray(time_of_arrivals),
+            jnp.asarray(design_matrices),
+        ).T
+    else:
+        raise ValueError(
+            'timing_model["which_model"] must be "approx", "quadratic",'
+            ' "quadratic+1yr" or "matrix"'
+        )
+
     # get the time tensor
-    time_tensor_IJ = get_time_tensor(frequencies, pta_span_yrs, Tspan_yr)
+    time_tensor_IJ = get_time_tensor(pta_span_yrs, Tspan_yr, transmission)
 
     # compute angular separations
     zeta_IJ = jnp.einsum("ik, jk->ij", pi_vec, pi_vec)

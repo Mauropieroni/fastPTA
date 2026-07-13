@@ -11,7 +11,7 @@ from scipy.special import legendre
 from fastPTA import get_tensors as gt
 
 # Setting plotting parameters
-matplotlib.rcParams["text.usetex"] = True
+matplotlib.rcParams["text.usetex"] = False
 plt.rc("xtick", labelsize=20)
 plt.rc("ytick", labelsize=20)
 plt.rcParams.update(
