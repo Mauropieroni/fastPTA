@@ -33,6 +33,7 @@ Fisher_data_path = test_data_path + "Fisher_data.npz"
 Fisher_data_path2 = test_data_path + "Fisher_data2.npz"
 f_PBH_lognormal_data_path = test_data_path + "f_PBH_lognormal.npz"
 find_A_PBH_lognormal_data_path = test_data_path + "find_A_PBH_lognormal.npz"
+transmission_data_path = test_data_path + "transmission_data.npz"
 mock_pulsar_noises = test_data_path + "mock_pulsar_noises.npz"
 
 parameters_to_test = {
