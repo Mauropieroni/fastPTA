@@ -9,6 +9,6 @@ __submodules__ = [
     "data",
     "defaults",
     "inference_tools",
-    "signal_templates",
+    "local_signal_templates",
 ]
 __all__ = __submodules__

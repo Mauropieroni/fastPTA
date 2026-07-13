@@ -5,7 +5,6 @@ import sys
 # Local
 import fastPTA.utils as ut
 
-
 sys.path.append(os.path.split(os.path.abspath(__file__))[0])
 
 

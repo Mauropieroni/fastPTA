@@ -8,12 +8,10 @@ import jax.numpy as jnp
 
 # Local
 import fastPTA.utils as ut
-from fastPTA.signal_templates.signal_utils import SMBBH_parameters
-from fastPTA.signals import get_signal_model
+from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
 from fastPTA.data.generate_data import generate_MCMC_data
 from fastPTA.inference_tools.likelihoods import log_posterior
-
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -28,7 +26,7 @@ R_convergence_default = 1e-1
 R_criterion_default = "mean_squared"
 burnin_steps_default = 300
 MCMC_iteration_steps_default = 500
-power_law_model = get_signal_model("power_law")
+power_law_model = get_signal_model("PowerLaw")
 
 
 def get_MCMC_data(

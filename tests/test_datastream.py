@@ -7,7 +7,6 @@ import numpy as np
 import utils as tu
 import fastPTA.data.datastream as gds
 
-
 datastream = np.load(tu.get_datastream_data_path)
 
 

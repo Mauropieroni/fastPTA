@@ -3,10 +3,8 @@ import jax
 from scipy import stats
 import jax.numpy as jnp
 
-
 # Local
 import fastPTA.utils as ut
-
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])

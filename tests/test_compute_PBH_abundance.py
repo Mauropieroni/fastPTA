@@ -5,7 +5,6 @@ import numpy as np
 from fastPTA import compute_PBH_Abundance as cpa
 import utils as tu
 
-
 # Already existing test data
 f_PBH_lognormal_data = np.load(tu.f_PBH_lognormal_data_path)
 find_A_PBH_lognormal_data = np.load(tu.find_A_PBH_lognormal_data_path)

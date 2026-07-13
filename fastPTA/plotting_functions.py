@@ -10,7 +10,6 @@ from scipy.special import legendre
 # Local imports
 from fastPTA import get_tensors as gt
 
-
 # Setting plotting parameters
 matplotlib.rcParams["text.usetex"] = True
 plt.rc("xtick", labelsize=20)

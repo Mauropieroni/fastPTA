@@ -4,11 +4,9 @@ import unittest
 import numpy as np
 from scipy.stats import kstest
 
-
 # Local
 import utils as tu
 from fastPTA.MCMC_code import get_MCMC_samples
-
 
 i_max_def = 10
 R_convergence_def = 5e-2

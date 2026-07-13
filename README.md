@@ -93,18 +93,19 @@ fastPTA/
 │   ├── likelihoods.py                            # Likelihood functions for PTA data
 │   ├── priors.py                                 # Prior distributions for Bayesian inference
 │   └── signal_covariance.py                      # Signal covariance matrix calculations
-└── signal_templates/                             # GW background spectral templates
-    ├── broken_power_law_template.py              # Broken power law spectrum model
-    ├── flat_template.py                          # Flat (white) spectrum model
-    ├── lognormal_template.py                     # Lognormal spectrum model
-    ├── power_law_template.py                     # Power law spectrum model
-    ├── signal_utils.py                           # Utilities for signal model creation
-    ├── SIGWB_template.py                         # Stochastic inflationary GW background 
-    │                                             # template
-    ├── SMBH_broken_power_law_template.py         # SMBH and broken power law model
-    ├── SMBH_flat_template.py                     # Combined SMBH and flat spectrum model
-    ├── SMBH_lognormal_template.py                # SMBH and lognormal spectrum model
-    └── SMBH_SIGWB_template.py                    # SMBH and SIGWB combined model
+├── signals.py                                     # Interface to the gwb_templates package;
+│                                                   # get_signal_model(label) dispatcher
+└── local_signal_templates/                       # fastPTA-specific GW background templates,
+                                                    # auto-registered alongside gwb_templates
+    ├── SIGWB_template.py                          # Stochastic induced GW background template
+    ├── SMBH_broken_power_law_template.py          # SMBH and broken power law model
+    ├── SMBH_flat_template.py                      # Combined SMBH and flat spectrum model
+    ├── SMBH_lognormal_template.py                 # SMBH and lognormal spectrum model
+    └── SMBH_SIGWB_template.py                     # SMBH and SIGWB combined model
+
+Generic templates (flat, power law, lognormal, broken power law, ...) are
+sourced from [GWB_templates](https://github.com/Mauropieroni/GWB_templates)
+rather than duplicated here.
 
 examples/
 ├── examples_utils.py                             # Utility functions for example notebooks

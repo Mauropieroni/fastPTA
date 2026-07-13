@@ -4,11 +4,9 @@ import jax.numpy as jnp
 
 # Local
 import fastPTA.utils as ut
-from fastPTA.signal_templates.signal_utils import SMBBH_parameters
-from fastPTA.signals import get_signal_model
+from fastPTA.signals import SMBBH_parameters, get_signal_model
 from fastPTA.get_tensors import get_tensors
 from fastPTA.inference_tools import signal_covariance as sc
-
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -19,7 +17,7 @@ jax.config.update("jax_enable_x64", True)
 
 # Default value for signal_lm
 default_signal_lm = jnp.array([1.0 / jnp.sqrt(4 * jnp.pi)])
-power_law_model = get_signal_model("power_law")
+power_law_model = get_signal_model("PowerLaw")
 
 
 @jax.jit

@@ -4,8 +4,10 @@ import jax
 import jax.numpy as jnp
 
 from fastPTA.inference_tools import likelihoods
-from fastPTA.signal_templates.power_law_template import power_law_model
+from fastPTA.signals import get_signal_model
 from fastPTA.inference_tools.priors import Priors
+
+power_law_model = get_signal_model("PowerLaw")
 
 
 class TestLikelihoods(unittest.TestCase):

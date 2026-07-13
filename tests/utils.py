@@ -2,10 +2,8 @@
 import os
 import numpy as np
 
-
 # Local imports
 from fastPTA.utils import load_yaml
-
 
 test_data_path = os.path.join(os.path.dirname(__file__), "test_data/")
 

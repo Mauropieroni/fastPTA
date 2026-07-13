@@ -2,7 +2,6 @@
 import jax
 import jax.numpy as jnp
 
-
 # Local imports
 import fastPTA.utils as ut
 

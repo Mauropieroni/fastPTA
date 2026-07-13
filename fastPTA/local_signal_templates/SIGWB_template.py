@@ -1,26 +1,18 @@
 r"""
-Example of a locally defined template: power law with running tilt.
+Locally defined template: SIGW from a broad lognormal scalar spectrum.
 
-Three-parameter model for a GWB:
-
-.. math::
-
-    \Omega_{\mathrm{GW}} h^2(f) = 10^{\alpha_{\mathrm{PL}}}
-        \left(\frac{f}{f_{\mathrm{pivot}}}\right)^{n_T
-        + \frac{\alpha_T}{2} \ln(f / f_{\mathrm{pivot}})}
-
-This file doubles as the reference for adding new local templates: copy
-it, rename the class, and adjust ``omega_gw_h2`` (free parameters are
-the positional arguments after ``frequency``), the default labels, and
-the default priors. Nothing else is needed — the class is picked up by
-``gwb_lisa.templates`` automatically.
+Three-parameter model for the GWB induced by scalar perturbations
+(originally proposed in 2005.12306), using the analytical approximation
+of eq. 9 of 2503.10805. Not part of the ``gwb_templates`` catalogue since
+it depends on a fastPTA-specific prefactor data file, so it lives here and
+is picked up by ``fastPTA.signals`` automatically.
 """
 
 # Global imports
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import Any, ClassVar
+from typing import Any
 import numpy as np
 
 import jax
@@ -66,8 +58,16 @@ class SIGWB(AnalyticTemplate):
         + "SIGWB_prefactor_data.txt",
     ) -> None:
 
-        default_labels = {}
-        default_priors = {}
+        default_labels = {
+            "log_amplitude": r"$\log_{10} A_{\mathcal{P}}$",
+            "log_width": r"$\log_{10} \sigma$",
+            "log_pivot": r"$\log_{10} f_p$",
+        }
+        default_priors = {
+            "log_amplitude": {"min": -3.0, "max": 0.0},
+            "log_width": {"min": -2.0, "max": 1.0},
+            "log_pivot": {"min": -9.0, "max": -7.0},
+        }
 
         self.SIGWB_prefactor_interpolator = self.set_prefactor_interpolator(
             path_to_prefactor_data
@@ -78,7 +78,7 @@ class SIGWB(AnalyticTemplate):
             model_label=(
                 model_label
                 if model_label is not None
-                else "Power Law with Running"
+                else "SIGW (broad lognormal)"
             ),
             parameter_labels=(
                 parameter_labels
@@ -119,7 +119,7 @@ class SIGWB(AnalyticTemplate):
             Array containing the prefactor for the SIGWB spectrum.
         """
 
-        # The data are in log scale so we log the frequency and then exp the result
+        # The data are in log scale: log the frequency and then exp the result
         return 10 ** self.SIGWB_prefactor_interpolator(jnp.log10(frequency))
 
     def omega_gw_h2(

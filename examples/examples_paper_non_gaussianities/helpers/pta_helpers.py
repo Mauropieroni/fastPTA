@@ -17,15 +17,12 @@ The SMBHB population code uses `fastropop` rather than the in-repo
 from __future__ import annotations
 
 import shutil
-from pathlib import Path
 
 import healpy as hp
 import numpy as np
-from scipy.stats import chi2 as chi2_dist
 from scipy.stats import kstest
 
 import jax
-jax.config.update("jax_enable_x64", True)
 import jax.numpy as jnp
 
 import fastPTA.data.generate_data as gd
@@ -37,10 +34,13 @@ import fastropop as frp
 
 from .kolmogorov_smirnov import KolmogorovSmirnovBootstrapCache
 
+jax.config.update("jax_enable_x64", True)
+
 
 # =========================================================================
 # Plotting rcParams (usetex with mathtext fallback)
 # =========================================================================
+
 
 def set_paper_rcparams(width=None):
     """Apply the paper's matplotlib rcParams.
@@ -55,8 +55,9 @@ def set_paper_rcparams(width=None):
     TEXT_WIDTH_PT = 510.0
     pt_to_inch = 1.0 / 72.27
 
-    use_tex = (shutil.which("latex") is not None and
-               shutil.which("dvipng") is not None)
+    use_tex = (
+        shutil.which("latex") is not None and shutil.which("dvipng") is not None
+    )
     common = {
         "font.family": "serif",
         "font.size": 8,
@@ -87,6 +88,7 @@ def set_paper_rcparams(width=None):
 # PTA + real response
 # =========================================================================
 
+
 def get_R_without_pulsar_term(f_vec, distances, p_vec, theta_k, phi_k):
     """Compute the Hellings-Downs correlation matrix from the response-integral
     R_p, R_c matrices at one frequency."""
@@ -103,12 +105,13 @@ def get_R_without_pulsar_term(f_vec, distances, p_vec, theta_k, phi_k):
     one_plus = 1.0 + jnp.einsum("pi,...i->...p", k_vec, p_vec)
 
     # Compute the factor (1 - exponential) in the response function
-    exponential = 1. - 0. * jnp.exp(
+    exponential = 1.0 - 0.0 * jnp.exp(
         -2.0j
         * jnp.pi
         * jnp.einsum(
             "f,...,...p->...pf", f_vec, distances / ut.light_speed, one_plus
-        )    )
+        )
+    )
 
     # Compute the response function for the plus and cross polarizations
     # The shapes of R_p_f and R_c_f will be (..., n_pixels, n_frequencies)
@@ -121,6 +124,7 @@ def get_R_without_pulsar_term(f_vec, distances, p_vec, theta_k, phi_k):
 
     return R_p_f, R_c_f
 
+
 def setup_pta(npulsars, nside, fcenter, integrate_HD_numerically=False):
     """Generate pulsar positions, the polarized response, and the
     Gamma-based whitening matrix at one frequency.
@@ -129,8 +133,8 @@ def setup_pta(npulsars, nside, fcenter, integrate_HD_numerically=False):
     npix.
     """
     npix = hp.nside2npix(nside)
-    p_vec, cos_IJ, distances, theta_k, phi_k = gd.generate_pulsar_sky_and_kpixels(
-        npulsars, Nside=nside
+    p_vec, cos_IJ, distances, theta_k, phi_k = (
+        gd.generate_pulsar_sky_and_kpixels(npulsars, Nside=nside)
     )
     distances = np.array(distances) * ut.parsec
 
@@ -145,14 +149,20 @@ def setup_pta(npulsars, nside, fcenter, integrate_HD_numerically=False):
 
     if integrate_HD_numerically:
         r_p_hd, r_c_hd = get_R_without_pulsar_term(
-            jnp.asarray(fcenter), distances, p_vec, theta_k, phi_k)
+            jnp.asarray(fcenter), distances, p_vec, theta_k, phi_k
+        )
         r_p_hd = np.array(r_p_hd[..., 0])
         r_c_hd = np.array(r_c_hd[..., 0])
         gamma_HD = (r_p_hd @ r_p_hd.conj().T + r_c_hd @ r_c_hd.conj().T) / npix
-        gamma_HD = 0.5 * (gamma_HD + gamma_HD.conj().T) + 0.5 * (2/3)/(2*np.pi*fcenter[0])**2 * np.eye(npulsars)
+        gamma_HD = 0.5 * (gamma_HD + gamma_HD.conj().T) + 0.5 * (2 / 3) / (
+            2 * np.pi * fcenter[0]
+        ) ** 2 * np.eye(npulsars)
     else:
-        gamma_HD = (np.asarray(HD_correlations(cos_IJ)) +
-                    0.5 * np.eye(npulsars)) * (2.0 / 3.0) / (2 * np.pi * fcenter[0]) ** 2
+        gamma_HD = (
+            (np.asarray(HD_correlations(cos_IJ)) + 0.5 * np.eye(npulsars))
+            * (2.0 / 3.0)
+            / (2 * np.pi * fcenter[0]) ** 2
+        )
     w_mat_HD = build_whitening_matrix(gamma_HD)
     return {
         "npix": npix,
@@ -187,8 +197,9 @@ def build_patch_response_matrices(p_vec, angular_patch, nside, rng):
     npix = hp.nside2npix(nside)
     pk = np.zeros((len(p_vec), npix), dtype=float)
     for i in range(len(p_vec)):
-        disc = hp.query_disc(nside=nside, vec=np.asarray(p_vec[i]),
-                             radius=float(angular_patch))
+        disc = hp.query_disc(
+            nside=nside, vec=np.asarray(p_vec[i]), radius=float(angular_patch)
+        )
         pk[i, disc] = 1.0
 
     phase_p = rng.uniform(0.0, 2 * np.pi, size=(len(p_vec), npix))
@@ -196,8 +207,9 @@ def build_patch_response_matrices(p_vec, angular_patch, nside, rng):
     r_p_patch = pk * np.exp(1j * phase_p)
     r_c_patch = pk * np.exp(1j * phase_c)
 
-    gamma_patch = (r_p_patch @ r_p_patch.conj().T +
-                   r_c_patch @ r_c_patch.conj().T) / npix
+    gamma_patch = (
+        r_p_patch @ r_p_patch.conj().T + r_c_patch @ r_c_patch.conj().T
+    ) / npix
     gamma_patch = 0.5 * (gamma_patch + gamma_patch.conj().T)
     w_patch = build_whitening_matrix(gamma_patch)
     return r_p_patch, r_c_patch, w_patch
@@ -207,8 +219,10 @@ def build_patch_response_matrices(p_vec, angular_patch, nside, rng):
 # Toy single-bin generation (uniform / exponential)
 # =========================================================================
 
-def generate_toy_pixel_map(rng, npix, nsources, dist_name,
-                           halfwidth=10.0, scale_exp=10.0):
+
+def generate_toy_pixel_map(
+    rng, npix, nsources, dist_name, halfwidth=10.0, scale_exp=10.0
+):
     """Place `nsources` discrete sources on randomly chosen pixels with
     complex amplitudes drawn from a uniform or exponential distribution
     (both normalized to unit variance per complex sample).
@@ -221,16 +235,27 @@ def generate_toy_pixel_map(rng, npix, nsources, dist_name,
         ) * np.sqrt(6.0 / (2 * halfwidth) ** 2)
     elif dist_name == "exponential":
         vals = (
-            (rng.exponential(scale=scale_exp, size=(2, nsources)) / scale_exp - 1.0)
-            + 1j * (rng.exponential(scale=scale_exp, size=(2, nsources)) / scale_exp - 1.0)
+            (
+                rng.exponential(scale=scale_exp, size=(2, nsources)) / scale_exp
+                - 1.0
+            )
+            + 1j
+            * (
+                rng.exponential(scale=scale_exp, size=(2, nsources)) / scale_exp
+                - 1.0
+            )
         ) / np.sqrt(2.0)
     else:
         raise ValueError(f"Unknown toy distribution: {dist_name}")
 
     d_pixel = np.empty((2, npix), dtype=np.complex128)
     for pol in (0, 1):
-        real_part = np.bincount(chosen_pixels, weights=vals[pol].real, minlength=npix)
-        imag_part = np.bincount(chosen_pixels, weights=vals[pol].imag, minlength=npix)
+        real_part = np.bincount(
+            chosen_pixels, weights=vals[pol].real, minlength=npix
+        )
+        imag_part = np.bincount(
+            chosen_pixels, weights=vals[pol].imag, minlength=npix
+        )
         d_pixel[pol] = real_part + 1j * imag_part
     return d_pixel
 
@@ -242,8 +267,10 @@ def whitened_powers_from_pixels_R(d_pixel, pta_setup):
     )
     return np.abs(w_vec) ** 2
 
+
 def whitened_powers_from_pixels_HD(d_pixel, pta_setup):
-    """|w_I|^2 for a pixel-space toy source draw, using the HD-based whitening."""
+    """
+    |w_I|^2 for a pixel-space toy source draw, using the HD-based whitening."""
     w_vec = pta_setup["w_mat_HD"] @ (
         pta_setup["r_p"] @ d_pixel[0] + pta_setup["r_c"] @ d_pixel[1]
     )
@@ -254,6 +281,7 @@ def whitened_powers_from_pixels_HD(d_pixel, pta_setup):
 # Astrophysical SMBHB single-bin generation (uses fastropop)
 # =========================================================================
 
+
 def make_lown0_population(nbins=14, target_bin_idx=None):
     """The lown0 SMBHB population used in the paper.
 
@@ -263,19 +291,24 @@ def make_lown0_population(nbins=14, target_bin_idx=None):
     """
     if target_bin_idx is None:
         target_bin_idx = nbins - 1
-    bin_edges = np.array([
-        [(2 * i + 1) * frp.fminNG15 * frp.s, (2 * i + 3) * frp.fminNG15 * frp.s]
-        for i in range(nbins)
-    ])
-    bin_centers = np.array([
-        0.5 * (bin_edges[i][0] + bin_edges[i][1]) for i in range(nbins)
-    ])
+    bin_edges = np.array(
+        [
+            [
+                (2 * i + 1) * frp.fminNG15 * frp.s,
+                (2 * i + 3) * frp.fminNG15 * frp.s,
+            ]
+            for i in range(nbins)
+        ]
+    )
+    bin_centers = np.array(
+        [0.5 * (bin_edges[i][0] + bin_edges[i][1]) for i in range(nbins)]
+    )
     fbounds = bin_edges[target_bin_idx]
     fcenter = np.array([bin_centers[target_bin_idx]])
 
     population_params = {
-        "n0": 1e-8 / ((1e6 * frp.pc * frp.pcinMKS) ** 3 *
-                      (1e9 * frp.yr * frp.yrinMKS)),
+        "n0": 1e-8
+        / ((1e6 * frp.pc * frp.pcinMKS) ** 3 * (1e9 * frp.yr * frp.yrinMKS)),
         "alphaM": 0.0,
         "Mstar": 1.8e8 * frp.MsunMKS,
         "betaz": 2.0,
@@ -283,9 +316,7 @@ def make_lown0_population(nbins=14, target_bin_idx=None):
     }
     integration_limits = {"fbounds": fbounds}
     sampling_grids = {"fgrid": np.geomspace(fbounds[0], fbounds[1], 3000)}
-    pta_params = {"fmin": fcenter / frp.s,
-                  "fmax": fcenter / frp.s,
-                  "Nfreqs": 1}
+    pta_params = {"fmin": fcenter / frp.s, "fmax": fcenter / frp.s, "Nfreqs": 1}
 
     pop = frp.SemiAnalyticPopulation(
         population_params=population_params,
@@ -316,17 +347,17 @@ def generate_single_bin_skymap(pop, nbinaries, nside, rng):
         key=seed,
     )
     skymaps_tot = np.asarray(skymaps_tot)  # (2, npix, n_freq=1)
-    return skymaps_tot[:, :, 0]            # (2, npix)
+    return skymaps_tot[:, :, 0]  # (2, npix)
 
 
 # =========================================================================
 # KS test wrappers
 # =========================================================================
 
+
 def naive_ks_pvalue_known_scale(w_sq, expected_scale, df=2):
     """KS test of `w_sq` against chi2(df, scale=expected_scale)."""
-    return float(kstest(w_sq, "chi2",
-                        args=(df, 0.0, expected_scale)).pvalue)
+    return float(kstest(w_sq, "chi2", args=(df, 0.0, expected_scale)).pvalue)
 
 
 def naive_ks_pvalue_estimated_scale(w_sq, df=2):
@@ -335,16 +366,23 @@ def naive_ks_pvalue_estimated_scale(w_sq, df=2):
     use bootstrap calibration for valid p-values.
     """
     estimated_scale = float(np.mean(w_sq)) / df
-    return float(kstest(w_sq, "chi2",
-                        args=(df, 0.0, estimated_scale)).pvalue)
+    return float(kstest(w_sq, "chi2", args=(df, 0.0, estimated_scale)).pvalue)
 
 
 # =========================================================================
 # Rejection sweeps used by Fig 2
 # =========================================================================
 
-def run_toy_subset(npulsars_list, nsources_list, nrealizations, nside,
-                   fcenter, n_bootstrap=20000, seed=0):
+
+def run_toy_subset(
+    npulsars_list,
+    nsources_list,
+    nrealizations,
+    nside,
+    fcenter,
+    n_bootstrap=20000,
+    seed=0,
+):
     """Sweep over (Np, Ns) for the uniform and exponential toy
     populations, whitening with BOTH the response-integral Gamma_R and the
     analytic Hellings-Downs Gamma_HD. For each whitening we record:
@@ -401,16 +439,26 @@ def run_toy_subset(npulsars_list, nsources_list, nrealizations, nside,
                         naive_ks_pvalue_known_scale(w_sq_HD, expected_scale)
                     )
                     # (c) bootstrap R, scale estimated
-                    _, p_boot_R = ks_cache.compute_test(w_sq_R, interpolate=False)
+                    _, p_boot_R = ks_cache.compute_test(
+                        w_sq_R, interpolate=False
+                    )
                     result[f"ks_boot_R_{dist_name}"][i_np, i_ns, j] = p_boot_R
                     # (d) bootstrap HD, scale estimated
-                    _, p_boot_HD = ks_cache.compute_test(w_sq_HD, interpolate=False)
+                    _, p_boot_HD = ks_cache.compute_test(
+                        w_sq_HD, interpolate=False
+                    )
                     result[f"ks_boot_HD_{dist_name}"][i_np, i_ns, j] = p_boot_HD
     return result
 
 
-def run_astro_subset(npulsars_list, nsources_list, nrealizations, nside,
-                     n_bootstrap=20000, seed=0):
+def run_astro_subset(
+    npulsars_list,
+    nsources_list,
+    nrealizations,
+    nside,
+    n_bootstrap=20000,
+    seed=0,
+):
     """Same sweep but for the lown0 SMBHB population, generated with
     fastropop's `generate_skymaps` and fed through the *pixel* whitening
     functions (equivalent to the toy path, just with a physical sky map
@@ -437,8 +485,12 @@ def run_astro_subset(npulsars_list, nsources_list, nrealizations, nside,
         "n_bootstrap": int(n_bootstrap),
         "population_name": "lown0",
     }
-    for k in ("ks_naive_R_astro", "ks_naive_HD_astro",
-              "ks_boot_R_astro", "ks_boot_HD_astro"):
+    for k in (
+        "ks_naive_R_astro",
+        "ks_naive_HD_astro",
+        "ks_boot_R_astro",
+        "ks_boot_HD_astro",
+    ):
         result[k] = np.zeros(
             (len(npulsars_list), len(nsources_list), nrealizations)
         )
@@ -490,6 +542,7 @@ def run_astro_subset(npulsars_list, nsources_list, nrealizations, nside,
 # =========================================================================
 # Fig 3 helpers: source-pixel selection and amplitude-distribution samples
 # =========================================================================
+
 
 def pick_source_pixels_real(r_p, r_c, ns, nside, min_sep_deg=30):
     """Pick `ns` source pixels that maximize total PTA response power,
@@ -553,7 +606,7 @@ def gen_h0_exp(rng, n):
 
 
 def gen_h0_lognorm(rng, n, sigma=1.2):
-    mu = -0.5 * sigma ** 2
+    mu = -0.5 * sigma**2
     return rng.lognormal(mean=mu, sigma=sigma, size=n)
 
 
@@ -590,18 +643,17 @@ def generate_samples_multisrc(resp_vectors, amp_dists, n_real, rng_seed):
                 w += resp_vectors[s] * h0 * np.exp(1j * phi0)
             w_sq = np.abs(w) ** 2
             mean_w_sq = float(np.mean(w_sq))
-            raw_all[i * n_p:(i + 1) * n_p] = w_sq
+            raw_all[i * n_p : (i + 1) * n_p] = w_sq
             if mean_w_sq > 0:
-                norm_all[i * n_p:(i + 1) * n_p] = w_sq / mean_w_sq
+                norm_all[i * n_p : (i + 1) * n_p] = w_sq / mean_w_sq
             else:
-                norm_all[i * n_p:(i + 1) * n_p] = 0.0
+                norm_all[i * n_p : (i + 1) * n_p] = 0.0
         raw[name] = np.sort(raw_all)
         norm[name] = np.sort(norm_all)
     return raw, norm
 
 
-def generate_samples_multisrc_linear(resp_vectors, amp_dists, n_real,
-                                     rng_seed):
+def generate_samples_multisrc_linear(resp_vectors, amp_dists, n_real, rng_seed):
     """Like `generate_samples_multisrc` but returns the *linear* whitened
     data: stacked (Re(w_I), Im(w_I)), 2*Np samples per realization.
 
@@ -633,12 +685,12 @@ def generate_samples_multisrc_linear(resp_vectors, amp_dists, n_real,
                 phi0 = rng_local.uniform(0, 2 * np.pi)
                 w += resp_vectors[s] * h0 * np.exp(1j * phi0)
             stacked = np.concatenate([w.real, w.imag])
-            raw_all[i * block:(i + 1) * block] = stacked
+            raw_all[i * block : (i + 1) * block] = stacked
             std = float(np.std(stacked))
             if std > 0:
-                norm_all[i * block:(i + 1) * block] = stacked / std
+                norm_all[i * block : (i + 1) * block] = stacked / std
             else:
-                norm_all[i * block:(i + 1) * block] = 0.0
+                norm_all[i * block : (i + 1) * block] = 0.0
         raw[name] = np.sort(raw_all)
         norm[name] = np.sort(norm_all)
     return raw, norm
