@@ -40,13 +40,13 @@ def _build_prefactor_interpolator(filename: str) -> RegularGridInterpolator:
 class SIGWB(AnalyticTemplate):
     r"""
     Analytical approximation of the SIGW background sourced by a broad
-    lognormal scalar spectrum (originally proposed in 2005.12306, see also 
+    lognormal scalar spectrum (originally proposed in 2005.12306, see also
     2302.07901).
 
     Free parameters
     ---------------
-    log_amplitude 
-        :math:`\log_{10} A_{\mathcal{P}}`, amplitude of the curvature power 
+    log_amplitude
+        :math:`\log_{10} A_{\mathcal{P}}`, amplitude of the curvature power
         spectrum.
     log_width
         :math:`\log_{10}` width of the lognormal bump.
@@ -105,7 +105,6 @@ class SIGWB(AnalyticTemplate):
     year = "2025"
 }
 """,
-
     )
 
     def __init__(
@@ -246,4 +245,3 @@ class SIGWB(AnalyticTemplate):
             * (10**log_amplitude) ** 2
             * (term1 + term2 + term3)
         )
-    
