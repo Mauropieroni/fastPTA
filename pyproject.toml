@@ -46,7 +46,7 @@ dev = ["flake8-black>=0.3.6", "pytest"]
 packages = ["fastPTA"]
 
 [tool.setuptools.package-data]
-fastPTA = ["angular_decomposition/*", "data/*", "defaults/*", "inference_tools/*", "local_signal_templates/*"]
+fastPTA = ["angular_decomposition/*", "data/*", "defaults/*", "inference_tools/*", "local_signal_templates/*", "local_signal_templates/data/*"]
 
 [tool.black]
 line_length = 80
