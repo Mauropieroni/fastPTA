@@ -37,6 +37,7 @@ dependencies = [
     "emcee>=3.1.2",
     "wigners>=0.3.0",
     "gwb_templates @ git+https://github.com/Mauropieroni/GWB_templates",
+    "interpax>=0.1.0",
 ]
 
 [project.optional-dependencies]
