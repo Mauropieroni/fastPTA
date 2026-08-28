@@ -109,9 +109,16 @@ class TestLikelihoods(unittest.TestCase):
         # Use a smaller signal value to avoid numerical issues
         self.signal_value = jnp.ones_like(self.signal_value) * 0.1
 
+        # Precompute the generalized eigenbasis shared by all signal values
+        eigenvalues, noise_logdet, data_eigenbasis = (
+            likelihoods.prepare_log_likelihood(
+                self.data, self.response_IJ, self.strain_omega
+            )
+        )
+
         # Compute log likelihood
         log_lik = likelihoods.log_likelihood(
-            self.data, self.signal_value, self.response_IJ, self.strain_omega
+            self.signal_value, eigenvalues, noise_logdet, data_eigenbasis
         )
 
         # Check type and finite value
@@ -121,7 +128,7 @@ class TestLikelihoods(unittest.TestCase):
         # Test with different signal values
         signal_value_zero = jnp.zeros_like(self.signal_value)
         log_lik_zero = likelihoods.log_likelihood(
-            self.data, signal_value_zero, self.response_IJ, self.strain_omega
+            signal_value_zero, eigenvalues, noise_logdet, data_eigenbasis
         )
 
         # The expected value for this input
@@ -132,7 +139,7 @@ class TestLikelihoods(unittest.TestCase):
         # Test that changing signal values affects the likelihood
         signal_value_diff = self.signal_value * 2
         log_lik_diff = likelihoods.log_likelihood(
-            self.data, signal_value_diff, self.response_IJ, self.strain_omega
+            signal_value_diff, eigenvalues, noise_logdet, data_eigenbasis
         )
 
         # The expected value for this input
@@ -142,14 +149,21 @@ class TestLikelihoods(unittest.TestCase):
 
     def test_log_posterior(self):
         """Test the log_posterior function."""
+        # Precompute the generalized eigenbasis shared by all signal values
+        eigenvalues, noise_logdet, data_eigenbasis = (
+            likelihoods.prepare_log_likelihood(
+                self.data, self.response_IJ, self.strain_omega
+            )
+        )
+
         # Compute log posterior with valid parameters
         log_post = likelihoods.log_posterior(
             self.parameters,
-            self.data,
             self.frequency,
             power_law_model,
-            self.response_IJ,
-            self.strain_omega,
+            eigenvalues,
+            noise_logdet,
+            data_eigenbasis,
             self.priors,
         )
 
@@ -164,11 +178,11 @@ class TestLikelihoods(unittest.TestCase):
         parameters_outside = jnp.array([-19.0, 8.0])  # Outside prior bounds
         log_post_outside = likelihoods.log_posterior(
             parameters_outside,
-            self.data,
             self.frequency,
             power_law_model,
-            self.response_IJ,
-            self.strain_omega,
+            eigenvalues,
+            noise_logdet,
+            data_eigenbasis,
             self.priors,
         )
         self.assertEqual(log_post_outside, -jnp.inf)

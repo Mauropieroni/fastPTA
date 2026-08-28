@@ -12,7 +12,10 @@ from fastPTA.signal_templates.signal_utils import SMBBH_parameters
 from fastPTA.signals import get_signal_model
 from fastPTA.get_tensors import get_tensors
 from fastPTA.data.generate_data import generate_MCMC_data
-from fastPTA.inference_tools.likelihoods import log_posterior
+from fastPTA.inference_tools.likelihoods import (
+    log_posterior,
+    prepare_log_likelihood,
+)
 
 
 # Set the device
@@ -374,13 +377,19 @@ def run_MCMC(
     else:
         nwalkers = len(initial)
 
+    # Diagonalize the response w.r.t. the noise once, since both are fixed
+    # throughout the MCMC run and only the signal changes at every step
+    eigenvalues, noise_logdet, data_eigenbasis = prepare_log_likelihood(
+        jnp.array(MCMC_data), jnp.array(response_IJ), jnp.array(strain_omega)
+    )
+
     # Args for the posterior
     log_posterior_args = [
-        jnp.array(MCMC_data),
         jnp.array(frequency),
         signal_model,
-        jnp.array(response_IJ),
-        jnp.array(strain_omega),
+        eigenvalues,
+        noise_logdet,
+        data_eigenbasis,
         priors,
     ]
 
