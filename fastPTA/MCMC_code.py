@@ -17,7 +17,6 @@ from fastPTA.inference_tools.likelihoods import (
     prepare_log_likelihood,
 )
 
-
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
@@ -380,12 +379,12 @@ def run_MCMC(
     # Diagonalize the response w.r.t. the noise once, since both are fixed
     # throughout the MCMC run and only the signal changes at every step
     eigenvalues, noise_logdet, data_eigenbasis = prepare_log_likelihood(
-        jnp.array(MCMC_data), jnp.array(response_IJ), jnp.array(strain_omega)
+        MCMC_data, response_IJ, strain_omega
     )
 
     # Args for the posterior
     log_posterior_args = [
-        jnp.array(frequency),
+        frequency,
         signal_model,
         eigenvalues,
         noise_logdet,
