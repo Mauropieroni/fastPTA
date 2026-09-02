@@ -384,7 +384,7 @@ def run_MCMC(
 
     # Args for the posterior
     log_posterior_args = [
-        frequency,
+        jnp.asarray(frequency),
         signal_model,
         eigenvalues,
         noise_logdet,

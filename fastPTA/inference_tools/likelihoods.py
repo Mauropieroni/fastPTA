@@ -156,7 +156,7 @@ def prepare_log_likelihood(data, response_IJ, strain_omega):
 @jax.jit
 def log_likelihood(signal_value, eigenvalues, noise_logdet, data_eigenbasis):
     """
-    Compute the logarithm of the likelihood assujming a Whittle likelihood.
+    Compute the logarithm of the likelihood assuming a Whittle likelihood.
 
     Parameters:
     -----------
