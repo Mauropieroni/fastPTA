@@ -106,10 +106,10 @@ def get_MCMC_data(
             raise FileNotFoundError("Flag forces MCMC data regeneration")
 
         data = np.load(path_to_MCMC_data)
-        frequency = data["frequency"]
-        MCMC_data = data["data"]
-        response_IJ = data["response_IJ"]
-        strain_omega = data["strain_omega"]
+        frequency = jnp.asarray(data["frequency"])
+        MCMC_data = jnp.asarray(data["data"])
+        response_IJ = jnp.asarray(data["response_IJ"])
+        strain_omega = jnp.asarray(data["strain_omega"])
 
     except FileNotFoundError:
         print("\nRegenerating MCMC data")
@@ -384,7 +384,7 @@ def run_MCMC(
 
     # Args for the posterior
     log_posterior_args = [
-        jnp.asarray(frequency),
+        frequency,
         signal_model,
         eigenvalues,
         noise_logdet,
