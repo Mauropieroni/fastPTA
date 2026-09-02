@@ -12,8 +12,10 @@ from fastPTA.signal_templates.signal_utils import SMBBH_parameters
 from fastPTA.signals import get_signal_model
 from fastPTA.get_tensors import get_tensors
 from fastPTA.data.generate_data import generate_MCMC_data
-from fastPTA.inference_tools.likelihoods import log_posterior
-
+from fastPTA.inference_tools.likelihoods import (
+    log_posterior,
+    prepare_log_likelihood,
+)
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -104,10 +106,10 @@ def get_MCMC_data(
             raise FileNotFoundError("Flag forces MCMC data regeneration")
 
         data = np.load(path_to_MCMC_data)
-        frequency = data["frequency"]
-        MCMC_data = data["data"]
-        response_IJ = data["response_IJ"]
-        strain_omega = data["strain_omega"]
+        frequency = jnp.asarray(data["frequency"])
+        MCMC_data = jnp.asarray(data["data"])
+        response_IJ = jnp.asarray(data["response_IJ"])
+        strain_omega = jnp.asarray(data["strain_omega"])
 
     except FileNotFoundError:
         print("\nRegenerating MCMC data")
@@ -374,13 +376,19 @@ def run_MCMC(
     else:
         nwalkers = len(initial)
 
+    # Diagonalize the response w.r.t. the noise once, since both are fixed
+    # throughout the MCMC run and only the signal changes at every step
+    eigenvalues, noise_logdet, data_eigenbasis = prepare_log_likelihood(
+        MCMC_data, response_IJ, strain_omega
+    )
+
     # Args for the posterior
     log_posterior_args = [
-        jnp.array(MCMC_data),
-        jnp.array(frequency),
+        frequency,
         signal_model,
-        jnp.array(response_IJ),
-        jnp.array(strain_omega),
+        eigenvalues,
+        noise_logdet,
+        data_eigenbasis,
         priors,
     ]
 
