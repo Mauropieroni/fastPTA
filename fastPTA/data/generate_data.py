@@ -360,7 +360,7 @@ def generate_D_IJ_fifj(
     return p_vec, zeta_IJ, D_IJ
 
 
-def generate_MCMC_data(
+def generate_inference_data(
     realization,
     frequency,
     signal_std,
@@ -368,15 +368,15 @@ def generate_MCMC_data(
     response_IJ,
     HD_functions_IJ,
     HD_coeffs,
-    save_MCMC_data=True,
-    path_to_MCMC_data="generated_data/MCMC_data.npz",
+    save_inference_data=True,
+    path_to_inference_data="generated_data/inference_data.npz",
 ):
     """
-    Generates (and might save) data for Markov Chain Monte Carlo (MCMC)
+    Generates (and might save) data for inference (MCMC or nested sampling)
     analysis based on the provided parameters. If `realization` is True,
     it generates a realization of the data. Otherwise, it uses the expectation
-    value. Data contain both signal and noise. If `save_MCMC_data` is True,
-    the generated data is saved to a specified path.
+    value. Data contain both signal and noise. If `save_inference_data` is
+    True, the generated data is saved to a specified path.
 
     Parameters:
     -----------
@@ -394,12 +394,12 @@ def generate_MCMC_data(
         Array containing the HD functions.
     HD_coeffs : numpy.ndarray
         Array containing the HD coefficients.
-    save_MCMC_data : bool, optional
+    save_inference_data : bool, optional
         Whether to save the generated data
         Default is True
-    path_to_MCMC_data : str, optional
+    path_to_inference_data : str, optional
         Path to save the generated data
-        Default is "generated_data/MCMC_data.npz"
+        Default is "generated_data/inference_data.npz"
 
     Returns:
     --------
@@ -455,9 +455,9 @@ def generate_MCMC_data(
     data = signal_part + noise_part
 
     # Save the data
-    if save_MCMC_data:
+    if save_inference_data:
         np.savez(
-            path_to_MCMC_data,
+            path_to_inference_data,
             frequency=frequency,
             data=data,
             response_IJ=response_IJ,

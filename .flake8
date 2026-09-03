@@ -2,3 +2,4 @@
 max-line-length = 80
 extend-select = 
 extend-ignore = E203
+exclude = venv,build,*.egg-info

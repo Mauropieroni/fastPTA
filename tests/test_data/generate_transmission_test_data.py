@@ -21,6 +21,7 @@ Mmat = np.array(
 ).T
 Mmat /= np.sqrt(np.sum(Mmat**2, axis=0))
 
+
 np.savez(
     "transmission_data.npz",
     T_obs=Tobs,
@@ -33,8 +34,8 @@ np.savez(
     transmission_quadratic_single=tf.transmission_function_quadratic(
         frequencies, Tobs[0]
     ),
-    transmission_quadratic_1yr_peak_single=tf.transmission_function_quadratic_1yr_peak(
-        frequencies, Tobs[0]
+    transmission_quadratic_1yr_peak_single=(
+        tf.transmission_function_quadratic_1yr_peak(frequencies, Tobs[0])
     ),
     transmission_approx_tensor=tf.transmission_function_approx(
         frequencies[:, None], Tobs[None, :]
@@ -42,8 +43,10 @@ np.savez(
     transmission_quadratic_tensor=tf.transmission_function_quadratic(
         frequencies[:, None], Tobs[None, :]
     ),
-    transmission_quadratic_1yr_peak_tensor=tf.transmission_function_quadratic_1yr_peak(
-        frequencies[:, None], Tobs[None, :]
+    transmission_quadratic_1yr_peak_tensor=(
+        tf.transmission_function_quadratic_1yr_peak(
+            frequencies[:, None], Tobs[None, :]
+        )
     ),
     transmission_matrix_single=tf.transmission_function_matrix(
         frequencies, t, Mmat

@@ -7,7 +7,7 @@ name = "fastPTA"
 version = "0.1.0"
 description = "Code for fast PTA forecasts"
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11,<3.14"
 authors = [
     { name = "Mauro Pieroni", email = "mauro.pieroni@csic.es" },
     { name = "Gabriele Franciolini", email = "gabriele.franciolini@cern.ch" },
@@ -18,23 +18,18 @@ keywords = ["PTAs", "GWs"]
 urls = { Homepage = "https://github.com/Mauropieroni/fastPTA/" }
 
 dependencies = [
-    # Python-version-specific dependencies handled via environment markers
-    "numpy==1.24.4; python_version < '3.9'",
-    "numpy>=1.26.4; python_version >= '3.9'",
-    "scipy>=1.10.1",
-    "jax==0.4.13; python_version < '3.9'",
-    "jax>=0.4.25; python_version >= '3.9'",
-    "jaxlib==0.4.13; python_version < '3.9'",
-    "jaxlib>=0.4.30; python_version == '3.9'",
-    "jaxlib<=0.9.1; python_version >= '3.9'",
-    "healpy==1.16.2; python_version < '3.9'",
-    "healpy>=1.16.6; python_version >= '3.9'",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "jax>=0.4.25,<=0.10.2",
+    "jaxlib<=0.10.2",
+    "healpy>=1.16.6",
     "typing_extensions>=4.10.0; python_version == '3.11'",
     "matplotlib>=3.7.4",
     "tqdm>=4.64.1",
     "pyyaml>=6.0",
     "corner>=2.2.1",
     "emcee>=3.1.2",
+    "blackjax>=1.2.0",
     "wigners>=0.3.0",
 ]
 
