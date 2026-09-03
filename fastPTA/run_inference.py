@@ -680,10 +680,10 @@ def get_inference_data(
             raise FileNotFoundError("Flag forces data regeneration")
 
         data = np.load(path_to_inference_data)
-        frequency = data["frequency"]
-        inference_data = data["data"]
-        response_IJ = data["response_IJ"]
-        strain_omega = data["strain_omega"]
+        frequency = jnp.asarray(data["frequency"])
+        inference_data = jnp.asarray(data["data"])
+        response_IJ = jnp.asarray(data["response_IJ"])
+        strain_omega = jnp.asarray(data["strain_omega"])
 
     except FileNotFoundError:
         print("\nRegenerating inference data")
