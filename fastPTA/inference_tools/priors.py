@@ -1,12 +1,12 @@
 # Global
 import jax
+import numpy as np
 from scipy import stats
 import jax.numpy as jnp
-
+import jax.scipy.stats as jstats
 
 # Local
 import fastPTA.utils as ut
-
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -57,8 +57,8 @@ class Priors(object):
         Set the prior probability density functions from a dictionary.
         The keys of the dictionary should be the parameter names and the values
         should either be callables or dictionaries. If dictionaries, the keys
-        should be the distribution names (in scipy.stats), and the values should
-        be the keyword arguments for the distribution.
+        should be the distribution names (in jax.scipy.stats), and the values
+        should be the keyword arguments for the distribution.
 
         Parameters:
         -----------
@@ -79,7 +79,7 @@ class Priors(object):
             if type(value) is dict:
                 for k, v in value.items():
                     priors[key] = {
-                        "pdf": getattr(stats, k).pdf,
+                        "pdf": getattr(jstats, k).pdf,
                         "rvs": getattr(stats, k).rvs,
                         "pdf_kwargs": v,
                     }
@@ -111,14 +111,41 @@ class Priors(object):
 
         log_prior = 0.0
 
-        if self.check_PBH_abundance and self.get_PBH_abundance:
-            PBH_abundance = self.get_PBH_abundance(list(parameters.values()))
-
-            if PBH_abundance > 1.0 or jnp.isnan(PBH_abundance):
-                return -jnp.inf
-
         for k, v in parameters.items():
             p = self.priors[k]
             log_prior += jnp.log(p["pdf"](v, **p["pdf_kwargs"]))
 
+        if self.check_PBH_abundance and self.get_PBH_abundance:
+            PBH_abundance = self.get_PBH_abundance(list(parameters.values()))
+            log_prior = jnp.where(
+                (PBH_abundance > 1.0) | jnp.isnan(PBH_abundance),
+                -jnp.inf,
+                log_prior,
+            )
+
         return log_prior
+
+    def sample(self, size):
+        """
+        Draw samples from the priors (ignores priors set from an arbitrary
+        callable, which have no rvs sampler).
+
+        Parameters:
+        -----------
+        size : int
+            Number of samples to draw.
+
+        Returns:
+        --------
+        numpy.ndarray
+            Array of shape (size, n_parameters) with samples from the priors.
+
+        """
+
+        values = np.empty((size, len(self.parameter_names)))
+
+        for i, name in enumerate(self.parameter_names):
+            p = self.priors[name]
+            values[:, i] = p["rvs"](**p["pdf_kwargs"], size=size)
+
+        return values

@@ -62,8 +62,8 @@ fastPTA/
 │                                                 # simulations
 ├── get_tensors.py                                # Tensor calculations for PTA correlation 
 │                                                 # patterns
-├── MCMC_code.py                                  # MCMC sampling methods for posterior 
-│                                                 # inference
+├── run_inference.py                              # MCMC and nested sampling methods for 
+│                                                 # posterior inference
 ├── plotting_functions.py                         # Functions for visualizing results and 
 │                                                 # diagnostics
 ├── pulsar_noises.py                              # Models for pulsar intrinsic noise sources
