@@ -752,10 +752,19 @@ def f_PBH_NL_QCD_lognormal(
     )
 
 
-def _axis_covers(vec, bounds):
-    """Whether the cached axis vec's range contains bounds."""
+def _axis_is_fine_enough(vec, bounds, n_grid_axis):
+    """Whether the cached axis vec covers bounds at a spacing at least as
+    fine as what n_grid_axis over bounds would give (not just a raw
+    point-count comparison, since bounds may be a narrower or wider box
+    than the one vec was originally built over)."""
 
-    return vec[0] <= bounds[0] and bounds[1] <= vec[-1]
+    if not (vec[0] <= bounds[0] and bounds[1] <= vec[-1]):
+        return False
+
+    cached_spacing = (vec[-1] - vec[0]) / (len(vec) - 1)
+    requested_spacing = (bounds[1] - bounds[0]) / (n_grid_axis - 1)
+
+    return cached_spacing <= requested_spacing
 
 
 def build_f_PBH_interpolator(
@@ -815,13 +824,24 @@ def build_f_PBH_interpolator(
     if n_grid is None:
         n_grid = 100 if cache_path else 40
 
+    if isinstance(n_grid, int):
+        n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
+    else:
+        n_amplitude, n_width, n_pivot = n_grid
+
     cached = None
     if cache_path is not None and os.path.exists(cache_path):
         with np.load(cache_path) as data:
             if (
-                _axis_covers(data["log_amp_vec"], log_amplitude_bounds)
-                and _axis_covers(data["log_width_vec"], log_width_bounds)
-                and _axis_covers(data["log_pivot_vec"], log_pivot_bounds)
+                _axis_is_fine_enough(
+                    data["log_amp_vec"], log_amplitude_bounds, n_amplitude
+                )
+                and _axis_is_fine_enough(
+                    data["log_width_vec"], log_width_bounds, n_width
+                )
+                and _axis_is_fine_enough(
+                    data["log_pivot_vec"], log_pivot_bounds, n_pivot
+                )
             ):
                 cached = (
                     jnp.asarray(data["log_amp_vec"]),
@@ -834,11 +854,6 @@ def build_f_PBH_interpolator(
         log_amp_vec, log_width_vec, log_pivot_vec, log10_f_PBH_grid = cached
 
     else:
-        if isinstance(n_grid, int):
-            n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
-        else:
-            n_amplitude, n_width, n_pivot = n_grid
-
         log_amp_vec = jnp.linspace(
             log_amplitude_bounds[0] - margin,
             log_amplitude_bounds[1] + margin,
