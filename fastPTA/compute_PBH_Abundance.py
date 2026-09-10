@@ -750,6 +750,206 @@ def f_PBH_NL_QCD_lognormal(
     )
 
 
+def build_f_PBH_interpolator(
+    log_amplitude_bounds,
+    log_width_bounds,
+    log_pivot_bounds,
+    n_grid=40,
+    margin=0.0,
+    len_k_vec=100,
+    len_r_max_vec=100,
+    len_C_G_vec=100,
+    batch_size=500,
+    floor=1e-30,
+    verbose=False,
+):
+    """
+    Build a cheap interpolator that approximates f_PBH_NL_QCD_lognormal over
+    a box in (log10 amplitude, log10 width, log10 pivot [Hz]) space, meant to
+    replace repeated exact evaluations of the PBH abundance when it is only
+    used as a hard prior cutoff (f_PBH > 1) inside a sampler, e.g. through
+    Priors.evaluate_log_priors in fastPTA/inference_tools/priors.py.
+
+    The box is typically the support of the priors on the SIGW parameters
+    for a given run, so it should be built once, right before the sampler
+    starts, from the priors' bounds.
+
+    f_PBH is precomputed exactly, using the same (well converged, default)
+    integration grid as f_PBH_NL_QCD_lognormal, on a regular grid spanning
+    the given bounds. log10(f_PBH) is interpolated rather than f_PBH
+    itself, since it can vary over many orders of magnitude. The exact
+    evaluations are batched with jax.vmap in chunks of batch_size to bound
+    peak memory use.
+
+    Parameters:
+    -----------
+    log_amplitude_bounds : tuple of float
+        (min, max) log10(amplitude) to cover.
+    log_width_bounds : tuple of float
+        (min, max) log10(width) to cover.
+    log_pivot_bounds : tuple of float
+        (min, max) log10(pivot frequency in Hz) to cover.
+    n_grid : int or tuple of 3 int, optional
+        Number of points per axis of the interpolation grid, in
+        (amplitude, width, pivot) order. A single int uses that many
+        points on all three axes; a 3-tuple sets them independently
+        (e.g. n_grid=(40, 30, 20) puts more resolution on amplitude, less
+        on pivot), which is worth doing when f_PBH is much more sensitive
+        to some parameters than others (default 40).
+    margin : float, optional
+        Extra padding, in log10 units, added on each side of each bound, to
+        reduce the chance of extrapolation for points drawn near the prior
+        edges (default 0.0).
+    len_k_vec : int, optional
+        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
+        that build the grid (default 100).
+    len_r_max_vec : int, optional
+        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
+        that build the grid (default 100).
+    len_C_G_vec : int, optional
+        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
+        that build the grid (default 100).
+    batch_size : int, optional
+        Number of grid points evaluated per vmapped call while building the
+        table (default 500).
+    floor : float, optional
+        Lower bound imposed on f_PBH before taking log10, to avoid -inf for
+        numerically zero abundances (default 1e-30).
+    verbose : bool, optional
+        Print build progress (default False).
+
+    Returns:
+    --------
+    callable
+        f_PBH_approx(log_amplitude, log_width, log_pivot) -> approximate
+        f_PBH, vmap-able, evaluated from the log10 amplitude/width/pivot
+        the same way f_PBH_wrapper in fastPTA/signals.py evaluates the
+        exact function.
+
+    """
+
+    if isinstance(n_grid, int):
+        n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
+    else:
+        n_amplitude, n_width, n_pivot = n_grid
+
+    log_amp_vec = jnp.linspace(
+        log_amplitude_bounds[0] - margin,
+        log_amplitude_bounds[1] + margin,
+        n_amplitude,
+    )
+    log_width_vec = jnp.linspace(
+        log_width_bounds[0] - margin, log_width_bounds[1] + margin, n_width
+    )
+    log_pivot_vec = jnp.linspace(
+        log_pivot_bounds[0] - margin, log_pivot_bounds[1] + margin, n_pivot
+    )
+
+    grid_amp, grid_width, grid_pivot = jnp.meshgrid(
+        log_amp_vec, log_width_vec, log_pivot_vec, indexing="ij"
+    )
+
+    amplitude_flat = 10.0 ** grid_amp.ravel()
+    delta_flat = 10.0 ** grid_width.ravel()
+    ks_flat = 10.0 ** grid_pivot.ravel() * 2.0 * jnp.pi / 9.7156e-15
+
+    n_points = amplitude_flat.shape[0]
+
+    f_PBH_exact_batch = jax.jit(
+        jax.vmap(
+            lambda a, d, k: f_PBH_NL_QCD_lognormal(
+                a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
+            )
+        )
+    )
+
+    f_PBH_values = np.empty(n_points)
+    n_batches = int(np.ceil(n_points / batch_size))
+
+    for i in range(n_batches):
+        sl = slice(i * batch_size, min((i + 1) * batch_size, n_points))
+        f_PBH_values[sl] = np.asarray(
+            f_PBH_exact_batch(amplitude_flat[sl], delta_flat[sl], ks_flat[sl])
+        )
+        if verbose:
+            print(f"build_f_PBH_interpolator: {i + 1}/{n_batches} batches done")
+
+    f_PBH_grid = jnp.asarray(f_PBH_values).reshape(
+        n_amplitude, n_width, n_pivot
+    )
+    log10_f_PBH_grid = jnp.log10(jnp.clip(f_PBH_grid, floor, None))
+
+    log10_f_PBH_interpolator = RegularGridInterpolator(
+        (log_amp_vec, log_width_vec, log_pivot_vec),
+        log10_f_PBH_grid,
+        bounds_error=False,
+        fill_value=None,
+    )
+
+    @jax.jit
+    def f_PBH_approx(log_amplitude, log_width, log_pivot):
+        """
+        Approximate f_PBH from log10(amplitude), log10(width) and
+        log10(pivot in Hz), interpolated from the precomputed grid.
+
+        """
+
+        point = jnp.array([log_amplitude, log_width, log_pivot])
+
+        return 10.0 ** log10_f_PBH_interpolator(point)[0]
+
+    return f_PBH_approx
+
+
+def get_PBH_abundance_from_interpolator(
+    parameter_names, PBH_parameter_names, priors_dictionary, **kwargs
+):
+    """
+    Build a fast, interpolator-backed PBH abundance function (see
+    build_f_PBH_interpolator) that is a drop-in replacement for an exact
+    get_PBH_abundance function: it takes the full parameter vector, like
+    the exact one, instead of just the 3 PBH-relevant values.
+
+    Parameters:
+    -----------
+    parameter_names : list of str
+        Full ordered parameter vector names (e.g.
+        signal_model.parameter_names), used to locate the 3 PBH-relevant
+        entries positionally.
+    PBH_parameter_names : tuple of 3 str
+        Names of the log10 amplitude, log10 width and log10 pivot [Hz]
+        parameters, in that order.
+    priors_dictionary : dictionary
+        Must contain uniform priors for each of PBH_parameter_names; their
+        bounds set the interpolator's box.
+    **kwargs
+        Extra keyword arguments passed to build_f_PBH_interpolator (e.g.
+        n_grid).
+
+    Returns:
+    --------
+    callable
+        get_PBH_abundance(parameters) -> f_PBH, from the full parameter
+        vector, like the exact function it replaces.
+
+    """
+
+    indices = tuple(parameter_names.index(name) for name in PBH_parameter_names)
+
+    def bounds(name):
+        spec = priors_dictionary[name]["uniform"]
+        return (spec["loc"], spec["loc"] + spec["scale"])
+
+    f_PBH_interpolated = build_f_PBH_interpolator(
+        *(bounds(name) for name in PBH_parameter_names), **kwargs
+    )
+
+    def get_PBH_abundance(parameters):
+        return f_PBH_interpolated(*(parameters[i] for i in indices))
+
+    return get_PBH_abundance
+
+
 # @jax.jit
 def find_A_NL_QCD(log10fPBH, Delta, ks, A_min=-2.5, A_max=-1.0):
     """
