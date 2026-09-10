@@ -1,3 +1,5 @@
+import os
+
 import numpy as np
 
 import jax
@@ -750,11 +752,17 @@ def f_PBH_NL_QCD_lognormal(
     )
 
 
+def _axis_covers(vec, bounds):
+    """Whether the cached axis vec's range contains bounds."""
+
+    return vec[0] <= bounds[0] and bounds[1] <= vec[-1]
+
+
 def build_f_PBH_interpolator(
     log_amplitude_bounds,
     log_width_bounds,
     log_pivot_bounds,
-    n_grid=40,
+    n_grid=None,
     margin=0.0,
     len_k_vec=100,
     len_r_max_vec=100,
@@ -762,122 +770,134 @@ def build_f_PBH_interpolator(
     batch_size=500,
     floor=1e-30,
     verbose=False,
+    cache_path=None,
 ):
     """
-    Build a cheap interpolator that approximates f_PBH_NL_QCD_lognormal over
-    a box in (log10 amplitude, log10 width, log10 pivot [Hz]) space, meant to
-    replace repeated exact evaluations of the PBH abundance when it is only
-    used as a hard prior cutoff (f_PBH > 1) inside a sampler, e.g. through
-    Priors.evaluate_log_priors in fastPTA/inference_tools/priors.py.
-
-    The box is typically the support of the priors on the SIGW parameters
-    for a given run, so it should be built once, right before the sampler
-    starts, from the priors' bounds.
-
-    f_PBH is precomputed exactly, using the same (well converged, default)
-    integration grid as f_PBH_NL_QCD_lognormal, on a regular grid spanning
-    the given bounds. log10(f_PBH) is interpolated rather than f_PBH
-    itself, since it can vary over many orders of magnitude. The exact
-    evaluations are batched with jax.vmap in chunks of batch_size to bound
-    peak memory use.
+    Interpolator for f_PBH_NL_QCD_lognormal over a (log10 amplitude, log10
+    width, log10 pivot [Hz]) box, used to speed up the PBH abundance check
+    in a sampler (see Priors.evaluate_log_priors) instead of the exact,
+    slower calculation. log10(f_PBH) is interpolated on a grid precomputed
+    with the exact function's own (well-converged) integration settings,
+    batched with jax.vmap in chunks of batch_size to bound peak memory.
 
     Parameters:
     -----------
-    log_amplitude_bounds : tuple of float
-        (min, max) log10(amplitude) to cover.
-    log_width_bounds : tuple of float
-        (min, max) log10(width) to cover.
-    log_pivot_bounds : tuple of float
-        (min, max) log10(pivot frequency in Hz) to cover.
+    log_amplitude_bounds, log_width_bounds, log_pivot_bounds : tuple of float
+        (min, max) to cover for each parameter.
     n_grid : int or tuple of 3 int, optional
-        Number of points per axis of the interpolation grid, in
-        (amplitude, width, pivot) order. A single int uses that many
-        points on all three axes; a 3-tuple sets them independently
-        (e.g. n_grid=(40, 30, 20) puts more resolution on amplitude, less
-        on pivot), which is worth doing when f_PBH is much more sensitive
-        to some parameters than others (default 40).
+        Grid points per axis (amplitude, width, pivot); a single int
+        applies to all three. Defaults to 100 if cache_path is set (an
+        amortized one-time cost), else 40.
     margin : float, optional
-        Extra padding, in log10 units, added on each side of each bound, to
-        reduce the chance of extrapolation for points drawn near the prior
-        edges (default 0.0).
-    len_k_vec : int, optional
-        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
-        that build the grid (default 100).
-    len_r_max_vec : int, optional
-        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
-        that build the grid (default 100).
-    len_C_G_vec : int, optional
-        Same as in f_PBH_NL_QCD_lognormal, used for the exact evaluations
-        that build the grid (default 100).
+        Extra padding added to each bound, to reduce the chance of
+        extrapolation for points near the prior edges (default 0.0).
+    len_k_vec, len_r_max_vec, len_C_G_vec : int, optional
+        Integration grid sizes for the exact evaluations (default 100).
     batch_size : int, optional
-        Number of grid points evaluated per vmapped call while building the
-        table (default 500).
+        Grid points evaluated per vmapped batch while building (default
+        500).
     floor : float, optional
-        Lower bound imposed on f_PBH before taking log10, to avoid -inf for
-        numerically zero abundances (default 1e-30).
+        Lower bound on f_PBH before taking log10 (default 1e-30).
     verbose : bool, optional
         Print build progress (default False).
+    cache_path : str, optional
+        If given, reuse a previously saved grid from this .npz file when
+        it covers the requested bounds; otherwise (re)build it and save
+        it there for next time.
 
     Returns:
     --------
     callable
-        f_PBH_approx(log_amplitude, log_width, log_pivot) -> approximate
-        f_PBH, vmap-able, evaluated from the log10 amplitude/width/pivot
-        the same way f_PBH_wrapper in fastPTA/signals.py evaluates the
-        exact function.
+        f_PBH_approx(log_amplitude, log_width, log_pivot), vmap-able.
 
     """
 
-    if isinstance(n_grid, int):
-        n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
+    if n_grid is None:
+        n_grid = 100 if cache_path else 40
+
+    cached = None
+    if cache_path is not None and os.path.exists(cache_path):
+        with np.load(cache_path) as data:
+            if (
+                _axis_covers(data["log_amp_vec"], log_amplitude_bounds)
+                and _axis_covers(data["log_width_vec"], log_width_bounds)
+                and _axis_covers(data["log_pivot_vec"], log_pivot_bounds)
+            ):
+                cached = (
+                    jnp.asarray(data["log_amp_vec"]),
+                    jnp.asarray(data["log_width_vec"]),
+                    jnp.asarray(data["log_pivot_vec"]),
+                    jnp.asarray(data["log10_f_PBH_grid"]),
+                )
+
+    if cached is not None:
+        log_amp_vec, log_width_vec, log_pivot_vec, log10_f_PBH_grid = cached
+
     else:
-        n_amplitude, n_width, n_pivot = n_grid
+        if isinstance(n_grid, int):
+            n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
+        else:
+            n_amplitude, n_width, n_pivot = n_grid
 
-    log_amp_vec = jnp.linspace(
-        log_amplitude_bounds[0] - margin,
-        log_amplitude_bounds[1] + margin,
-        n_amplitude,
-    )
-    log_width_vec = jnp.linspace(
-        log_width_bounds[0] - margin, log_width_bounds[1] + margin, n_width
-    )
-    log_pivot_vec = jnp.linspace(
-        log_pivot_bounds[0] - margin, log_pivot_bounds[1] + margin, n_pivot
-    )
+        log_amp_vec = jnp.linspace(
+            log_amplitude_bounds[0] - margin,
+            log_amplitude_bounds[1] + margin,
+            n_amplitude,
+        )
+        log_width_vec = jnp.linspace(
+            log_width_bounds[0] - margin, log_width_bounds[1] + margin, n_width
+        )
+        log_pivot_vec = jnp.linspace(
+            log_pivot_bounds[0] - margin, log_pivot_bounds[1] + margin, n_pivot
+        )
 
-    grid_amp, grid_width, grid_pivot = jnp.meshgrid(
-        log_amp_vec, log_width_vec, log_pivot_vec, indexing="ij"
-    )
+        grid_amp, grid_width, grid_pivot = jnp.meshgrid(
+            log_amp_vec, log_width_vec, log_pivot_vec, indexing="ij"
+        )
 
-    amplitude_flat = 10.0 ** grid_amp.ravel()
-    delta_flat = 10.0 ** grid_width.ravel()
-    ks_flat = 10.0 ** grid_pivot.ravel() * 2.0 * jnp.pi / 9.7156e-15
+        amplitude_flat = 10.0 ** grid_amp.ravel()
+        delta_flat = 10.0 ** grid_width.ravel()
+        ks_flat = 10.0 ** grid_pivot.ravel() * 2.0 * jnp.pi / 9.7156e-15
 
-    n_points = amplitude_flat.shape[0]
+        n_points = amplitude_flat.shape[0]
 
-    f_PBH_exact_batch = jax.jit(
-        jax.vmap(
-            lambda a, d, k: f_PBH_NL_QCD_lognormal(
-                a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
+        f_PBH_exact_batch = jax.jit(
+            jax.vmap(
+                lambda a, d, k: f_PBH_NL_QCD_lognormal(
+                    a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
+                )
             )
         )
-    )
 
-    f_PBH_values = np.empty(n_points)
-    n_batches = int(np.ceil(n_points / batch_size))
+        f_PBH_values = np.empty(n_points)
+        n_batches = int(np.ceil(n_points / batch_size))
 
-    for i in range(n_batches):
-        sl = slice(i * batch_size, min((i + 1) * batch_size, n_points))
-        f_PBH_values[sl] = np.asarray(
-            f_PBH_exact_batch(amplitude_flat[sl], delta_flat[sl], ks_flat[sl])
+        for i in range(n_batches):
+            sl = slice(i * batch_size, min((i + 1) * batch_size, n_points))
+            f_PBH_values[sl] = np.asarray(
+                f_PBH_exact_batch(
+                    amplitude_flat[sl], delta_flat[sl], ks_flat[sl]
+                )
+            )
+            if verbose:
+                print(
+                    f"build_f_PBH_interpolator: {i + 1}/{n_batches} "
+                    "batches done"
+                )
+
+        f_PBH_grid = jnp.asarray(f_PBH_values).reshape(
+            n_amplitude, n_width, n_pivot
         )
-        if verbose:
-            print(f"build_f_PBH_interpolator: {i + 1}/{n_batches} batches done")
+        log10_f_PBH_grid = jnp.log10(jnp.clip(f_PBH_grid, floor, None))
 
-    f_PBH_grid = jnp.asarray(f_PBH_values).reshape(
-        n_amplitude, n_width, n_pivot
-    )
-    log10_f_PBH_grid = jnp.log10(jnp.clip(f_PBH_grid, floor, None))
+        if cache_path is not None:
+            np.savez(
+                cache_path,
+                log_amp_vec=log_amp_vec,
+                log_width_vec=log_width_vec,
+                log_pivot_vec=log_pivot_vec,
+                log10_f_PBH_grid=log10_f_PBH_grid,
+            )
 
     log10_f_PBH_interpolator = RegularGridInterpolator(
         (log_amp_vec, log_width_vec, log_pivot_vec),
@@ -924,7 +944,7 @@ def get_PBH_abundance_from_interpolator(
         bounds set the interpolator's box.
     **kwargs
         Extra keyword arguments passed to build_f_PBH_interpolator (e.g.
-        n_grid).
+        n_grid, cache_path).
 
     Returns:
     --------
