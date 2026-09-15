@@ -3,11 +3,9 @@ import jax
 from scipy import stats
 import jax.numpy as jnp
 
-
 # Local
 import fastPTA.utils as ut
 from fastPTA.compute_PBH_Abundance import get_PBH_abundance_from_interpolator
-
 
 # Set the device
 jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
@@ -147,14 +145,27 @@ class Priors(object):
 
         log_prior = 0.0
 
-        if self.check_PBH_abundance and self.get_PBH_abundance:
-            PBH_abundance = self.get_PBH_abundance(list(parameters.values()))
-
-            if PBH_abundance > 1.0 or jnp.isnan(PBH_abundance):
-                return -jnp.inf
-
         for k, v in parameters.items():
             p = self.priors[k]
             log_prior += jnp.log(p["pdf"](v, **p["pdf_kwargs"]))
+
+        if self.check_PBH_abundance and self.get_PBH_abundance:
+            # new design that allows fusing in a single jitted function the PBH
+            # abundance calculation and the prior evaluation
+            exceeds_bound = getattr(
+                self.get_PBH_abundance, "pbh_exceeds_bound", None
+            )
+
+            if exceeds_bound is not None:
+                exceeds = exceeds_bound(list(parameters.values()))
+
+            else:
+                PBH_abundance = self.get_PBH_abundance(
+                    list(parameters.values())
+                )
+                exceeds = (PBH_abundance > 1.0) | jnp.isnan(PBH_abundance)
+
+            # jnp.where rather than an early Python return for jittability
+            log_prior = jnp.where(exceeds, -jnp.inf, log_prior)
 
         return log_prior
