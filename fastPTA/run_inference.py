@@ -1,4 +1,5 @@
 # Global
+import os
 import time
 import numpy as np
 import emcee
@@ -154,7 +155,13 @@ class BlackjaxSampler:
             # per walker at trace time
             tuned_step = jax.vmap(
                 lambda key, s, params: self.algorithm(
-                    self.logdensity_fn, **self.sampler_kwargs, **params
+                    self.logdensity_fn,
+                    **{
+                        k: v
+                        for k, v in self.sampler_kwargs.items()
+                        if k not in params
+                    },
+                    **params,
                 ).step(key, s)
             )
 
@@ -792,7 +799,7 @@ def run_inference(
     get_tensors_kwargs={},
     generate_catalog_kwargs={},
     # -- method="mcmc" only --
-    initial=jnp.array([False]),
+    initial=None,
     sampler="emcee",
     sampler_kwargs={},
     i_max=i_max_default,
@@ -803,6 +810,7 @@ def run_inference(
     path_to_MCMC_chains="generated_chains/MCMC_chains.npz",
     # -- method="nested_sampling" only --
     n_live=n_live_default,
+    initial_live_points=None,
     num_inner_steps=None,
     num_delete=1,
     dlogz=dlogz_default,
@@ -871,8 +879,9 @@ def run_inference(
         Additional keyword arguments for generating the catalog
         Default is an empty dictionary
     initial : list or numpy.ndarray, optional (method="mcmc" only)
-        Initial parameter values for the MCMC walkers
-        Default is empty (drawn from the priors)
+        Initial parameter values for the MCMC walkers. If None, drawn from
+        the priors via priors.sample(nwalkers).
+        Default is None
     sampler : str, optional (method="mcmc" only)
         Sampler to use, either "emcee" or the name of a blackjax sampling
         algorithm (e.g. "nuts", "hmc", "normal_random_walk")
@@ -905,6 +914,13 @@ def run_inference(
     n_live : int, optional (method="nested_sampling" only)
         Number of live points
         Default is n_live_default
+    initial_live_points : array-like, optional (method="nested_sampling" only)
+        Starting live points, shape (n_live, ndims). If None, drawn from the
+        priors via priors.sample(n_live) -- which requires every parameter's
+        prior to support sampling (see Priors.sample). Pass this explicitly
+        to use nested sampling with a priors dictionary that includes a
+        callable-only prior (no rvs sampler).
+        Default is None
     num_inner_steps : int, optional (method="nested_sampling" only)
         Slice-sampling steps per new live point. If None, uses max(5, 2 *
         ndims), as recommended by blackjax
@@ -971,7 +987,7 @@ def run_inference(
         ndims = len(priors.parameter_names)
 
         # Generate the initial points if not provided
-        if not np.all(initial):
+        if initial is None:
             nwalkers = max(2 * ndims, 5)
             initial = priors.sample(nwalkers)
         else:
@@ -1003,6 +1019,7 @@ def run_inference(
         )
 
         print("Storing as", path_to_MCMC_chains)
+        os.makedirs(os.path.dirname(path_to_MCMC_chains) or ".", exist_ok=True)
         np.savez(path_to_MCMC_chains, samples=samples, pdfs=pdfs)
 
         return samples, pdfs
@@ -1019,8 +1036,10 @@ def run_inference(
             signal_value, eigenvalues, noise_logdet, data_eigenbasis
         )
 
-    # Draw the initial live points from the priors
-    initial_live_points = priors.sample(n_live)
+    # Draw the initial live points from the priors, unless the caller
+    # supplied their own (required if any prior is callable-only)
+    if initial_live_points is None:
+        initial_live_points = priors.sample(n_live)
 
     # Samples and evidence
     samples, logZ_mean, logZ_std = get_nested_samples(
@@ -1036,6 +1055,7 @@ def run_inference(
     )
 
     print("Storing as", path_to_NS_chains)
+    os.makedirs(os.path.dirname(path_to_NS_chains) or ".", exist_ok=True)
     np.savez(
         path_to_NS_chains,
         samples=samples,
