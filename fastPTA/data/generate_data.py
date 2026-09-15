@@ -457,7 +457,9 @@ def generate_inference_data(
 
     # Save the data
     if save_inference_data:
-        os.makedirs(os.path.dirname(path_to_inference_data) or ".", exist_ok=True)
+        os.makedirs(
+            os.path.dirname(path_to_inference_data) or ".", exist_ok=True
+        )
         np.savez(
             path_to_inference_data,
             frequency=frequency,
