@@ -1,6 +1,9 @@
 import unittest
 import numpy as np
 
+import jax
+import jax.numpy as jnp
+
 # Local imports
 from fastPTA import compute_PBH_Abundance as cpa
 import utils as tu
@@ -181,6 +184,113 @@ class Test_Abundance_Extended(unittest.TestCase):
     # - compute_sigma_c_NL_QCD: Requires array input for k_vec
     # - integrand_beta: Uses phi_QCD interpolator
     # - compute_beta_NL_C_QCD: Depends on compute_sigma_c_NL_QCD
+
+
+class Test_f_PBH_Interpolator(unittest.TestCase):
+    """Tests for the build_f_PBH_interpolator / get_PBH_abundance_from_
+    interpolator fast path used by Priors to speed up the PBH abundance
+    check (see compute_PBH_Abundance.py)."""
+
+    amplitude_bounds = (-3.5, -1.5)
+    width_bounds = (-1.8, 0.8)
+    pivot_bounds = (-9.0, -7.0)
+
+    @classmethod
+    def setUpClass(cls):
+        # staticmethod: a plain function assigned as a class attribute is
+        # bound as a method (self gets passed as its first arg) when
+        # accessed via self.approx otherwise.
+        cls.approx = staticmethod(
+            cpa.build_f_PBH_interpolator(
+                cls.amplitude_bounds,
+                cls.width_bounds,
+                cls.pivot_bounds,
+                n_grid=20,
+                verbose=False,
+            )
+        )
+
+    def test_matches_exact_at_grid_point(self):
+        """
+        The interpolator should closely reproduce the exact calculation
+        it was built from, at an interior grid point (no interpolation
+        error at a knot itself, up to the floor/log10 round trip).
+        """
+
+        log_amplitude, log_width, log_pivot = -1.7, -0.3, -8.25
+        ks = 10.0**log_pivot * 2.0 * np.pi / 9.7156e-15
+
+        exact = cpa.f_PBH_NL_QCD_lognormal(
+            10.0**log_amplitude, 10.0**log_width, ks
+        )
+        approx = self.approx(log_amplitude, log_width, log_pivot)
+
+        self.assertAlmostEqual(
+            float(np.log10(max(float(exact), 1e-30))),
+            float(np.log10(max(float(approx), 1e-30))),
+            delta=0.2,
+        )
+
+    def test_pbh_exceeds_bound_matches_generic_check(self):
+        """
+        get_PBH_abundance_from_interpolator's fused pbh_exceeds_bound
+        fast path (a single jitted dispatch, see compute_PBH_Abundance.py)
+        must agree with the generic get_PBH_abundance(...) > 1.0 or
+        isnan(...) check it replaces in Priors.evaluate_log_priors.
+        """
+
+        parameter_names = ["a", "b", "c"]
+        pbh_names = ("a", "b", "c")
+        priors_dictionary = {
+            "a": {"uniform": {"loc": self.amplitude_bounds[0], "scale": 2.0}},
+            "b": {"uniform": {"loc": self.width_bounds[0], "scale": 2.6}},
+            "c": {"uniform": {"loc": self.pivot_bounds[0], "scale": 2.0}},
+        }
+
+        get_pbh_abundance = cpa.get_PBH_abundance_from_interpolator(
+            parameter_names, pbh_names, priors_dictionary, n_grid=20
+        )
+
+        for point in [(-1.7, -0.3, -8.25), (-1.6, -1.8, -8.0)]:
+            abundance = float(get_pbh_abundance(list(point)))
+            generic_exceeds = abundance > 1.0 or np.isnan(abundance)
+            fused_exceeds = bool(
+                get_pbh_abundance.pbh_exceeds_bound(list(point))
+            )
+
+            self.assertEqual(generic_exceeds, fused_exceeds)
+
+    def test_gradient_is_never_nan(self):
+        """
+        Regression test for future use in a gradient-based sampler (e.g.
+        blackjax): jax.grad through the interpolator, and through the
+        jnp.where(exceeds, -jnp.inf, ...) gate pattern Priors uses it
+        with, must never be nan -- including under gross extrapolation
+        far outside the grid, where the raw interpolated value can itself
+        be inf. See the note on pbh_exceeds_bound for why this holds (the
+        excluded branch must stay a bare -jnp.inf constant).
+        """
+
+        def gate(a, b, c):
+            v = self.approx(a, b, c)
+            exceeds = (v > 1.0) | jnp.isnan(v)
+            stand_in_log_density = -(a**2) - (b**2) - (c**2)
+            return jnp.where(exceeds, -jnp.inf, stand_in_log_density)
+
+        points = [
+            (-1.7, -0.3, -8.25),  # interior, valid
+            (-1.6, -1.8, -8.0),  # interior, likely excluded
+            (100.0, 100.0, 100.0),  # gross extrapolation, v -> inf
+            (-500.0, -500.0, -500.0),  # gross extrapolation, other side
+        ]
+
+        for point in points:
+            grads = jax.grad(gate, argnums=(0, 1, 2))(*point)
+
+            self.assertFalse(
+                any(bool(jnp.isnan(g)) for g in grads),
+                msg=f"nan gradient at {point}: {grads}",
+            )
 
 
 if __name__ == "__main__":

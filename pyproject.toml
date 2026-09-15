@@ -33,6 +33,7 @@ dependencies = [
     "matplotlib>=3.7.4",
     "tqdm>=4.64.1",
     "pyyaml>=6.0",
+    "interpax>=0.3.14",
     "corner>=2.2.1",
     "emcee>=3.1.2",
     "wigners>=0.3.0",

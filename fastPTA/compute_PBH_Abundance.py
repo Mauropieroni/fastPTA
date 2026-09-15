@@ -1,15 +1,15 @@
 import os
 
 import numpy as np
+import tqdm
+import interpax
 
 import jax
 import jax.numpy as jnp
 from jax.scipy.interpolate import RegularGridInterpolator
 
-
 # Local
 import fastPTA.utils as ut
-
 
 if ut.compare_versions(jax.__version__, "0.4.24"):
     from jax.numpy import trapezoid
@@ -17,7 +17,6 @@ else:
     from jax.numpy import trapz as trapezoid
 
 from functools import partial
-
 
 # Set some global parameters for jax
 jax.config.update("jax_enable_x64", True)
@@ -844,10 +843,10 @@ def build_f_PBH_interpolator(
                 )
             ):
                 cached = (
-                    jnp.asarray(data["log_amp_vec"]),
-                    jnp.asarray(data["log_width_vec"]),
-                    jnp.asarray(data["log_pivot_vec"]),
-                    jnp.asarray(data["log10_f_PBH_grid"]),
+                    jnp.array(data["log_amp_vec"]),
+                    jnp.array(data["log_width_vec"]),
+                    jnp.array(data["log_pivot_vec"]),
+                    jnp.array(data["log10_f_PBH_grid"]),
                 )
 
     if cached is not None:
@@ -876,31 +875,46 @@ def build_f_PBH_interpolator(
 
         n_points = amplitude_flat.shape[0]
 
-        f_PBH_exact_batch = jax.jit(
-            jax.vmap(
-                lambda a, d, k: f_PBH_NL_QCD_lognormal(
-                    a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
-                )
+        f_PBH_vmapped = jax.vmap(
+            lambda a, d, k: f_PBH_NL_QCD_lognormal(
+                a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
             )
         )
 
-        f_PBH_values = np.empty(n_points)
+        # Pad up and reshape into (n_batches, batch_size) to use a single
+        # jax.lax.scan that also allows a live progress updates
         n_batches = int(np.ceil(n_points / batch_size))
+        pad = n_batches * batch_size - n_points
 
-        for i in range(n_batches):
-            sl = slice(i * batch_size, min((i + 1) * batch_size, n_points))
-            f_PBH_values[sl] = np.asarray(
-                f_PBH_exact_batch(
-                    amplitude_flat[sl], delta_flat[sl], ks_flat[sl]
-                )
-            )
+        def _pad_and_chunk(x):
+            if pad:
+                x = jnp.concatenate([x, jnp.zeros(pad, dtype=x.dtype)])
+            return x.reshape(n_batches, batch_size)
+
+        chunks = (
+            _pad_and_chunk(amplitude_flat),
+            _pad_and_chunk(delta_flat),
+            _pad_and_chunk(ks_flat),
+        )
+
+        progress_bar = tqdm.tqdm(
+            total=n_batches,
+            disable=not verbose,
+            desc="build_f_PBH_interpolator",
+        )
+
+        def _scan_body(carry, chunk):
+            out = f_PBH_vmapped(*chunk)
             if verbose:
-                print(
-                    f"build_f_PBH_interpolator: {i + 1}/{n_batches} "
-                    "batches done"
-                )
+                jax.debug.callback(lambda: progress_bar.update(1))
+            return carry, out
 
-        f_PBH_grid = jnp.asarray(f_PBH_values).reshape(
+        f_PBH_batched = jax.jit(
+            lambda chunks: jax.lax.scan(_scan_body, None, chunks)[1]
+        )(chunks)
+        progress_bar.close()
+
+        f_PBH_grid = f_PBH_batched.reshape(-1)[:n_points].reshape(
             n_amplitude, n_width, n_pivot
         )
         log10_f_PBH_grid = jnp.log10(jnp.clip(f_PBH_grid, floor, None))
@@ -914,11 +928,14 @@ def build_f_PBH_interpolator(
                 log10_f_PBH_grid=log10_f_PBH_grid,
             )
 
-    log10_f_PBH_interpolator = RegularGridInterpolator(
-        (log_amp_vec, log_width_vec, log_pivot_vec),
+    # Cubic (C1 local splines) rather than linear slighlty costlier but better
+    log10_f_PBH_interpolator = interpax.Interpolator3D(
+        log_amp_vec,
+        log_width_vec,
+        log_pivot_vec,
         log10_f_PBH_grid,
-        bounds_error=False,
-        fill_value=None,
+        method="cubic",
+        extrap=True,
     )
 
     @jax.jit
@@ -929,9 +946,9 @@ def build_f_PBH_interpolator(
 
         """
 
-        point = jnp.array([log_amplitude, log_width, log_pivot])
-
-        return 10.0 ** log10_f_PBH_interpolator(point)[0]
+        return 10.0 ** log10_f_PBH_interpolator(
+            log_amplitude, log_width, log_pivot
+        )
 
     return f_PBH_approx
 
@@ -981,6 +998,24 @@ def get_PBH_abundance_from_interpolator(
 
     def get_PBH_abundance(parameters):
         return f_PBH_interpolated(*(parameters[i] for i in indices))
+
+    @jax.jit
+    def _exceeds_bound(a, b, c):
+        # Fuses the interpolation and the > 1.0 / isnan check into one jax.jit
+        # call. With this approach, Priors.evaluate_log_priors only pays for a
+        # single dispatch and a single host sync
+        v = f_PBH_interpolated(a, b, c)
+        return (v > 1.0) | jnp.isnan(v)
+
+    def pbh_exceeds_bound(parameters):
+        """Fuses the interpolation and the > 1.0 / isnan check into one jax.jit
+        call. Used by Priors when only the pass/fail check is needed. Every op
+        here is plain JAX and it's gradient-safe by construction.
+        """
+
+        return _exceeds_bound(*(parameters[i] for i in indices))
+
+    get_PBH_abundance.pbh_exceeds_bound = pbh_exceeds_bound
 
     return get_PBH_abundance
 
