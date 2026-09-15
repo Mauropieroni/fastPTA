@@ -15,9 +15,6 @@ jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 jax.config.update("jax_enable_x64", True)
 
 
-function_type = type(lambda x: x)
-
-
 class Priors(object):
     """
     Class to define the prior probability density functions.
@@ -84,7 +81,7 @@ class Priors(object):
                         "pdf_kwargs": v,
                     }
 
-            elif type(value) is function_type:
+            elif callable(value):
                 priors[key] = {
                     "pdf": value,
                     "rvs": None,
@@ -127,8 +124,8 @@ class Priors(object):
 
     def sample(self, size):
         """
-        Draw samples from the priors (ignores priors set from an arbitrary
-        callable, which have no rvs sampler).
+        Draw samples from the priors. Raises if a prior was set from an
+        arbitrary callable, since those have no rvs sampler.
 
         Parameters:
         -----------
@@ -146,6 +143,13 @@ class Priors(object):
 
         for i, name in enumerate(self.parameter_names):
             p = self.priors[name]
+
+            if p["rvs"] is None:
+                raise ValueError(
+                    f"Cannot sample prior for {name!r}: prior was provided "
+                    "as a callable and has no rvs sampler."
+                )
+
             values[:, i] = p["rvs"](**p["pdf_kwargs"], size=size)
 
         return values
