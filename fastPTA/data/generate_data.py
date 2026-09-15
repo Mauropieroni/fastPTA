@@ -1,4 +1,5 @@
 # Global imports
+import os
 import healpy as hp
 import jax
 import jax.numpy as jnp
@@ -456,6 +457,7 @@ def generate_inference_data(
 
     # Save the data
     if save_inference_data:
+        os.makedirs(os.path.dirname(path_to_inference_data) or ".", exist_ok=True)
         np.savez(
             path_to_inference_data,
             frequency=frequency,
