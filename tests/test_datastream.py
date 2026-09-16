@@ -104,12 +104,16 @@ class TestGetTensors(unittest.TestCase):
 
         R_p, R_c = gds.get_R_pc(ff, dist, p_vec, theta, phi)
 
-        self.assertAlmostEqual(
-            np.sum(R_p - datastream["R_p"]), 0.0, delta=1e-13
+        # R_p/R_c span a huge dynamic range (~1/f, with f down to ~1e-9 Hz)
+        # and R_c crosses near zero at some pixels/frequencies, so summing
+        # the raw difference lets float64 rounding noise accumulate past an
+        # absolute tolerance, and a pure relative tolerance blows up near
+        # the zero crossings; compare element-wise with rtol + a small atol
+        np.testing.assert_allclose(
+            R_p, datastream["R_p"], rtol=1e-10, atol=1e-4
         )
-
-        self.assertAlmostEqual(
-            np.sum(R_c - datastream["R_c"]), 0.0, delta=1e-13
+        np.testing.assert_allclose(
+            R_c, datastream["R_c"], rtol=1e-10, atol=1e-4
         )
 
     def test_get_s_I(self):
