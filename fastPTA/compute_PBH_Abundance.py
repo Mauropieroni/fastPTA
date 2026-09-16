@@ -1,13 +1,15 @@
+import os
+
 import numpy as np
+import tqdm
+import interpax
 
 import jax
 import jax.numpy as jnp
 from jax.scipy.interpolate import RegularGridInterpolator
 
-
 # Local
 import fastPTA.utils as ut
-
 
 if ut.compare_versions(jax.__version__, "0.4.24"):
     from jax.numpy import trapezoid
@@ -15,7 +17,6 @@ else:
     from jax.numpy import trapz as trapezoid
 
 from functools import partial
-
 
 # Set some global parameters for jax
 jax.config.update("jax_enable_x64", True)
@@ -748,6 +749,272 @@ def f_PBH_NL_QCD_lognormal(
     return f_PBH_NL_QCD(
         r_max_vec / ks, k_vec, scalar_spectrum, len_C_G_vec=len_C_G_vec
     )
+
+
+def _axis_is_fine_enough(vec, bounds, n_grid_axis):
+    """Whether the cached axis vec covers bounds at a spacing at least as
+    fine as what n_grid_axis over bounds would give (not just a raw
+    point-count comparison, since bounds may be a narrower or wider box
+    than the one vec was originally built over)."""
+
+    if not (vec[0] <= bounds[0] and bounds[1] <= vec[-1]):
+        return False
+
+    cached_spacing = (vec[-1] - vec[0]) / (len(vec) - 1)
+    requested_spacing = (bounds[1] - bounds[0]) / (n_grid_axis - 1)
+
+    return cached_spacing <= requested_spacing
+
+
+def build_f_PBH_interpolator(
+    log_amplitude_bounds,
+    log_width_bounds,
+    log_pivot_bounds,
+    n_grid=None,
+    margin=0.0,
+    len_k_vec=100,
+    len_r_max_vec=100,
+    len_C_G_vec=100,
+    batch_size=500,
+    floor=1e-30,
+    verbose=False,
+    cache_path=None,
+):
+    """
+    Interpolator for f_PBH_NL_QCD_lognormal over (log10 amplitude, log10 width,
+    log10 pivot [Hz]) box, used to speed up the PBH abundance check in a sampler
+    (see Priors.evaluate_log_priors) instead of the exact, slower calculation.
+    log10(f_PBH) is interpolated on a grid precomputed with the exact function
+    batched with jax.vmap in chunks of batch_size to bound peak memory.
+
+    Parameters:
+    -----------
+    log_amplitude_bounds, log_width_bounds, log_pivot_bounds : tuple of float
+        (min, max) to cover for each parameter.
+    n_grid : int or tuple of 3 int, optional
+        Grid points per axis (amplitude, width, pivot); a single int
+        applies to all three. Defaults to 100 if cache_path is set (an
+        amortized one-time cost), else 40.
+    margin : float, optional
+        Extra padding added to each bound, to reduce the chance of
+        extrapolation for points near the prior edges (default 0.0).
+    len_k_vec, len_r_max_vec, len_C_G_vec : int, optional
+        Integration grid sizes for the exact evaluations (default 100).
+    batch_size : int, optional
+        Grid points evaluated per vmapped batch while building (default
+        500).
+    floor : float, optional
+        Lower bound on f_PBH before taking log10 (default 1e-30).
+    verbose : bool, optional
+        Print build progress (default False).
+    cache_path : str, optional
+        If given, reuse a previously saved grid from this .npz file when
+        it covers the requested bounds; otherwise (re)build it and save
+        it there for next time.
+
+    Returns:
+    --------
+    callable
+        f_PBH_approx(log_amplitude, log_width, log_pivot), vmap-able.
+
+    """
+
+    if n_grid is None:
+        n_grid = 100 if cache_path else 40
+
+    if isinstance(n_grid, int):
+        n_amplitude, n_width, n_pivot = n_grid, n_grid, n_grid
+    else:
+        n_amplitude, n_width, n_pivot = n_grid
+
+    cached = None
+    if cache_path is not None and os.path.exists(cache_path):
+        with np.load(cache_path) as data:
+            if (
+                _axis_is_fine_enough(
+                    data["log_amp_vec"], log_amplitude_bounds, n_amplitude
+                )
+                and _axis_is_fine_enough(
+                    data["log_width_vec"], log_width_bounds, n_width
+                )
+                and _axis_is_fine_enough(
+                    data["log_pivot_vec"], log_pivot_bounds, n_pivot
+                )
+            ):
+                cached = (
+                    jnp.array(data["log_amp_vec"]),
+                    jnp.array(data["log_width_vec"]),
+                    jnp.array(data["log_pivot_vec"]),
+                    jnp.array(data["log10_f_PBH_grid"]),
+                )
+
+    if cached is not None:
+        log_amp_vec, log_width_vec, log_pivot_vec, log10_f_PBH_grid = cached
+
+    else:
+        log_amp_vec = jnp.linspace(
+            log_amplitude_bounds[0] - margin,
+            log_amplitude_bounds[1] + margin,
+            n_amplitude,
+        )
+        log_width_vec = jnp.linspace(
+            log_width_bounds[0] - margin, log_width_bounds[1] + margin, n_width
+        )
+        log_pivot_vec = jnp.linspace(
+            log_pivot_bounds[0] - margin, log_pivot_bounds[1] + margin, n_pivot
+        )
+
+        grid_amp, grid_width, grid_pivot = jnp.meshgrid(
+            log_amp_vec, log_width_vec, log_pivot_vec, indexing="ij"
+        )
+
+        amplitude_flat = 10.0 ** grid_amp.ravel()
+        delta_flat = 10.0 ** grid_width.ravel()
+        ks_flat = 10.0 ** grid_pivot.ravel() * 2.0 * jnp.pi / 9.7156e-15
+
+        n_points = amplitude_flat.shape[0]
+
+        f_PBH_vmapped = jax.vmap(
+            lambda a, d, k: f_PBH_NL_QCD_lognormal(
+                a, d, k, len_k_vec, len_r_max_vec, len_C_G_vec
+            )
+        )
+
+        # Pad up and reshape into (n_batches, batch_size) to use a single
+        # jax.lax.scan that also allows a live progress updates
+        n_batches = int(np.ceil(n_points / batch_size))
+        pad = n_batches * batch_size - n_points
+
+        def _pad_and_chunk(x):
+            if pad:
+                x = jnp.concatenate([x, jnp.zeros(pad, dtype=x.dtype)])
+            return x.reshape(n_batches, batch_size)
+
+        chunks = (
+            _pad_and_chunk(amplitude_flat),
+            _pad_and_chunk(delta_flat),
+            _pad_and_chunk(ks_flat),
+        )
+
+        progress_bar = tqdm.tqdm(
+            total=n_batches,
+            disable=not verbose,
+            desc="build_f_PBH_interpolator",
+        )
+
+        def _scan_body(carry, chunk):
+            out = f_PBH_vmapped(*chunk)
+            if verbose:
+                jax.debug.callback(lambda: progress_bar.update(1))
+            return carry, out
+
+        f_PBH_batched = jax.jit(
+            lambda chunks: jax.lax.scan(_scan_body, None, chunks)[1]
+        )(chunks)
+        progress_bar.close()
+
+        f_PBH_grid = f_PBH_batched.reshape(-1)[:n_points].reshape(
+            n_amplitude, n_width, n_pivot
+        )
+        log10_f_PBH_grid = jnp.log10(jnp.clip(f_PBH_grid, floor, None))
+
+        if cache_path is not None:
+            np.savez(
+                cache_path,
+                log_amp_vec=log_amp_vec,
+                log_width_vec=log_width_vec,
+                log_pivot_vec=log_pivot_vec,
+                log10_f_PBH_grid=log10_f_PBH_grid,
+            )
+
+    # Cubic (C1 local splines) rather than linear slighlty costlier but better
+    log10_f_PBH_interpolator = interpax.Interpolator3D(
+        log_amp_vec,
+        log_width_vec,
+        log_pivot_vec,
+        log10_f_PBH_grid,
+        method="cubic",
+        extrap=True,
+    )
+
+    @jax.jit
+    def f_PBH_approx(log_amplitude, log_width, log_pivot):
+        """
+        Approximate f_PBH from log10(amplitude), log10(width) and
+        log10(pivot in Hz), interpolated from the precomputed grid.
+
+        """
+
+        return 10.0 ** log10_f_PBH_interpolator(
+            log_amplitude, log_width, log_pivot
+        )
+
+    return f_PBH_approx
+
+
+def get_PBH_abundance_from_interpolator(
+    parameter_names, PBH_parameter_names, priors_dictionary, **kwargs
+):
+    """
+    Build an interpolator-backed (see build_f_PBH_interpolator) for the PBH
+    abundance function, which is a perfect replacement for get_PBH_abundance.
+
+    Parameters:
+    -----------
+    parameter_names : list of str
+        Full ordered parameter vector names (e.g.
+        signal_model.parameter_names), used to locate the 3 PBH-relevant
+        entries positionally.
+    PBH_parameter_names : tuple of 3 str
+        Names of the log10 amplitude, log10 width and log10 pivot [Hz]
+        parameters, in that order.
+    priors_dictionary : dictionary
+        Must contain uniform priors for each of PBH_parameter_names; their
+        bounds set the interpolator's box.
+    **kwargs
+        Extra keyword arguments passed to build_f_PBH_interpolator (e.g.
+        n_grid, cache_path).
+
+    Returns:
+    --------
+    callable
+        get_PBH_abundance(parameters) -> f_PBH, from the full parameter
+        vector, like the exact function it replaces.
+
+    """
+
+    indices = tuple(parameter_names.index(name) for name in PBH_parameter_names)
+
+    def bounds(name):
+        spec = priors_dictionary[name]["uniform"]
+        return (spec["loc"], spec["loc"] + spec["scale"])
+
+    f_PBH_interpolated = build_f_PBH_interpolator(
+        *(bounds(name) for name in PBH_parameter_names), **kwargs
+    )
+
+    def get_PBH_abundance(parameters):
+        return f_PBH_interpolated(*(parameters[i] for i in indices))
+
+    @jax.jit
+    def _exceeds_bound(a, b, c):
+        # Fuses the interpolation and the > 1.0 / isnan check into one jax.jit
+        # call. With this approach, Priors.evaluate_log_priors only pays for a
+        # single dispatch and a single host sync
+        v = f_PBH_interpolated(a, b, c)
+        return (v > 1.0) | jnp.isnan(v)
+
+    def pbh_exceeds_bound(parameters):
+        """Fuses the interpolation and the > 1.0 / isnan check into one jax.jit
+        call. Used by Priors when only the pass/fail check is needed. Every op
+        here is plain JAX and it's gradient-safe by construction.
+        """
+
+        return _exceeds_bound(*(parameters[i] for i in indices))
+
+    get_PBH_abundance.pbh_exceeds_bound = pbh_exceeds_bound
+
+    return get_PBH_abundance
 
 
 # @jax.jit
