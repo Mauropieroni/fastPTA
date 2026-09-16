@@ -303,6 +303,43 @@ class TestUtils(unittest.TestCase):
         # Second parameter should have R > 1 (poor convergence)
         self.assertGreater(R[1], 1.1)
 
+    def test_update_R(self):
+        """
+        Test that update_R, folding in one fixed-size batch at a time,
+        exactly matches get_R applied to the whole chain built so far --
+        it's meant to be an incremental reformulation, not an approximation.
+
+        """
+
+        n_chains = 3
+        n_params = 2
+        batch_size = 200
+        n_batches = 4
+
+        chain = None
+        state = None
+
+        for _ in range(n_batches):
+            batch = np.zeros((batch_size, n_chains, n_params))
+            for chain_idx in range(n_chains):
+                batch[:, chain_idx, 0] = np.random.normal(
+                    5.0, 1.0, batch_size
+                )
+                batch[:, chain_idx, 1] = np.random.normal(
+                    5.0 + chain_idx, 1.0, batch_size
+                )
+
+            chain = (
+                batch if chain is None else np.concatenate([chain, batch])
+            )
+
+            state, R_incremental = ut.update_R(state, batch)
+            R_direct = ut.get_R(chain)
+
+            np.testing.assert_allclose(
+                R_incremental, R_direct, rtol=1e-10, atol=1e-10
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

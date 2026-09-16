@@ -1,7 +1,9 @@
 # Global
 import jax
+import numpy as np
 from scipy import stats
 import jax.numpy as jnp
+import jax.scipy.stats as jstats
 
 # Local
 import fastPTA.utils as ut
@@ -12,9 +14,6 @@ jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
 # Enable 64-bit precision
 jax.config.update("jax_enable_x64", True)
-
-
-function_type = type(lambda x: x)
 
 
 class Priors(object):
@@ -91,8 +90,8 @@ class Priors(object):
         Set the prior probability density functions from a dictionary.
         The keys of the dictionary should be the parameter names and the values
         should either be callables or dictionaries. If dictionaries, the keys
-        should be the distribution names (in scipy.stats), and the values should
-        be the keyword arguments for the distribution.
+        should be the distribution names (in jax.scipy.stats), and the values
+        should be the keyword arguments for the distribution.
 
         Parameters:
         -----------
@@ -113,12 +112,12 @@ class Priors(object):
             if type(value) is dict:
                 for k, v in value.items():
                     priors[key] = {
-                        "pdf": getattr(stats, k).pdf,
+                        "pdf": getattr(jstats, k).pdf,
                         "rvs": getattr(stats, k).rvs,
                         "pdf_kwargs": v,
                     }
 
-            elif type(value) is function_type:
+            elif callable(value):
                 priors[key] = {
                     "pdf": value,
                     "rvs": None,
@@ -150,8 +149,9 @@ class Priors(object):
             log_prior += jnp.log(p["pdf"](v, **p["pdf_kwargs"]))
 
         if self.check_PBH_abundance and self.get_PBH_abundance:
-            # new design that allows fusing in a single jitted function the PBH
-            # abundance calculation and the prior evaluation
+            # get_PBH_abundance_from_interpolator returns a single-dispatch
+            # pass/fail check that can be fused in a single jitted log-density
+            # evaluation. Prefer (for speed) it when available.
             exceeds_bound = getattr(
                 self.get_PBH_abundance, "pbh_exceeds_bound", None
             )
@@ -169,3 +169,35 @@ class Priors(object):
             log_prior = jnp.where(exceeds, -jnp.inf, log_prior)
 
         return log_prior
+
+    def sample(self, size):
+        """
+        Draw samples from the priors. Raises if a prior was set from an
+        arbitrary callable, since those have no rvs sampler.
+
+        Parameters:
+        -----------
+        size : int
+            Number of samples to draw.
+
+        Returns:
+        --------
+        numpy.ndarray
+            Array of shape (size, n_parameters) with samples from the priors.
+
+        """
+
+        values = np.empty((size, len(self.parameter_names)))
+
+        for i, name in enumerate(self.parameter_names):
+            p = self.priors[name]
+
+            if p["rvs"] is None:
+                raise ValueError(
+                    f"Cannot sample prior for {name!r}: prior was provided "
+                    "as a callable and has no rvs sampler."
+                )
+
+            values[:, i] = p["rvs"](**p["pdf_kwargs"], size=size)
+
+        return values

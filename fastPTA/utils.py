@@ -490,43 +490,49 @@ def get_R(samples):
     GR statistic is a convergence diagnostic used to assess whether multiple
     Markov chains have converged to the same distribution. Values close to 1
     indicate convergence. For details see
-    https://en.wikipedia.org/wiki/Gelman-Rubin_statistic
+    https://en.wikipedia.org/wiki/Gelman-Rubin_statistic. Written with
+    jax.numpy so it stays on-device for a jax array (e.g. BlackjaxSampler's
+    chain) rather than round-tripping it to numpy, and works equally well on
+    a numpy array (e.g. emcee's chain). Not jitted: this is meant for a
+    one-off/generic array, and a caller cannot guarantee the shape is ever
+    reused, so a jax.jit wrapper here would just recompile on every call for
+    no benefit. get_MCMC_samples' convergence loop, which does call this
+    every iteration on a fixed shape, uses update_R below instead.
 
     Parameters:
     -----------
-    samples : numpy.ndarray
+    samples : Array
         Array containing MCMC samples with dimensions
         (N_steps, N_chains, N_parameters).
 
     Returns:
     --------
-    R : numpy.ndarray
+    R : Array
         Array containing the Gelman-Rubin statistics indicating convergence for
         the different parameters. Values close to 1 indicate convergence.
 
     """
 
-    # Get the shapes
     N_steps, N_chains, N_parameters = samples.shape
 
     # Chain means
-    chain_mean = np.mean(samples, axis=0)
+    chain_mean = jnp.mean(samples, axis=0)
 
     # Global mean
-    global_mean = np.mean(chain_mean, axis=0)
+    global_mean = jnp.mean(chain_mean, axis=0)
 
     # Variance between the chain means
     variance_of_means = (
         N_steps
         / (N_chains - 1)
-        * np.sum((chain_mean - global_mean[None, :]) ** 2, axis=0)
+        * jnp.sum((chain_mean - global_mean[None, :]) ** 2, axis=0)
     )
 
     # Variance of the individual chain across all chains
-    intra_chain_variance = np.std(samples, axis=0, ddof=1) ** 2
+    intra_chain_variance = jnp.std(samples, axis=0, ddof=1) ** 2
 
     # And its averaged value over the chains
-    mean_intra_chain_variance = np.mean(intra_chain_variance, axis=0)
+    mean_intra_chain_variance = jnp.mean(intra_chain_variance, axis=0)
 
     # First term
     term_1 = (N_steps - 1) / N_steps
@@ -536,3 +542,140 @@ def get_R(samples):
 
     # This is the R (as a vector running on the paramters)
     return term_1 + term_2
+
+
+@jax.jit
+def _combine_chain_stats(count, mean, M2, batch):
+    """
+    Fold a new, fixed-shape batch of samples into running per-chain
+    sufficient statistics (count, mean, M2 -- the sum of squared deviations
+    from the mean), using Chan et al.'s parallel/batch combination formula.
+    This is an exact update (not an approximation) of the same mean/variance
+    get_R would compute from the full history, at O(batch size) cost per
+    call instead of O(total size so far). Jit-compiled: unlike get_R on the
+    ever-growing chain, `batch` has the same shape on every call between
+    resets, so this compiles once and every later call reuses it.
+
+    Parameters:
+    -----------
+    count : Array
+        Scalar number of steps folded in so far (0 for a fresh state).
+    mean, M2 : Array
+        Running per-chain, per-parameter mean and M2, shape (N_chains,
+        N_parameters) (all-zero for a fresh state).
+    batch : Array
+        New samples to fold in, shape (n_steps, N_chains, N_parameters).
+
+    Returns:
+    --------
+    Tuple containing the updated (count, mean, M2).
+
+    """
+
+    batch_count = batch.shape[0]
+    batch_mean = jnp.mean(batch, axis=0)
+    batch_M2 = jnp.sum((batch - batch_mean[None, :, :]) ** 2, axis=0)
+
+    new_count = count + batch_count
+    delta = batch_mean - mean
+    new_mean = mean + delta * (batch_count / new_count)
+    new_M2 = (
+        M2 + batch_M2 + delta**2 * (count * batch_count / new_count)
+    )
+
+    return new_count, new_mean, new_M2
+
+
+@jax.jit
+def _R_from_chain_stats(count, mean, M2):
+    """
+    Gelman-Rubin R (see get_R) from running per-chain sufficient statistics
+    (see _combine_chain_stats).
+
+    Parameters:
+    -----------
+    count : Array
+        Scalar number of steps per chain.
+    mean, M2 : Array
+        Per-chain, per-parameter mean and M2, shape (N_chains,
+        N_parameters).
+
+    Returns:
+    --------
+    R : Array
+        Array containing the Gelman-Rubin statistics, shape (N_parameters,).
+
+    """
+
+    N_chains = mean.shape[0]
+
+    intra_chain_variance = M2 / (count - 1)
+    mean_intra_chain_variance = jnp.mean(intra_chain_variance, axis=0)
+
+    global_mean = jnp.mean(mean, axis=0)
+    variance_of_means = (
+        count
+        / (N_chains - 1)
+        * jnp.sum((mean - global_mean[None, :]) ** 2, axis=0)
+    )
+
+    term_1 = (count - 1) / count
+    term_2 = variance_of_means / mean_intra_chain_variance / count
+
+    return term_1 + term_2
+
+
+def update_R(state, batch):
+    """
+    Incremental counterpart to get_R, for a convergence loop that calls it
+    every iteration on the newest, fixed-size batch of samples rather than
+    re-deriving R from the whole (ever-growing) chain each time. Since
+    `batch` has the same shape on every call between resets, the underlying
+    jit-compiled update (_combine_chain_stats/_R_from_chain_stats) compiles
+    once and is reused on every later call -- unlike calling get_R directly
+    on a chain whose length grows every iteration, which would recompile
+    from scratch every time for no benefit.
+
+    Parameters:
+    -----------
+    state : tuple or None
+        (count, mean, M2) returned by a previous call, or None to start a
+        fresh computation (e.g. right after burn-in).
+    batch : Array
+        The newest samples only (not the full chain), shape (n_steps,
+        N_chains, N_parameters); n_steps must be the same on every call
+        since a reset.
+
+    Returns:
+    --------
+    Tuple containing:
+    - new_state: tuple
+        Updated (count, mean, M2), to pass to the next call.
+    - R: Array
+        Array containing the Gelman-Rubin statistics indicating convergence
+        for the different parameters, as get_R would return on the full
+        history. Values close to 1 indicate convergence.
+
+    """
+
+    if state is None:
+        chain_shape = batch.shape[1:]
+        state = (jnp.zeros(()), jnp.zeros(chain_shape), jnp.zeros(chain_shape))
+
+    new_state = _combine_chain_stats(*state, batch)
+    return new_state, _R_from_chain_stats(*new_state)
+
+
+def new_rng_key():
+    """
+    Generate a fresh jax PRNGKey seeded from numpy's global random state, for
+    modules that do not otherwise thread an explicit key through.
+
+    Returns:
+    --------
+    jax.random.PRNGKey
+        A freshly seeded PRNG key.
+
+    """
+
+    return jax.random.PRNGKey(np.random.randint(2**31 - 1))

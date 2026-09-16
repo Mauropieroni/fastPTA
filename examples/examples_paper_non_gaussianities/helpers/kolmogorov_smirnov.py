@@ -36,7 +36,9 @@ def _bootstrap_stat_chi2(n, df, scale):
     """
     sample = chi2.rvs(df, loc=0.0, scale=scale, size=n)
     estimated_scale = np.mean(sample) / df
-    return kolmogorov_smirnov_statistic_chi2(sample, df=df, scale=estimated_scale)
+    return kolmogorov_smirnov_statistic_chi2(
+        sample, df=df, scale=estimated_scale
+    )
 
 
 class KolmogorovSmirnovBootstrapCache:
@@ -78,7 +80,9 @@ class KolmogorovSmirnovBootstrapCache:
         """
         data = np.asarray(data)
         if data.shape[0] != self.n:
-            raise ValueError(f"Data length {data.shape[0]} does not match cache n={self.n}")
+            raise ValueError(
+                f"Data length {data.shape[0]} does not match cache n={self.n}"
+            )
 
         estimated_scale = np.mean(data) / self.df
         observed_stat = kolmogorov_smirnov_statistic_chi2(

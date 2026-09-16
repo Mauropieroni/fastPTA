@@ -1,4 +1,5 @@
 # Global imports
+import functools
 import jax
 import jax.numpy as jnp
 
@@ -192,6 +193,7 @@ def log_likelihood(signal_value, eigenvalues, noise_logdet, data_eigenbasis):
     return -jnp.sum(logdet + data_term)
 
 
+@functools.partial(jax.jit, static_argnames=("signal_model", "priors"))
 def log_posterior(
     signal_parameters,
     frequency,
@@ -203,7 +205,9 @@ def log_posterior(
 ):
     """
     Compute the logarithm of the posterior probability summing log likelihood
-    and prior.
+    and prior. Jitted with signal_model and priors static, so repeated eager
+    calls (e.g. from emcee, one per walker per step) hit the compiled cache
+    instead of re-dispatching through jax.scipy.stats every time.
 
     Parameters:
     -----------
@@ -237,10 +241,6 @@ def log_posterior(
         dict(zip(signal_model.parameter_names, signal_parameters))
     )
 
-    # If the prior is not finite, return -inf
-    if not jnp.isfinite(lp):
-        return -jnp.inf
-
     # Evaluate the signal model
     signal_value = signal_model.template(frequency, signal_parameters)
 
@@ -249,5 +249,5 @@ def log_posterior(
         signal_value, eigenvalues, noise_logdet, data_eigenbasis
     )
 
-    # Return log prior + log likelihood
-    return lp + log_lik
+    # Return log prior + log likelihood, or -inf if the prior is not finite
+    return jnp.where(jnp.isfinite(lp), lp + log_lik, -jnp.inf)

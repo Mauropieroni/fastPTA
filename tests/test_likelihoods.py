@@ -187,6 +187,22 @@ class TestLikelihoods(unittest.TestCase):
         )
         self.assertEqual(log_post_outside, -jnp.inf)
 
+        # log_posterior must be jax-traceable (jit and grad) for it to be
+        # usable with gradient-based blackjax samplers (e.g. nuts, hmc)
+        def f(parameters):
+            return likelihoods.log_posterior(
+                parameters,
+                self.frequency,
+                power_law_model,
+                eigenvalues,
+                noise_logdet,
+                data_eigenbasis,
+                self.priors,
+            )
+
+        self.assertAlmostEqual(jax.jit(f)(self.parameters), expected_value)
+        self.assertTrue(jnp.all(jnp.isfinite(jax.grad(f)(self.parameters))))
+
     def test_log_likelihood_full(self):
         """Test the log_likelihood_full function."""
         # Make a valid test case
