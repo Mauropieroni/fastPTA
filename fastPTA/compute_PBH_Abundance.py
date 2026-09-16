@@ -781,10 +781,11 @@ def build_f_PBH_interpolator(
     cache_path=None,
 ):
     """
-    Interpolator for f_PBH_NL_QCD_lognormal over (log10 amplitude, log10 width,
-    log10 pivot [Hz]) box, used to speed up the PBH abundance check in a sampler
-    (see Priors.evaluate_log_priors) instead of the exact, slower calculation.
-    log10(f_PBH) is interpolated on a grid precomputed with the exact function
+    Interpolator for f_PBH_NL_QCD_lognormal over a (log10 amplitude, log10
+    width, log10 pivot [Hz]) box, used to speed up the PBH abundance check
+    in a sampler (see Priors.evaluate_log_priors) instead of the exact,
+    slower calculation. log10(f_PBH) is interpolated on a grid precomputed
+    with the exact function's own (well-converged) integration settings,
     batched with jax.vmap in chunks of batch_size to bound peak memory.
 
     Parameters:
@@ -956,8 +957,10 @@ def get_PBH_abundance_from_interpolator(
     parameter_names, PBH_parameter_names, priors_dictionary, **kwargs
 ):
     """
-    Build an interpolator-backed (see build_f_PBH_interpolator) for the PBH
-    abundance function, which is a perfect replacement for get_PBH_abundance.
+    Build a fast, interpolator-backed PBH abundance function (see
+    build_f_PBH_interpolator) that is a drop-in replacement for an exact
+    get_PBH_abundance function: it takes the full parameter vector, like
+    the exact one, instead of just the 3 PBH-relevant values.
 
     Parameters:
     -----------
