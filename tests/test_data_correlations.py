@@ -1,9 +1,9 @@
 # Global
 import unittest
 
-import healpy as hp
 import jax
 import jax.numpy as jnp
+import jax_healpy as jhp
 import numpy as np
 
 # Local
@@ -18,8 +18,8 @@ jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
 
 nside = 64
-npix = hp.nside2npix(nside)
-theta, phi = hp.pix2ang(nside, jnp.arange(npix))
+npix = jhp.nside2npix(nside)
+theta, phi = jhp.pix2ang(nside, jnp.arange(npix))
 theta = jnp.array(theta)
 phi = jnp.array(phi)
 

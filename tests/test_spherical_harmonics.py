@@ -1,7 +1,10 @@
 # Global
+import functools
 import unittest
 
 import healpy as hp
+import jax
+import jax_healpy as jhp
 import numpy as np
 
 # Local
@@ -10,8 +13,8 @@ import utils as tu
 from fastPTA.angular_decomposition import spherical_harmonics as sph
 
 nside = 64
-npix = hp.nside2npix(nside)
-theta, phi = hp.pix2ang(nside, np.arange(npix))
+npix = jhp.nside2npix(nside)
+theta, phi = jhp.pix2ang(nside, np.arange(npix))
 
 
 class TestGetTensors(unittest.TestCase):
@@ -191,6 +194,72 @@ class TestGetTensors(unittest.TestCase):
         self.assertAlmostEqual(np.abs(res_Y3m3[9] - 1.0), 0.0, delta=1e-4)
         self.assertAlmostEqual(np.abs(res_Y3p3[15] - 1.0), 0.0, delta=1e-4)
 
+    def test_get_projection_matrix(self, nside=8, l_max=5):
+        """
+        Test the function precomputing the spherical harmonics projection
+        matrix used by spherical_harmonics_projection and
+        get_map_from_real_clms
+        """
+        npix = jhp.nside2npix(nside)
+        theta_n, phi_n = jhp.pix2ang(nside, np.arange(npix))
+        l_grid, m_grid, _, _, _ = sph.get_sort_indexes(l_max)
+
+        spherical_harmonics, spherical_harmonics_conj, weight = (
+            sph.get_projection_matrix(nside, l_max)
+        )
+
+        expected = sph.sph_harm_y(
+            l_grid[:, None], m_grid[:, None], theta_n[None, :], phi_n[None, :]
+        )
+
+        self.assertEqual(spherical_harmonics.shape, (len(l_grid), npix))
+        self.assertTrue(np.allclose(spherical_harmonics, expected))
+        self.assertTrue(
+            np.allclose(spherical_harmonics_conj, np.conj(expected))
+        )
+        self.assertTrue(np.allclose(weight, np.where(m_grid == 0, 1.0, 2.0)))
+
+    def test_spherical_harmonics_projection_matches_healpy(self, l_max=6):
+        """
+        Test that spherical_harmonics_projection matches, to machine
+        precision, healpy's own map2alm followed by complex_to_real_conversion
+        """
+        quantity = np.random.default_rng(0).normal(size=npix)
+
+        real_alm = sph.spherical_harmonics_projection(quantity, l_max)
+        real_alm_healpy = sph.complex_to_real_conversion(
+            hp.map2alm(quantity, lmax=l_max)
+        )
+
+        self.assertTrue(
+            np.allclose(real_alm, real_alm_healpy, rtol=1e-10, atol=1e-10)
+        )
+
+    def test_project_correlation_spherical_harmonics_batching(
+        self, l_max=3, n_pulsars=3
+    ):
+        """
+        Test that project_correlation_spherical_harmonics, applied to a batch
+        of pulsar-pair maps, agrees pair by pair with
+        spherical_harmonics_projection applied individually to each pair
+        """
+        quantity = np.random.default_rng(0).normal(size=(n_pulsars, npix))
+        quantity = quantity[:, None, :] * quantity[None, :, :]
+
+        real_alm = sph.project_correlation_spherical_harmonics(quantity, l_max)
+
+        self.assertEqual(
+            real_alm.shape,
+            (sph.get_n_coefficients_real(l_max), n_pulsars, n_pulsars),
+        )
+
+        for i in range(n_pulsars):
+            for j in range(n_pulsars):
+                expected = sph.spherical_harmonics_projection(
+                    quantity[i, j], l_max
+                )
+                self.assertTrue(np.allclose(real_alm[:, i, j], expected))
+
     def test_get_map_from_real_clms(self, nside=8, l_max=5):
         """
         Test the function returning the map from the real spherical harmonics
@@ -203,7 +272,7 @@ class TestGetTensors(unittest.TestCase):
             clms[i] += 1.0
             map_from_clms = sph.get_map_from_real_clms(clms, nside)
             cclms = sph.complex_to_real_conversion(
-                hp.map2alm(map_from_clms, lmax=l_max)
+                hp.map2alm(np.array(map_from_clms), lmax=l_max)
             )
 
             self.assertTrue(np.allclose(clms, cclms, rtol=1e-7, atol=1e-7))
@@ -380,6 +449,153 @@ class TestGetTensors(unittest.TestCase):
         self.assertAlmostEqual(dCL_neg[0], l0_val)
         self.assertAlmostEqual(dCL_neg[1], l1_val)
         self.assertAlmostEqual(dCL_neg[2], l2_val)
+
+    def test_jit_compatibility(self, l_max=5, nside_map=8):
+        """
+        Test that the functions rewritten in pure jax.numpy (no longer
+        touching numpy) can be wrapped in jax.jit and give results matching
+        their un-jitted counterparts to machine precision
+        """
+        rng = np.random.default_rng(0)
+
+        n_complex = sph.get_n_coefficients_complex(l_max)
+        complex_vals = rng.normal(size=n_complex) + 1j * rng.normal(
+            size=n_complex
+        )
+        _, m_grid, _, _, _ = sph.get_sort_indexes(l_max)
+        complex_vals[np.array(m_grid) == 0] = complex_vals[
+            np.array(m_grid) == 0
+        ].real
+
+        jit_complex_to_real = jax.jit(sph.complex_to_real_conversion)
+        self.assertTrue(
+            np.allclose(
+                jit_complex_to_real(complex_vals),
+                sph.complex_to_real_conversion(complex_vals),
+            )
+        )
+
+        n_real = sph.get_n_coefficients_real(l_max)
+        real_vals = rng.normal(size=n_real)
+
+        jit_real_to_complex = jax.jit(sph.real_to_complex_conversion)
+        self.assertTrue(
+            np.allclose(
+                jit_real_to_complex(real_vals),
+                sph.real_to_complex_conversion(real_vals),
+            )
+        )
+
+        npix_map = jhp.nside2npix(nside_map)
+        quantity = rng.normal(size=npix_map)
+
+        jit_projection = jax.jit(
+            functools.partial(sph.spherical_harmonics_projection, l_max=l_max)
+        )
+        self.assertTrue(
+            np.allclose(
+                jit_projection(quantity),
+                sph.spherical_harmonics_projection(quantity, l_max),
+                atol=1e-10,
+            )
+        )
+
+        clms_real = rng.normal(size=n_real)
+
+        jit_get_map = jax.jit(
+            functools.partial(
+                sph.get_map_from_real_clms, Nside=nside_map, l_max=l_max
+            )
+        )
+        self.assertTrue(
+            np.allclose(
+                jit_get_map(clms_real),
+                sph.get_map_from_real_clms(clms_real, nside_map, l_max),
+            )
+        )
+
+        dclms_real = rng.normal(size=n_real)
+
+        jit_CL = jax.jit(sph.get_CL_from_real_clm)
+        self.assertTrue(
+            np.allclose(jit_CL(clms_real), sph.get_CL_from_real_clm(clms_real))
+        )
+
+        jit_dCL = jax.jit(sph.get_dCL_from_real_clm)
+        self.assertTrue(
+            np.allclose(
+                jit_dCL(clms_real, dclms_real),
+                sph.get_dCL_from_real_clm(clms_real, dclms_real),
+            )
+        )
+
+    def test_get_Cl_limits(self, l_max=2, n_points=20000):
+        """
+        Test get_Cl_limits: shapes, reproducibility given a fixed seed, and
+        statistical (not exact, since this is a Monte Carlo estimator with
+        its own RNG stream) agreement against an independent numpy-based
+        Monte Carlo computation of the same quantity.
+        """
+        n_coeffs = sph.get_n_coefficients_real(l_max)
+        shape_params = 1
+        prior = 1.0
+
+        rng = np.random.default_rng(1)
+        means = np.zeros(n_coeffs)
+        std = 0.1 * (1.0 + rng.uniform(size=n_coeffs))
+        cov = np.diag(std**2)
+
+        Cl_limits, Cl_limits_prior = sph.get_Cl_limits(
+            0, means, cov, shape_params, n_points=n_points, prior=prior
+        )
+
+        self.assertEqual(Cl_limits.shape, (l_max,))
+        self.assertEqual(Cl_limits_prior.shape, (l_max,))
+        self.assertTrue(np.all(np.isfinite(Cl_limits)))
+
+        # Same seed -> identical result
+        Cl_limits_2, _ = sph.get_Cl_limits(
+            0, means, cov, shape_params, n_points=n_points, prior=prior
+        )
+        self.assertTrue(np.allclose(Cl_limits, Cl_limits_2))
+
+        # Different seed -> different (not degenerate) result
+        Cl_limits_3, _ = sph.get_Cl_limits(
+            1,
+            means,
+            cov,
+            shape_params,
+            n_points=n_points,
+            prior=prior,
+        )
+        self.assertFalse(np.allclose(Cl_limits, Cl_limits_3))
+
+        # Independent numpy Monte Carlo reference, replicating the same
+        # algorithm this function implements, with its own RNG stream
+        np_rng = np.random.default_rng(42)
+        data = np_rng.multivariate_normal(means, cov, n_points)
+        data_prior = data[
+            np.max(np.abs(data[:, shape_params:]), axis=-1) <= prior
+        ]
+        correlations_lm = np.array(
+            sph.get_CL_from_real_clm(data.T[shape_params - 1 :])
+        )[1:]
+        correlations_lm_prior = np.array(
+            sph.get_CL_from_real_clm(data_prior.T[shape_params - 1 :])
+        )[1:]
+        ref_Cl_limits = np.quantile(correlations_lm, 0.95, axis=-1)
+        ref_Cl_limits_prior = np.quantile(correlations_lm_prior, 0.95, axis=-1)
+
+        # Statistical (not exact) agreement: different RNG streams, so
+        # allow a generous tolerance set by Monte Carlo sampling noise
+        self.assertTrue(
+            np.allclose(Cl_limits, ref_Cl_limits, rtol=0.2, atol=1e-4)
+        )
+        self.assertTrue(
+            np.allclose(
+                Cl_limits_prior, ref_Cl_limits_prior, rtol=0.2, atol=1e-4
+            )
+        )
 
 
 if __name__ == "__main__":

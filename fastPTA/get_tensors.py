@@ -1,7 +1,7 @@
 # Global
-import healpy as hp
 import jax
 import jax.numpy as jnp
+import jax_healpy as jhp
 import numpy as np
 from scipy.integrate import simpson
 from scipy.special import legendre
@@ -332,7 +332,7 @@ def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
     """
 
     # Get the number of pixels
-    npix = hp.nside2npix(theta_k)
+    npix = jhp.nside2npix(theta_k)
 
     # spherical harmonis with shape (lm, pp)
     spherical_harmonics = spha.get_spherical_harmonics(l_max, theta_k, phi_k)
@@ -378,8 +378,8 @@ def get_correlations_lm_IJ(
     """
 
     # Given nside get a pixelization of the sky
-    npix = hp.nside2npix(nside)
-    theta_k, phi_k = hp.pix2ang(nside, jnp.arange(npix))
+    npix = jhp.nside2npix(nside)
+    theta_k, phi_k = jhp.pix2ang(nside, jnp.arange(npix))
     theta_k = jnp.array(theta_k)
     phi_k = jnp.array(phi_k)
 

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import shutil
 
-import healpy as hp
+import jax_healpy as jhp
 import numpy as np
 from scipy.stats import kstest
 
@@ -131,7 +131,7 @@ def setup_pta(npulsars, nside, fcenter, integrate_HD_numerically=False):
     Returns a dict with: p_vec, theta_k, phi_k, r_p, r_c, gamma, w_mat,
     npix.
     """
-    npix = hp.nside2npix(nside)
+    npix = jhp.nside2npix(nside)
     p_vec, cos_IJ, distances, theta_k, phi_k = (
         gd.generate_pulsar_sky_and_kpixels(npulsars, Nside=nside)
     )
@@ -193,13 +193,17 @@ def build_patch_response_matrices(p_vec, angular_patch, nside, rng):
 
     Returns (R_p_patch, R_c_patch, W_patch) all in numpy.
     """
-    npix = hp.nside2npix(nside)
+    npix = jhp.nside2npix(nside)
     pk = np.zeros((len(p_vec), npix), dtype=float)
     for i in range(len(p_vec)):
-        disc = hp.query_disc(
-            nside=nside, vec=np.asarray(p_vec[i]), radius=float(angular_patch)
+        disc = np.asarray(
+            jhp.query_disc(
+                nside=nside,
+                vec=np.asarray(p_vec[i]),
+                radius=float(angular_patch),
+            )
         )
-        pk[i, disc] = 1.0
+        pk[i, disc[disc < npix]] = 1.0
 
     phase_p = rng.uniform(0.0, 2 * np.pi, size=(len(p_vec), npix))
     phase_c = rng.uniform(0.0, 2 * np.pi, size=(len(p_vec), npix))
@@ -557,9 +561,9 @@ def pick_source_pixels_real(r_p, r_c, ns, nside, min_sep_deg=30):
         powers[~available] = -1
         pix = int(np.argmax(powers))
         chosen.append(pix)
-        vec_chosen = np.array(hp.pix2vec(nside, pix))
+        vec_chosen = np.array(jhp.pix2vec(nside, pix))
         for p in range(len(available)):
-            vec_p = np.array(hp.pix2vec(nside, p))
+            vec_p = np.array(jhp.pix2vec(nside, p))
             if np.dot(vec_chosen, vec_p) > cos_min_sep:
                 available[p] = False
     return chosen
@@ -576,11 +580,11 @@ def pick_source_pixels_patch(p_vec, ns, nside, min_sep_deg=20):
     for i, pvec in enumerate(p_vec):
         if i in used_pulsars:
             continue
-        pix = hp.vec2pix(nside, *pvec)
+        pix = jhp.vec2pix(nside, *pvec)
         too_close = False
-        vec_candidate = np.array(hp.pix2vec(nside, pix))
+        vec_candidate = np.array(jhp.pix2vec(nside, pix))
         for prev_pix in chosen:
-            vec_prev = np.array(hp.pix2vec(nside, prev_pix))
+            vec_prev = np.array(jhp.pix2vec(nside, prev_pix))
             if np.dot(vec_candidate, vec_prev) > cos_min_sep:
                 too_close = True
                 break

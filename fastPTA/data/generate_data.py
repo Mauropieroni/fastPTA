@@ -1,8 +1,8 @@
 # Global imports
 import os
-import healpy as hp
 import jax
 import jax.numpy as jnp
+import jax_healpy as jhp
 import numpy as np
 
 # Local imports
@@ -82,17 +82,17 @@ def generate_pulsar_sky_and_kpixels(
     """
 
     # Get the number of pixels in the HEALPix map
-    Npix = hp.nside2npix(Nside)
+    Npix = jhp.nside2npix(Nside)
 
     # Generate the k-pixels theta_k and phi_k, polar and azimuthal angles
-    theta_k, phi_k = hp.pix2ang(Nside, np.arange(Npix))
+    theta_k, phi_k = jhp.pix2ang(Nside, np.arange(Npix))
 
     # Generate pulsar sky positions in Cartesian coordinates
     theta = jnp.arccos(np.random.uniform(-1.0, 1.0, Np))
     phi = jnp.array(np.random.uniform(0.0, 2.0 * jnp.pi, Np))
 
     # Convert spherical coordinates to Cartesian coordinates
-    p_vec = jnp.array(hp.ang2vec(theta, phi))
+    p_vec = jnp.array(jhp.ang2vec(theta, phi))
 
     # Calculate the cosine of the angle between pulsar pairs
     cos_IJ = jnp.dot(p_vec, p_vec.T)

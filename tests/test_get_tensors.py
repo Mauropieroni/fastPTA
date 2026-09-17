@@ -1,9 +1,9 @@
 # Global
 import unittest
 
-import healpy as hp
 import jax
 import jax.numpy as jnp
+import jax_healpy as jhp
 import numpy as np
 
 # Local
@@ -19,8 +19,8 @@ jax.config.update("jax_default_device", jax.devices(ut.which_device)[0])
 
 
 nside = 64
-npix = hp.nside2npix(nside)
-theta, phi = hp.pix2ang(nside, jnp.arange(npix))
+npix = jhp.nside2npix(nside)
+theta, phi = jhp.pix2ang(nside, jnp.arange(npix))
 theta = jnp.array(theta)
 phi = jnp.array(phi)
 
@@ -88,7 +88,7 @@ class TestGetTensors(unittest.TestCase):
 
         npoints = 10
 
-        theta, phi = hp.pix2ang(
+        theta, phi = jhp.pix2ang(
             nside, np.linspace(0, npix - 1, npoints, dtype=int)
         )
 
@@ -124,10 +124,10 @@ class TestGetTensors(unittest.TestCase):
         nside = 32
         npixels = 35
 
-        npix = hp.nside2npix(nside)
+        npix = jhp.nside2npix(nside)
         pixels = np.linspace(0, npix - 1, npixels, dtype=int)
-        p_I = jnp.array(hp.pix2vec(nside, pixels))
-        GammalmIJ = gt.get_correlations_lm_IJ(p_I.T, l_max, nside)
+        p_I = jnp.array(jhp.pix2vec(nside, pixels))
+        GammalmIJ = gt.get_correlations_lm_IJ(p_I, l_max, nside)
 
         data = np.load(tu.get_correlations_lm_IJ_data_path)["data"]
 

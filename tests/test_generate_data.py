@@ -1,9 +1,9 @@
 # Global imports
 import unittest
 
-import healpy as hp
 import jax
 import jax.numpy as jnp
+import jax_healpy as jhp
 import numpy as np
 
 # Local imports
@@ -80,14 +80,14 @@ class TestGenerateData(unittest.TestCase):
         self.assertTrue(jnp.all(distance > 0))
 
         # Check that number of k-pixels is correct
-        npix = hp.nside2npix(NSIDE)
+        npix = jhp.nside2npix(NSIDE)
         self.assertEqual(len(theta_k), npix)
         self.assertEqual(len(phi_k), npix)
 
     def test_generate_hpc_polarization_pixel_frequency(self):
         """Test the generation of GW signal in pixel and frequency space"""
         # Create a test spectrum (constant for simplicity)
-        npix = hp.nside2npix(NSIDE)
+        npix = jhp.nside2npix(NSIDE)
         nfreq = len(FREQUENCIES)
         H_p_ff = jnp.ones((npix, nfreq)) * 1e-30  # Small constant value
 
@@ -103,7 +103,7 @@ class TestGenerateData(unittest.TestCase):
     def test_generate_D_IJ(self):
         """Test the generation of pulsar-pulsar correlation matrix D_IJ"""
         # Create a test spectrum (constant for simplicity)
-        npix = hp.nside2npix(NSIDE)
+        npix = jhp.nside2npix(NSIDE)
         nfreq = len(FREQUENCIES)
         H_p_fi = jnp.ones((npix, nfreq)) * 1e-30  # Small constant value
 
@@ -130,7 +130,7 @@ class TestGenerateData(unittest.TestCase):
         # Create test frequencies and spectrum
         fi = FREQUENCIES[:5]  # External frequencies (shorter)
         ff = FREQUENCIES  # Internal frequencies (full)
-        npix = hp.nside2npix(NSIDE)
+        npix = jhp.nside2npix(NSIDE)
         H_p_ff = jnp.ones((npix, len(ff))) * 1e-30  # Small constant value
 
         # Generate the correlation matrix
@@ -156,7 +156,7 @@ class TestGenerateData(unittest.TestCase):
         # Create test frequencies and spectrum
         fi = FREQUENCIES[:5]  # External frequencies (shorter)
         ff = FREQUENCIES  # Internal frequencies (full)
-        npix = hp.nside2npix(NSIDE)
+        npix = jhp.nside2npix(NSIDE)
         H_p_ff = jnp.ones((npix, len(ff))) * 1e-30  # Small constant value
 
         # Generate the correlation matrix

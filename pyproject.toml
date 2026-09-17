@@ -23,6 +23,7 @@ dependencies = [
     "jax>=0.4.25,<=0.10.2",
     "jaxlib<=0.10.2",
     "healpy>=1.16.6",
+    "jax-healpy>=0.7.1",
     "typing_extensions>=4.10.0; python_version == '3.11'",
     "matplotlib>=3.7.4",
     "tqdm>=4.64.1",
