@@ -300,7 +300,9 @@ def get_correlations_lm_IJ_spherical_harmonics_basis(p_I, l_max, gamma_pq):
     return correlations_lm * (1 + np.eye(len(p_I)))[None, ...]
 
 
-def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
+def get_correlations_lm_IJ_sqrt_basis(
+    p_I, l_max, theta_k, phi_k, gamma_pq, npix
+):
     """
     Compute the correlations in sqrt basis for a given pulsar catalog. The
     correlations are computed up to a maximum ell value l_max and for a given
@@ -321,6 +323,13 @@ def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
         3D array of gamma values computed for all pulsar pairs and pixels.
         The shape should be (N, N, pp), where N is the number of pulsars and
         pp is the number of pixels
+    npix : int
+        Total number of HEALPix pixels for the sky pixelization theta_k and
+        phi_k were built from (healpy.nside2npix(nside)). Passed in rather
+        than inferred from theta_k.shape, since the per-pixel solid angle
+        (4*pi / npix) below is only correct for the full-sky pixel count,
+        not the number of entries in theta_k/phi_k if those were ever a
+        masked/patch subset of the sky.
 
     Returns:
     --------
@@ -331,11 +340,10 @@ def get_correlations_lm_IJ_sqrt_basis(p_I, l_max, theta_k, phi_k, gamma_pq):
 
     """
 
-    # Get the number of pixels
-    npix = jhp.nside2npix(theta_k)
-
-    # spherical harmonis with shape (lm, pp)
-    spherical_harmonics = spha.get_spherical_harmonics(l_max, theta_k, phi_k)
+    # spherical harmonics with shape (lm, pp)
+    spherical_harmonics = spha.get_real_spherical_harmonics(
+        l_max, theta_k, phi_k
+    )
 
     # Quadratic spherical_harmonics basis with shape (lm, lm, pp)
     quadratic = spherical_harmonics[:, None] * spherical_harmonics[None, :]
@@ -397,7 +405,7 @@ def get_correlations_lm_IJ(
 
     elif lm_basis.lower() == "sqrt_basis":
         correlations_lm_IJ = get_correlations_lm_IJ_sqrt_basis(
-            p_I, l_max, theta_k, phi_k, gamma_pq
+            p_I, l_max, theta_k, phi_k, gamma_pq, npix
         )
 
     # return the correlations
